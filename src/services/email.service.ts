@@ -6,6 +6,8 @@ import { config } from "dotenv";
 import { render } from '@react-email/render';
 import VerificationCodeTemplate from '../templates/email/verification-code-template';
 import InternalInviteTemplate from '../templates/email/internal-invite-template';
+import AccountDeactivationTemplate from '../templates/email/account-deactivation-template';
+import AccountReactivationTemplate from '../templates/email/account-reactivation-template';
 
 config({
   path: ".env.local"
@@ -151,7 +153,7 @@ export class EmailService {
   async sendInternalInviteEmail(params: { email: string; inviteUrl: string; role: 'super-admin' | 'admin' | 'member' }): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
       const html = await render(
-        InternalInviteTemplate({ role: params.role, inviteUrl: params.inviteUrl })
+        InternalInviteTemplate({ role: params.role, inviteUrl: params.inviteUrl, firstName: "" })
       );
 
       const result = await this.resend.emails.send({
@@ -170,6 +172,61 @@ export class EmailService {
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       logger.error('Error sending internal invitation email:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async sendAccountDeactivationEmail(params: { email: string; firstName?: string }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const html = await render(
+        AccountDeactivationTemplate({ firstName: params.firstName || '' })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || 'Melanin Kapital <nore@melaninkapital.com>',
+        to: [params.email],
+        subject: 'Your Melanin Kapital Account Has Been Deactivated',
+        html,
+      });
+
+      if (result.error) {
+        logger.error('Failed to send account deactivation email:', result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`Account deactivation email sent to ${params.email}`, { messageId: result.data?.id });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error('Error sending account deactivation email:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async sendAccountReactivationEmail(params: { email: string; firstName?: string; loginUrl?: string }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const html = await render(
+        AccountReactivationTemplate({ 
+          firstName: params.firstName || '',
+          loginUrl: params.loginUrl || `${process.env.APP_URL?.replace(/\/$/, '') || ''}/login`
+        })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || 'Melanin Kapital <nore@melaninkapital.com>',
+        to: [params.email],
+        subject: 'Your Melanin Kapital Account Has Been Reactivated',
+        html,
+      });
+
+      if (result.error) {
+        logger.error('Failed to send account reactivation email:', result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`Account reactivation email sent to ${params.email}`, { messageId: result.data?.id });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error('Error sending account reactivation email:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }

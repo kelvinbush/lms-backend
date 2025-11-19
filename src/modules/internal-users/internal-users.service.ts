@@ -8,6 +8,7 @@ import {
 } from "../../db/schema";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import type { InternalUsersModel } from "./internal-users.model";
+import { emailService } from "../../services/email.service";
 
 export class InternalUsersService {
   static async requireSuperAdminOrThrow(clerkUserId: string) {
@@ -390,6 +391,29 @@ export class InternalUsersService {
         await clerkClient.sessions.revokeSession(s.id);
       }
     } catch {}
+
+    // Send deactivation email non-blocking
+    // Fetch user data in a single DB lookup to get both email and firstName
+    db.query.users
+      .findFirst({
+        where: eq(users.clerkId, params.clerkUserId),
+      })
+      .then((user) => {
+        if (user?.email) {
+          emailService
+            .sendAccountDeactivationEmail({
+              email: user.email,
+              firstName: user.firstName || undefined,
+            })
+            .catch((error) => {
+              logger.error("Failed to send deactivation email:", error);
+            });
+        }
+      })
+      .catch((error) => {
+        logger.error("Failed to fetch user for deactivation email:", error);
+      });
+
     return { success: true };
   }
 
@@ -416,6 +440,29 @@ export class InternalUsersService {
   }): Promise<InternalUsersModel.BasicSuccessResponse> {
     // Unlock the user account in Clerk
     await clerkClient.users.unlockUser(params.clerkUserId as any);
+
+    // Send reactivation email non-blocking
+    // Fetch user data in a single DB lookup to get both email and firstName
+    db.query.users
+      .findFirst({
+        where: eq(users.clerkId, params.clerkUserId),
+      })
+      .then((user) => {
+        if (user?.email) {
+          emailService
+            .sendAccountReactivationEmail({
+              email: user.email,
+              firstName: user.firstName || undefined,
+            })
+            .catch((error) => {
+              logger.error("Failed to send reactivation email:", error);
+            });
+        }
+      })
+      .catch((error) => {
+        logger.error("Failed to fetch user for reactivation email:", error);
+      });
+
     return { success: true };
   }
 }
