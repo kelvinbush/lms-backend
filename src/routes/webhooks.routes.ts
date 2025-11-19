@@ -1,16 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { docuSignService, type DocuSignWebhookEvent } from "../services/docusign.service";
-import { db } from "../db";
-import { users, internalInvitations } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
 import { logger } from "../utils/logger";
 import { verifyClerkWebhook } from "../utils/webhook.utils";
-import { extractEmailUpdateFromWebhook, extractUserDataFromWebhook } from "../modules/user/user.utils";
-import { sendWelcomeEmail } from "../utils/email.utils";
-import { User } from "../modules/user/user.service";
-import { emailService } from "../services/email.service";
-import { UserDeletionService } from "../services/user-deletion.service";
 import { DocuSignWebhookService } from "../services/docusign-webhook.service";
+import { ClerkWebhookService } from "../services/clerk-webhook.service";
 
 export async function webhookRoutes(fastify: FastifyInstance) {
   // DocuSign webhook endpoint
@@ -68,6 +61,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
     { config: { rawBody: true } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
+        // Verify webhook signature
         const body: any = (request as any).rawBody || request.body;
         const headers = {
           "svix-id": (request.headers["svix-id"] as string) || undefined,
@@ -83,195 +77,32 @@ export async function webhookRoutes(fastify: FastifyInstance) {
           });
         }
 
+        // Route event to appropriate handler
         const { event } = webhookResult;
-        const { type } = event!;
-
-        if (type === "user.created") {
-          try {
-            logger.info("[WEBHOOK user.created] received", {
-              clerkId: (event as any)?.data?.id,
-              primaryEmailId: (event as any)?.data?.primary_email_address_id,
-              publicMeta: (event as any)?.data?.public_metadata,
-              unsafeMetaKeys: Object.keys((event as any)?.data?.unsafe_metadata || {}),
-            });
-          } catch {}
-          const userDataResult = extractUserDataFromWebhook(event!);
-          if (!userDataResult.success) {
-            logger.warn("[WEBHOOK user.created] extraction failed", {
-              error: userDataResult.error?.message,
-              missing: userDataResult.missingFields,
-            });
-            return reply.code(400).send({
-              error:
-                userDataResult.error?.message ||
-                `Missing required fields: ${userDataResult.missingFields?.join(", ")}`,
-              code: userDataResult.error?.code || "INVALID_METADATA",
-            });
-          }
-
-          let userResult;
-          try {
-            userResult = await User.signUp(userDataResult.userData!);
-            logger.info("[WEBHOOK user.created] local user created", {
-              email: userDataResult.userData!.email,
-              clerkId: userDataResult.userData!.clerkId,
-            });
-          } catch (e: any) {
-            logger.error("[WEBHOOK user.created] local user creation failed", {
-              email: userDataResult.userData!.email,
-              error: e?.message,
-            });
-            throw e;
-          }
-
-          // Determine internal invite + role from public metadata
-          const publicMeta: any = (event as any)?.data?.public_metadata || (event as any)?.data?.publicMeta;
-          const isInternal: boolean = publicMeta?.internal === true;
-          const invitedRole: string | undefined = publicMeta?.role;
-
-          logger.info("[WEBHOOK user.created]", {
-            email: userDataResult.userData!.email,
-            clerkId: userDataResult.userData!.clerkId,
-            isInternal,
-            invitedRole,
+        if (!event) {
+          return reply.code(400).send({
+            error: "Missing event in webhook payload",
+            code: "MISSING_EVENT",
           });
+        }
 
-          // If role present, mirror into local users table
-          try {
-            const u = await User.findByEmail(userDataResult.userData!.email);
-            if (u && invitedRole) {
-              await db.update(users).set({ role: invitedRole, updatedAt: new Date() }).where(eq(users.id, u.id));
-              logger.info("[WEBHOOK user.created] role mirrored to local user", { email: u.email, role: invitedRole });
-            }
-          } catch (e: any) {
-            logger.error("[WEBHOOK user.created] role mirror failed", { error: e?.message });
-          }
-          // Send welcome email async (non-blocking)
-          sendWelcomeEmail(
-            userDataResult.userData!.firstName,
-            userDataResult.userData!.email,
-          ).catch((error) => {
-            logger.error("Unhandled error sending welcome email:", error);
+        const result = await ClerkWebhookService.handleWebhookEvent(event);
+
+        // Handle response based on result
+        if (!result.success) {
+          const statusCode = result.error?.code?.includes("EXTRACTION") || result.error?.code?.includes("INVALID")
+            ? 400
+            : 500;
+          return reply.code(statusCode).send({
+            error: result.error?.message || "Failed to process webhook",
+            code: result.error?.code || "WEBHOOK_HANDLER_ERROR",
           });
-
-          // For internal users, skip phone OTP; otherwise send if user exists
-          if (!isInternal) {
-            const user = await User.findByEmail(userDataResult.userData!.email);
-            if (user) {
-              User.sendPhoneVerificationOtp(user.clerkId).catch((error) => {
-                logger.error("Unhandled error sending phone verification OTP:", error);
-              });
-            }
-          }
-
-          return reply.send(userResult);
         }
 
-        if (type === "user.updated") {
-          const updateInfo = extractEmailUpdateFromWebhook(event!);
-          if (!updateInfo.success) {
-            return reply.code(400).send({
-              error: updateInfo.error?.message || "Invalid webhook payload",
-              code: updateInfo.error?.code || "EMAIL_UPDATE_EXTRACTION_FAILED",
-            });
-          }
-
-          const updateResult = await User.updateEmail(
-            updateInfo.clerkId!,
-            updateInfo.email!,
-          );
-          return reply.send(updateResult);
-        }
-
-        if (type === "email.created") {
-          try {
-            const payload: any = event?.data || {};
-            const toEmail: string | undefined = payload?.to_email_address;
-
-            // Branch A: Verification code emails (existing behavior)
-            const code: string | undefined = payload?.data?.otp_code;
-            if (code && toEmail) {
-              let firstName = "";
-              try {
-                const user = await User.findByEmail(toEmail);
-                if (!user) {
-                  logger.warn("User not found by email for firstName; proceeding without it", { toEmail });
-                } else if (user.firstName) {
-                  firstName = user.firstName;
-                }
-              } catch (e) {
-                logger.warn("Lookup errored; proceeding without firstName", { toEmail, error: e instanceof Error ? e.message : e });
-              }
-
-              const sendResult = await emailService.sendVerificationCodeEmail({
-                firstName,
-                email: toEmail,
-                code,
-              });
-
-              if (!sendResult.success) {
-                logger.error("Failed to dispatch verification email", { toEmail, error: sendResult.error });
-                return reply.code(500).send({ error: "EMAIL_SEND_FAILED" });
-              }
-
-              return reply.send({ received: true, messageId: sendResult.messageId });
-            }
-
-            // Branch B: Invitation emails — send our custom invite email with __clerk_ticket link
-            // Attempt to extract the invitation CTA URL Clerk includes (name may vary by template)
-            const inviteUrl: string | undefined = payload?.data?.action_url || payload?.data?.url || payload?.data?.links?.[0]?.url;
-            if (toEmail && inviteUrl) {
-              logger.info("[WEBHOOK email.created] invitation email detected", { toEmail, inviteUrlPresent: !!inviteUrl });
-              // Find latest pending internal invitation to get the intended role
-              const record = await db.query.internalInvitations.findFirst({
-                where: eq(internalInvitations.email, toEmail),
-                orderBy: desc(internalInvitations.createdAt),
-              });
-
-              const role: 'super-admin' | 'admin' | 'member' = (record?.role as any) || 'member';
-              logger.info("[WEBHOOK email.created] sending custom invite", { toEmail, role });
-              const sendInvite = await emailService.sendInternalInviteEmail({ email: toEmail, inviteUrl, role });
-              if (!sendInvite.success) {
-                logger.error("Failed to send custom internal invite email", { toEmail, error: sendInvite.error });
-                return reply.code(500).send({ error: "INVITE_EMAIL_SEND_FAILED" });
-              }
-
-              return reply.send({ received: true, messageId: sendInvite.messageId });
-            }
-
-            // If neither OTP nor invitation URL present, ignore
-            logger.warn("email.created payload not recognized (no otp_code or invite url)", { hasEmail: !!toEmail });
-            return reply.code(200).send({ received: true, ignored: true });
-          } catch (e) {
-            logger.error("Unexpected error handling email.created", e);
-            return reply.code(500).send({ error: "INTERNAL_ERROR" });
-          }
-        }
-
-        if (type === "user.deleted") {
-          try {
-            const clerkId: string | undefined = event?.data?.id;
-
-            if (!clerkId) {
-              logger.warn("user.deleted event missing clerk user ID");
-              return reply.code(200).send({ received: true, ignored: true });
-            }
-
-            logger.info("Processing user.deleted event", { clerkId });
-            await UserDeletionService.deleteUserAndAllRelatedData(clerkId);
-            return reply.send({ received: true, deleted: true });
-          } catch (e) {
-            logger.error("Unexpected error handling user.deleted", e);
-            return reply.code(500).send({ error: "USER_DELETION_FAILED" });
-          }
-        }
-
-        return reply
-          .code(200)
-          .send({ received: true, ignored: true, type });
+        return reply.send(result.data || { received: true });
       } catch (err) {
         logger.error("Unexpected error while handling Clerk webhook:", err);
-        return reply.code(400).send({
+        return reply.code(500).send({
           error: "Unexpected error while handling Clerk webhook",
           code: "UNEXPECTED_ERROR",
         });

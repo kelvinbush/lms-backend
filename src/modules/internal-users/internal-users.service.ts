@@ -2,7 +2,7 @@ import { clerkClient } from "@clerk/fastify";
 import { logger } from "../../utils/logger";
 import { db } from "../../db";
 import { internalInvitations, internalInvitationStatusEnum, users } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull, isNull } from "drizzle-orm";
 import type { InternalUsersModel } from "./internal-users.model";
 
 export class InternalUsersService {
@@ -68,7 +68,9 @@ export class InternalUsersService {
     });
 
     // Existing local users with a role (internal)
-    const localUsers = await db.query.users.findMany({});
+    const localUsers = await db.query.users.findMany({
+      where: isNotNull(users.deletedAt)
+    });
 
     const items: InternalUsersModel.ListedUserItem[] = [];
 
