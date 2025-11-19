@@ -132,15 +132,19 @@ export class ClerkWebhookService {
       // Wait for all operations to complete
       await Promise.allSettled(operations);
 
-      // Send welcome email async (non-blocking)
-      sendWelcomeEmail(userDataResult.userData!.firstName, userDataResult.userData!.email).catch((error) => {
-        logger.error("Unhandled error sending welcome email:", error);
-      });
-
-      // Send phone OTP for non-internal users (async, non-blocking)
+      // Send welcome email and phone OTP for non-internal users (async, non-blocking)
+      // Using Promise.allSettled to run in parallel without blocking on errors
       if (!isInternal) {
-        User.sendPhoneVerificationOtp(user.clerkId).catch((error) => {
-          logger.error("Unhandled error sending phone verification OTP:", error);
+        Promise.allSettled([
+          sendWelcomeEmail(userDataResult.userData!.firstName, userDataResult.userData!.email),
+          User.sendPhoneVerificationOtp(user.clerkId),
+        ]).then((results) => {
+          results.forEach((result, index) => {
+            if (result.status === "rejected") {
+              const operation = index === 0 ? "welcome email" : "phone verification OTP";
+              logger.error(`Unhandled error sending ${operation}:`, result.reason);
+            }
+          });
         });
       }
 

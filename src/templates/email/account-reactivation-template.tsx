@@ -2,46 +2,42 @@ import * as React from 'react';
 import { BaseTemplate } from './base-template';
 import { Text, Button, Section } from '@react-email/components';
 
-interface InternalInviteTemplateProps {
-  role: 'super-admin' | 'admin' | 'member';
-  inviteUrl: string;
+interface AccountReactivationTemplateProps {
   firstName: string;
+  loginUrl: string;
 }
 
-export default function InternalInviteTemplate({ role, inviteUrl, firstName }: InternalInviteTemplateProps) {
+export default function AccountReactivationTemplate({ firstName, loginUrl }: AccountReactivationTemplateProps) {
   return (
     <BaseTemplate
-      previewText={`Welcome to Melanin Kapital`}
-      title={`You're invited as ${role}`}
+      previewText={`Your account has been reactivated`}
+      title={`Account Reactivation Notice`}
       firstName={firstName}
     >
       <Text style={paragraph}>
-        Welcome to Melanin Kapital! An account has been created for you on our platform. We're excited to have you on board.
+        We're pleased to inform you that your Melanin Kapital account has been successfully <span style={boldText}>reactivated</span>. 
+        You can now log in and resume using the platform without any restrictions.
       </Text>
 
-      <Text style={nextStepLabel}>
-        <span style={lightbulbIcon}>💡</span> Your Next Step:
-      </Text>
-      
       <Text style={paragraph}>
-        To activate your account and access the platform, click the button below to set your password.
+        Click the button below to log in to your account.
       </Text>
 
       <Section style={buttonSection}>
-        <Button style={button} href={inviteUrl}>
-          <span style={buttonIcon}>👆</span> Complete Account Setup
+        <Button style={button} href={loginUrl}>
+          <span style={buttonIcon}>🔑</span> Log In
         </Button>
       </Section>
-
-      <Text style={securityNotice}>
-        For security reasons, this link will expire in <span style={boldText}>72 hours</span>.
-      </Text>
 
       <Text style={supportText}>
         If you have any questions or need assistance, feel free to reach out to us at{' '}
         <a href="mailto:support@melaninkapital.com" style={link}>support@melaninkapital.com</a>
         {' '}or{' '}
         <a href="tel:+254703680991" style={link}>+254 703 680 991</a>
+      </Text>
+
+      <Text style={paragraph}>
+        We're glad to have you back!
       </Text>
 
       <Text style={closing}>
@@ -61,17 +57,8 @@ const paragraph = {
   fontWeight: '400',
 };
 
-const nextStepLabel = {
-  fontSize: '16px',
+const boldText = {
   fontWeight: '500',
-  color: '#151F28',
-  margin: '0 0 10px 0',
-  padding: '0',
-};
-
-const lightbulbIcon = {
-  marginRight: '8px',
-  fontSize: '16px',
 };
 
 const buttonSection = {
@@ -96,18 +83,6 @@ const buttonIcon = {
   fontSize: '16px',
 };
 
-const securityNotice = {
-  fontSize: '14px',
-  lineHeight: '1.6',
-  color: '#444C53',
-  margin: '20px 0',
-  fontWeight: '400',
-};
-
-const boldText = {
-  fontWeight: '500',
-};
-
 const supportText = {
   fontSize: '16px',
   lineHeight: '1.6',
@@ -128,5 +103,4 @@ const closing = {
   margin: '30px 0 0 0',
   fontWeight: '400',
 };
-
 

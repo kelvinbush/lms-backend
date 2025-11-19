@@ -40,10 +40,6 @@ export const BaseTemplate = ({
     <Html>
       <Head>
         <style>{`
-          .social-icon {
-            display: inline-block;
-            margin: 0 5px;
-          }
           @media (prefers-color-scheme: dark) {
             .social-icon img {
               filter: brightness(0) invert(1);
@@ -78,42 +74,34 @@ export const BaseTemplate = ({
           <Section style={footer}>
             {/* Social media icons */}
             <Section style={socialSection}>
-              <div className="social-icon">
-                <Link href="https://www.facebook.com/MelaninKapital/" style={socialLink}>
-                  <Img
-                    src="https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jLYEnXGXjU2OF53aB9PrCHtxwbNlZyf47nXIo1"
-                    alt="Facebook"
-                    style={socialIcon}
-                  />
-                </Link>
-              </div>
-              <div className="social-icon">
-                <Link href="https://www.instagram.com/melaninkapital/?__d=1" style={socialLink}>
-                  <Img
-                    src="https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jL0qNIjdO5GwlgmOu27Li9VbzJxrfDeIFNkcvs"
-                    alt="Instagram"
-                    style={socialIcon}
-                  />
-                </Link>
-              </div>
-              <div className="social-icon">
-                <Link href="https://www.linkedin.com/company/melaninkapital/mycompany/?viewAsMember=true" style={socialLink}>
-                  <Img
-                    src="https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jLDIGcJzmLUeVBpSYWqgsFti4nwPudk2hly6rv"
-                    alt="LinkedIn"
-                    style={socialIcon}
-                  />
-                </Link>
-              </div>
-              <div className="social-icon">
-                <Link href="https://twitter.com/MelaninKapital" style={socialLink}>
-                  <Img
-                    src="https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jLU1pjEXnnMtilx8uJwjYCHPm4zGDrRo9UyaOW"
-                    alt="Twitter"
-                    style={socialIcon}
-                  />
-                </Link>
-              </div>
+              <Link href="https://www.facebook.com/MelaninKapital/" style={socialLink}>
+                <Img
+                  src="https://cdn.simpleicons.org/facebook/444C53"
+                  alt="Facebook"
+                  style={socialIcon}
+                />
+              </Link>
+              <Link href="https://www.instagram.com/melaninkapital/?__d=1" style={socialLink}>
+                <Img
+                  src="https://cdn.simpleicons.org/instagram/444C53"
+                  alt="Instagram"
+                  style={socialIcon}
+                />
+              </Link>
+              <Link href="https://www.linkedin.com/company/melaninkapital/mycompany/?viewAsMember=true" style={socialLink}>
+                <Img
+                  src="https://cdn.simpleicons.org/linkedin/444C53"
+                  alt="LinkedIn"
+                  style={socialIcon}
+                />
+              </Link>
+              <Link href="https://twitter.com/MelaninKapital" style={socialLink}>
+                <Img
+                  src="https://cdn.simpleicons.org/x/444C53"
+                  alt="X (Twitter)"
+                  style={socialIcon}
+                />
+              </Link>
             </Section>
 
             <Text style={address}>
@@ -190,29 +178,26 @@ const greeting = {
 const footer = {
   padding: '20px',
   textAlign: 'center' as const,
-  backgroundColor: '#E8E9EA',
 };
 
 const socialSection = {
   margin: '0 auto 20px auto',
-  maxWidth: '320px',
-  display: 'flex',
-  justifyContent: 'center',
-  gap: '10px',
+  textAlign: 'center' as const,
 };
 
 const socialLink = {
   textDecoration: 'none',
+  display: 'inline-block',
+  margin: '0 8px',
+  verticalAlign: 'middle',
 };
 
 const socialIcon = {
-  width: '40px',
-  height: '40px',
-  backgroundColor: '#0C1116',
-  borderRadius: '50%',
-  padding: '8px',
+  width: '24px',
+  height: '24px',
   display: 'block',
   border: '0',
+  opacity: '0.7',
 };
 
 const address = {

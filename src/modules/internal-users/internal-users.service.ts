@@ -210,6 +210,8 @@ export class InternalUsersService {
       status: "pending" as const,
       invitationId: inv.clerkInvitationId || inv.id,
       role: inv.role as InternalUsersModel.Role,
+      createdAt: inv.createdAt?.toISOString(),
+      updatedAt: inv.updatedAt?.toISOString(),
     }));
   }
 
@@ -236,6 +238,8 @@ export class InternalUsersService {
         role: user.role as InternalUsersModel.Role,
         status: clerkStatus.isActive ? ("active" as const) : ("inactive" as const),
         clerkId: user.clerkId,
+        createdAt: user.createdAt?.toISOString(),
+        updatedAt: user.updatedAt?.toISOString(),
       };
     });
   }

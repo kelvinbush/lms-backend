@@ -40,6 +40,8 @@ export namespace InternalUsersModel {
     status: 'pending' | 'active' | 'inactive';
     clerkId?: string;
     invitationId?: string;
+    createdAt?: string;
+    updatedAt?: string;
   }
 
   export const ListedUserItemSchema = {
@@ -53,6 +55,8 @@ export namespace InternalUsersModel {
       status: { type: 'string', enum: ['pending','active','inactive'] },
       clerkId: { type: 'string' },
       invitationId: { type: 'string' },
+      createdAt: { type: 'string', format: 'date-time' },
+      updatedAt: { type: 'string', format: 'date-time' },
     },
     required: ['name','email','status'],
     additionalProperties: true,
