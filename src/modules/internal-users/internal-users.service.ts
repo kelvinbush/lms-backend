@@ -293,17 +293,11 @@ export class InternalUsersService {
   static async resendInvitation(params: {
     localInvitationId: string;
   }): Promise<InternalUsersModel.BasicSuccessResponse> {
-    logger.info("[INVITE] Resend request received", {
-      invitationId: params.localInvitationId,
-    });
     let inv = await db.query.internalInvitations.findFirst({
       where: eq(internalInvitations.id, params.localInvitationId),
     });
     // Support passing Clerk invitation id as well
     if (!inv) {
-      logger.info("[INVITE] Resend lookup by clerkInvitationId fallback", {
-        clerkInvitationId: params.localInvitationId,
-      });
       inv = await db.query.internalInvitations.findFirst({
         where: eq(
           internalInvitations.clerkInvitationId,
@@ -316,25 +310,44 @@ export class InternalUsersService {
       err.status = 404;
       throw err;
     }
+    // Revoke old invitation if it exists before creating a new one
+    if (inv.clerkInvitationId) {
+      try {
+        await clerkClient.invitations.revokeInvitation(inv.clerkInvitationId as any);
+      } catch (e: any) {
+        // Ignore - the invitation might already be revoked or expired
+      }
+    }
+
     // Create a fresh Clerk invitation; webhook will handle the email sending
     const redirectUrl = `${process.env.APP_URL?.replace(/\/$/, "") || ""}/internal/accept-invite`;
-    const newInvite = await clerkClient.invitations.createInvitation({
-      emailAddress: inv.email,
-      publicMetadata: { role: inv.role, internal: true },
-      redirectUrl,
-    } as any);
+    let newInvite: any;
+    try {
+      newInvite = await clerkClient.invitations.createInvitation({
+        emailAddress: inv.email,
+        publicMetadata: { role: inv.role, internal: true },
+        redirectUrl,
+      } as any);
+    } catch (e: any) {
+      const err: any = new Error(
+        e?.errors?.[0]?.message || e?.message || "Failed to create invitation",
+      );
+      err.status = e?.status || 400;
+      logger.error("[INVITE] Resend failed", {
+        email: inv.email,
+        error: err.message,
+      });
+      throw err;
+    }
     await db
       .update(internalInvitations)
       .set({
+        clerkInvitationId: (newInvite as any)?.id,
         lastSentAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(internalInvitations.id, inv.id));
-    logger.info("[INVITE] Resent Clerk invitation", {
-      email: inv.email,
-      oldInvitationId: inv.clerkInvitationId,
-      newInvitationId: (newInvite as any)?.id,
-    });
+    logger.info("[INVITE] Resent invitation", { email: inv.email });
     return { success: true };
   }
 

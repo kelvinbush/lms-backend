@@ -76,28 +76,28 @@ export const BaseTemplate = ({
             <Section style={socialSection}>
               <Link href="https://www.facebook.com/MelaninKapital/" style={socialLink}>
                 <Img
-                  src="https://cdn.simpleicons.org/facebook/444C53"
+                  src="https://img.icons8.com/ios-filled/50/444C53/facebook.png"
                   alt="Facebook"
                   style={socialIcon}
                 />
               </Link>
               <Link href="https://www.instagram.com/melaninkapital/?__d=1" style={socialLink}>
                 <Img
-                  src="https://cdn.simpleicons.org/instagram/444C53"
+                  src="https://img.icons8.com/ios-filled/50/444C53/instagram.png"
                   alt="Instagram"
                   style={socialIcon}
                 />
               </Link>
               <Link href="https://www.linkedin.com/company/melaninkapital/mycompany/?viewAsMember=true" style={socialLink}>
                 <Img
-                  src="https://cdn.simpleicons.org/linkedin/444C53"
+                  src="https://img.icons8.com/ios-filled/50/444C53/linkedin.png"
                   alt="LinkedIn"
                   style={socialIcon}
                 />
               </Link>
               <Link href="https://twitter.com/MelaninKapital" style={socialLink}>
                 <Img
-                  src="https://cdn.simpleicons.org/x/444C53"
+                  src="https://img.icons8.com/ios-filled/50/444C53/twitterx.png"
                   alt="X (Twitter)"
                   style={socialIcon}
                 />

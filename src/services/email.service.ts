@@ -1,13 +1,13 @@
 import { Resend } from 'resend';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { logger } from '../utils/logger';
 import { config } from "dotenv";
 import { render } from '@react-email/render';
 import VerificationCodeTemplate from '../templates/email/verification-code-template';
+import ResetPasswordTemplate from '../templates/email/reset-password-template';
 import InternalInviteTemplate from '../templates/email/internal-invite-template';
 import AccountDeactivationTemplate from '../templates/email/account-deactivation-template';
 import AccountReactivationTemplate from '../templates/email/account-reactivation-template';
+import WelcomeEmailTemplate from '../templates/email/welcome-email-template';
 
 config({
   path: ".env.local"
@@ -39,7 +39,6 @@ export interface VerificationEmailData {
 
 export class EmailService {
   private resend: Resend;
-  private welcomeTemplate: string;
 
   constructor() {
     const apiKey = process.env.RESEND_API_KEY;
@@ -48,45 +47,24 @@ export class EmailService {
     }
     
     this.resend = new Resend(apiKey);
-    
-    // Load welcome email template
-    try {
-      const templatePath = join(process.cwd(), 'src', 'templates', 'welcome-email.html');
-      this.welcomeTemplate = readFileSync(templatePath, 'utf-8');
-    } catch (error) {
-      logger.error('Failed to load welcome email template:', error);
-      throw new Error('Failed to load welcome email template');
-    }
-  }
-
-  private replaceTemplateVariables(template: string, data: WelcomeEmailData): string {
-    const replacements = {
-      '{{firstName}}': data.firstName,
-      '{{loginUrl}}': data.loginUrl || process.env.APP_URL || '#',
-      '{{supportEmail}}': data.supportEmail || process.env.SUPPORT_EMAIL || 'support@melaninkapital.com',
-      '{{supportPhone}}': data.supportPhone || process.env.SUPPORT_PHONE || '+254703680991',
-      '{{termsUrl}}': data.termsUrl || process.env.TERMS_URL || 'https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jLsw0JXtTaSljhRqXr6mBuJN1opUPFeKbcZg3k',
-      '{{privacyUrl}}': data.privacyUrl || process.env.PRIVACY_URL || 'https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jLvFVCntHCgvpe94FiSQ72Z3oc8WVDqNGKtasB',
-      '{{unsubscribeUrl}}': data.unsubscribeUrl || process.env.UNSUBSCRIBE_URL || '#'
-    };
-
-    let processedTemplate = template;
-    Object.entries(replacements).forEach(([placeholder, value]) => {
-      processedTemplate = processedTemplate.replace(new RegExp(placeholder, 'g'), value);
-    });
-
-    return processedTemplate;
   }
 
   async sendWelcomeEmail(data: WelcomeEmailData): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const htmlContent = this.replaceTemplateVariables(this.welcomeTemplate, data);
+      const html = await render(
+        WelcomeEmailTemplate({
+          firstName: data.firstName,
+          loginUrl: data.loginUrl || process.env.APP_URL || '#',
+          supportEmail: data.supportEmail || process.env.SUPPORT_EMAIL || 'support@melaninkapital.com',
+          supportPhone: data.supportPhone || process.env.SUPPORT_PHONE || '+254703680991',
+        })
+      );
       
       const result = await this.resend.emails.send({
         from: process.env.FROM_EMAIL || 'Melanin Kapital <nore@melaninkapital.com>',
         to: [data.email],
         subject: 'Welcome to Melanin Kapital - Your Journey Begins Now! 🚀',
-        html: htmlContent,
+        html,
       });
 
       if (result.error) {
@@ -146,6 +124,32 @@ export class EmailService {
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       logger.error('Error sending verification code email:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async sendResetPasswordEmail(data: VerificationEmailData): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const html = await render(
+        ResetPasswordTemplate({ firstName: data.firstName || '', code: data.code })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || 'Melanin Kapital <nore@melaninkapital.com>',
+        to: [data.email],
+        subject: `Your password reset code is ${data.code}`,
+        html,
+      });
+
+      if (result.error) {
+        logger.error('Failed to send reset password email:', result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`Reset password email sent successfully to ${data.email}`, { messageId: result.data?.id });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error('Error sending reset password email:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }

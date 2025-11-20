@@ -206,12 +206,14 @@ export class ClerkWebhookService {
 
   /**
    * Handles email.created webhook event
-   * Processes verification code emails and invitation emails
+   * Processes verification code emails, reset password emails, and invitation emails
+   * Uses slug to identify email type: "verification_code", "reset_password_code", or "invitation"
    */
   static async handleEmailCreated(event: WebhookEvent): Promise<ClerkWebhookHandlerResult> {
     try {
       const payload: any = event?.data || {};
       const toEmail: string | undefined = payload?.to_email_address;
+      const slug: string | undefined = payload?.slug;
 
       if (!toEmail) {
         logger.warn("[WEBHOOK email.created] missing email address");
@@ -221,22 +223,49 @@ export class ClerkWebhookService {
         };
       }
 
-      // Branch A: Verification code emails (OTP)
+      // Use slug to identify email type
+      if (slug === "verification_code") {
+        const code: string | undefined = payload?.data?.otp_code;
+        if (code) {
+          return await this.handleVerificationCodeEmail(toEmail, code);
+        }
+      }
+
+      if (slug === "reset_password_code") {
+        const code: string | undefined = payload?.data?.otp_code;
+        if (code) {
+          return await this.handleResetPasswordEmail(toEmail, code);
+        }
+      }
+
+      if (slug === "invitation") {
+        const inviteUrl: string | undefined =
+          payload?.data?.action_url || payload?.data?.url || payload?.data?.links?.[0]?.url;
+        if (inviteUrl) {
+          return await this.handleInvitationEmail(toEmail, inviteUrl);
+        }
+      }
+
+      // Fallback: Try to detect by content if slug is not available
       const code: string | undefined = payload?.data?.otp_code;
-      if (code) {
+      if (code && !slug) {
+        // Default to verification code if slug is missing but code is present
         return await this.handleVerificationCodeEmail(toEmail, code);
       }
 
-      // Branch B: Invitation emails
       const inviteUrl: string | undefined =
         payload?.data?.action_url || payload?.data?.url || payload?.data?.links?.[0]?.url;
-      if (inviteUrl) {
+      if (inviteUrl && !slug) {
+        // Default to invitation if slug is missing but URL is present
         return await this.handleInvitationEmail(toEmail, inviteUrl);
       }
 
-      // If neither OTP nor invitation URL present, ignore
-      logger.warn("[WEBHOOK email.created] payload not recognized (no otp_code or invite url)", {
+      // If email type not recognized, ignore
+      logger.warn("[WEBHOOK email.created] payload not recognized", {
         hasEmail: !!toEmail,
+        slug,
+        hasCode: !!code,
+        hasInviteUrl: !!inviteUrl,
       });
       return {
         success: true,
@@ -252,6 +281,66 @@ export class ClerkWebhookService {
         error: {
           message: error?.message || "Failed to handle email.created event",
           code: "EMAIL_CREATED_HANDLER_ERROR",
+        },
+      };
+    }
+  }
+
+  /**
+   * Handles reset password email
+   */
+  private static async handleResetPasswordEmail(
+    toEmail: string,
+    code: string
+  ): Promise<ClerkWebhookHandlerResult> {
+    try {
+      let firstName = "";
+      try {
+        const user = await User.findByEmail(toEmail);
+        if (user?.firstName) {
+          firstName = user.firstName;
+        }
+      } catch (e) {
+        logger.warn("[WEBHOOK email.created] lookup errored; proceeding without firstName", {
+          toEmail,
+          error: e instanceof Error ? e.message : e,
+        });
+      }
+
+      const sendResult = await emailService.sendResetPasswordEmail({
+        firstName,
+        email: toEmail,
+        code,
+      });
+
+      if (!sendResult.success) {
+        logger.error("[WEBHOOK email.created] failed to dispatch reset password email", {
+          toEmail,
+          error: sendResult.error,
+        });
+        return {
+          success: false,
+          error: {
+            message: "Failed to send reset password email",
+            code: "EMAIL_SEND_FAILED",
+          },
+        };
+      }
+
+      return {
+        success: true,
+        data: { received: true, messageId: sendResult.messageId },
+      };
+    } catch (error: any) {
+      logger.error("[WEBHOOK email.created] reset password email handler error", {
+        toEmail,
+        error: error?.message,
+      });
+      return {
+        success: false,
+        error: {
+          message: error?.message || "Failed to handle reset password email",
+          code: "RESET_PASSWORD_EMAIL_HANDLER_ERROR",
         },
       };
     }
