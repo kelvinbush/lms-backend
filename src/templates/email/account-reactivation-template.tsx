@@ -58,7 +58,7 @@ const paragraph = {
 };
 
 const boldText = {
-  fontWeight: '500',
+  fontWeight: '600',
 };
 
 const buttonSection = {
@@ -70,12 +70,13 @@ const button = {
   backgroundColor: '#151F28',
   color: '#ffffff',
   padding: '12px 24px',
-  borderRadius: '8px',
+  borderRadius: '6px',
   textDecoration: 'none',
   display: 'inline-block',
   fontWeight: '500',
   fontSize: '16px',
   border: '0',
+  fontFamily: 'Arial, sans-serif',
 };
 
 const buttonIcon = {

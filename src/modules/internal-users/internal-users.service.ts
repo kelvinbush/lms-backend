@@ -37,7 +37,7 @@ export class InternalUsersService {
       err.status = 500;
       throw err;
     }
-    const redirectUrl = `${appUrl}/internal/accept-invite`;
+    const redirectUrl = `${appUrl}/accept-invite`;
 
     let invitation: any;
     try {
@@ -320,7 +320,7 @@ export class InternalUsersService {
     }
 
     // Create a fresh Clerk invitation; webhook will handle the email sending
-    const redirectUrl = `${process.env.APP_URL?.replace(/\/$/, "") || ""}/internal/accept-invite`;
+    const redirectUrl = `${process.env.APP_URL?.replace(/\/$/, "") || ""}/accept-invite`;
     let newInvite: any;
     try {
       newInvite = await clerkClient.invitations.createInvitation({

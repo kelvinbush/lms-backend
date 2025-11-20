@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { BaseTemplate } from './base-template';
-import { Text } from '@react-email/components';
+import { Text, Section } from '@react-email/components';
 
 interface AccountDeactivationTemplateProps {
   firstName: string;
@@ -26,17 +26,16 @@ export default function AccountDeactivationTemplate({ firstName }: AccountDeacti
         If you believe this was in error or need further assistance, please contact our support team for clarification.
       </Text>
 
-      <Text style={contactSection}>
-        <span style={icon}>✉️</span> <span style={contactLabel}>Support Email:</span>
-        <br />
-        <a href="mailto:support@melaninkapital.com" style={link}>support@melaninkapital.com</a>
-      </Text>
-
-      <Text style={contactSection}>
-        <span style={icon}>📞</span> <span style={contactLabel}>Contact Number:</span>
-        <br />
-        <a href="tel:+254703680991" style={phoneLink}>+254 703 680 991</a>
-      </Text>
+      <Section style={contactSection}>
+        <Text style={contactItem}>
+          <span style={icon}>✉️</span>{' '}
+          <a href="mailto:support@melaninkapital.com" style={link}>support@melaninkapital.com</a>
+        </Text>
+        <Text style={contactItem}>
+          <span style={icon}>📞</span>{' '}
+          <a href="tel:+254703680991" style={link}>+254 703 680 991</a>
+        </Text>
+      </Section>
 
       <Text style={paragraph}>
         We appreciate your cooperation and look forward to assisting you.
@@ -60,37 +59,30 @@ const paragraph = {
 };
 
 const boldText = {
-  fontWeight: '500',
+  fontWeight: '600',
 };
 
 const contactSection = {
+  margin: '20px 0',
+};
+
+const contactItem = {
   fontSize: '16px',
   lineHeight: '1.6',
   color: '#151F28',
-  margin: '0 0 20px 0',
+  margin: '0 0 12px 0',
   fontWeight: '400',
 };
 
 const icon = {
   marginRight: '8px',
   fontSize: '16px',
-  opacity: '0.7',
-};
-
-const contactLabel = {
-  fontWeight: '500',
+  verticalAlign: 'middle',
 };
 
 const link = {
-  color: '#01337F',
-  textDecoration: 'none',
-  marginLeft: '24px',
-};
-
-const phoneLink = {
   color: '#151F28',
   textDecoration: 'none',
-  marginLeft: '24px',
 };
 
 const closing = {
