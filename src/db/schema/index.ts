@@ -15,3 +15,7 @@ export * from "./investorOpportunityBookmarks";
 export * from "./userGroups";
 export * from "./userGroupMembers";
 export * from "./businessUserGroups";
+export * from "./businessCountries";
+export * from "./businessPhotos";
+export * from "./businessVideoLinks";
+export * from "./smeOnboardingProgress";

@@ -15,6 +15,11 @@ export const businessDocumentTypeEnum = pgEnum("business_document_type", [
   "tax_clearance_certificate",
   "partnership_deed",
   "memorandum_of_association",
+  // Company registration documents (CR forms)
+  "CR1",
+  "CR2",
+  "CR8",
+  "CR12",
 
   // Plans and presentations
   "business_plan",

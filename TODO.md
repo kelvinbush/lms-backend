@@ -48,31 +48,31 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
 - [x] Add indexes for queries
 
 ### 1.4 Business Countries - Junction Table
-- [ ] Create `businessCountries` table schema
-- [ ] Fields: `id`, `businessId` (FK), `country` (varchar), `createdAt`
-- [ ] Add unique constraint on (businessId, country)
-- [ ] Add indexes for queries
+- [x] Create `businessCountries` table schema
+- [x] Fields: `id`, `businessId` (FK), `country` (varchar), `createdAt`
+- [x] Add unique constraint on (businessId, country)
+- [x] Add indexes for queries
 
 ### 1.5 Business Photos - Separate Table
-- [ ] Create `businessPhotos` table schema
-- [ ] Fields: `id`, `businessId` (FK), `photoUrl` (text), `displayOrder` (integer), `createdAt`, `deletedAt`
-- [ ] Add constraint: max 5 photos per business (enforce in service layer)
-- [ ] Add indexes for queries
+- [x] Create `businessPhotos` table schema
+- [x] Fields: `id`, `businessId` (FK), `photoUrl` (text), `displayOrder` (integer), `createdAt`, `deletedAt`
+- [x] Add constraint: max 5 photos per business (enforce in service layer)
+- [x] Add indexes for queries
 
 ### 1.6 Business Video Links - Separate Table
-- [ ] Create `businessVideoLinks` table schema
-- [ ] Fields: `id`, `businessId` (FK), `videoUrl` (text), `source` (varchar - e.g., "youtube", "vimeo", "direct"), `displayOrder` (integer), `createdAt`, `deletedAt`
-- [ ] Add indexes for queries
+- [x] Create `businessVideoLinks` table schema
+- [x] Fields: `id`, `businessId` (FK), `videoUrl` (text), `source` (varchar - e.g., "youtube", "vimeo", "direct"), `displayOrder` (integer), `createdAt`, `deletedAt`
+- [x] Add indexes for queries
 
 ### 1.7 SME Onboarding Progress - Tracking Table
-- [ ] Create `smeOnboardingProgress` table schema
-- [ ] Fields: `id`, `userId` (FK, unique), `currentStep` (integer 1-7), `completedSteps` (integer array or JSON), `lastSavedAt` (timestamp), `createdAt`, `updatedAt`
-- [ ] Add indexes for queries
+- [x] Create `smeOnboardingProgress` table schema
+- [x] Fields: `id`, `userId` (FK, unique), `currentStep` (integer 1-7), `completedSteps` (integer array or JSON), `lastSavedAt` (timestamp), `createdAt`, `updatedAt`
+- [x] Add indexes for queries
 
 ### 1.8 Business Documents - Add New Document Types
-- [ ] Add `CR1`, `CR2`, `CR8`, `CR12` to `businessDocumentTypeEnum`
-- [ ] Keep all existing document types (backward compatibility)
-- [ ] Update business document model types
+- [x] Add `CR1`, `CR2`, `CR8`, `CR12` to `businessDocumentTypeEnum`
+- [x] Keep all existing document types (backward compatibility)
+- [ ] Update business document model types (will do when we create the service layer)
 
 ### 1.9 Database Migrations
 - [ ] Create migration for all schema changes
