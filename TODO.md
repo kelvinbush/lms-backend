@@ -123,14 +123,14 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
   - Transaction: ensure all or nothing
 
 ### 2.4 Step 3: Location Info Service
-- [ ] `saveLocationInfo(userId, data)` - Save/update Step 3 data
+- [x] `saveLocationInfo(userId, data)` - Save/update Step 3 data
   - Update business profile: companyHQ, city, registeredOfficeAddress, registeredOfficeCity, registeredOfficeZipCode
   - Handle: countriesOfOperation (array) - create/update in businessCountries table
   - Update `onboardingStep` and `completedSteps`
 
 ### 2.5 Step 4: Personal Documents Service
-- [ ] `savePersonalDocuments(userId, data)` - Save/update Step 4 data
-  - Upsert personal documents (reuse existing Documents service or create admin version)
+- [x] `savePersonalDocuments(userId, data)` - Save/update Step 4 data
+  - Upsert personal documents (admin version - works with userId, no clerkId required)
   - Accept admin override (skip ownership check)
   - Update `onboardingStep` and `completedSteps`
 

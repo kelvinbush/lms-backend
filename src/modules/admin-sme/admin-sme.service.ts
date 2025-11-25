@@ -6,10 +6,16 @@ import { eq } from "drizzle-orm";
 import { httpError } from "./admin-sme.utils";
 import { AdminSMEStep1Service } from "./admin-sme.step1.service";
 import { AdminSMEStep2Service } from "./admin-sme.step2.service";
+import { AdminSMEStep3Service } from "./admin-sme.step3.service";
+import { AdminSMEStep4Service } from "./admin-sme.step4.service";
+import { AdminSMEStep5Service } from "./admin-sme.step5.service";
 
 // Re-export step services for convenience
 export { AdminSMEStep1Service } from "./admin-sme.step1.service";
 export { AdminSMEStep2Service } from "./admin-sme.step2.service";
+export { AdminSMEStep3Service } from "./admin-sme.step3.service";
+export { AdminSMEStep4Service } from "./admin-sme.step4.service";
+export { AdminSMEStep5Service } from "./admin-sme.step5.service";
 
 /**
  * Main Admin SME Service
@@ -83,5 +89,26 @@ export abstract class AdminSMEService {
     payload: AdminSMEModel.Step2BusinessBasicInfoBody,
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     return AdminSMEStep2Service.saveBusinessBasicInfo(userId, payload);
+  }
+
+  static async saveLocationInfo(
+    userId: string,
+    payload: AdminSMEModel.Step3LocationInfoBody,
+  ): Promise<AdminSMEModel.OnboardingStateResponse> {
+    return AdminSMEStep3Service.saveLocationInfo(userId, payload);
+  }
+
+  static async savePersonalDocuments(
+    userId: string,
+    payload: AdminSMEModel.Step4PersonalDocumentsBody,
+  ): Promise<AdminSMEModel.OnboardingStateResponse> {
+    return AdminSMEStep4Service.savePersonalDocuments(userId, payload);
+  }
+
+  static async saveCompanyInfoDocuments(
+    userId: string,
+    payload: AdminSMEModel.Step5CompanyInfoDocumentsBody,
+  ): Promise<AdminSMEModel.OnboardingStateResponse> {
+    return AdminSMEStep5Service.saveCompanyInfoDocuments(userId, payload);
   }
 }
