@@ -92,18 +92,19 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
 ## Phase 2: Admin SME Service - Multi-Step Onboarding
 
 ### 2.1 Create Admin SME Module Structure
-- [ ] Create `src/modules/admin-sme/` directory
+- [x] Create `src/modules/admin-sme/` directory
 - [ ] Create `admin-sme.service.ts` with core business logic
-- [ ] Create `admin-sme.model.ts` with types and schemas for all 7 steps
-- [ ] Create `admin-sme.utils.ts` for helper functions
+- [x] Create `admin-sme.model.ts` with types and schemas for all 7 steps
+- [ ] Create `admin-sme.utils.ts` for helper functions (if needed)
 
 ### 2.2 Step 1: User Creation Service
-- [ ] `createSMEUser()` - Create user with draft status
+- [x] `createSMEUser()` - Create user with draft status
   - Required: email, firstName, lastName, phone, dob, gender, position
   - Set `onboardingStatus: 'draft'`
   - Set `onboardingStep: 1`
   - Create entry in `smeOnboardingProgress`
   - Return user ID for subsequent steps
+- [x] `getOnboardingState()` - Get current onboarding state
 
 ### 2.3 Step 2: Business Basic Info Service
 - [ ] `saveBusinessBasicInfo(userId, data)` - Save/update Step 2 data
