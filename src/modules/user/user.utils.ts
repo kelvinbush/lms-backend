@@ -85,8 +85,14 @@ export const extractUserDataFromWebhook = (
     if (!first_name) missing.push("firstName");
     if (!last_name) missing.push("lastName");
     // For internal invited users, relax requirements: gender, phone, dob are optional on creation
+    // For SME users (admin-created), gender is required but phone/dob can be optional
+    // Check if this is an SME user by checking if user already exists with draft/pending status
     if (!isInternal) {
+      // Gender is always required for non-internal users
       if (!gender) missing.push("gender");
+      // Phone and DOB are required for regular signups, but optional for admin-created SME users
+      // We'll check for existing user in the webhook handler, so we'll be lenient here
+      // and let the webhook handler decide based on whether user exists
       if (!phoneNumber) missing.push("phoneNumber");
       if (!dob) missing.push("dob");
     }

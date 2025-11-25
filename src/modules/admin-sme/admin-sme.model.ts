@@ -301,6 +301,58 @@ export namespace AdminSMEModel {
   }
 
   // ============================================
+  // List Response Types
+  // ============================================
+  export interface SMEUserListItem {
+    userId: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    phone: string | null;
+    onboardingStatus: "draft" | "pending_invitation" | "active";
+    onboardingStep: number | null;
+    currentStep: number | null;
+    completedSteps: number[];
+    business: {
+      id: string;
+      name: string;
+    } | null;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  export interface ListSMEUsersResponse {
+    items: SMEUserListItem[];
+    total: number;
+    page?: number;
+    limit?: number;
+  }
+
+  export interface ListSMEUsersQuery {
+    page?: string;
+    limit?: string;
+    onboardingStatus?: "draft" | "pending_invitation" | "active";
+    search?: string; // Search by email, firstName, lastName
+  }
+
+  export interface GetSMEUserDetailResponse extends OnboardingStateResponse {
+    business: {
+      id: string;
+      name: string;
+      entityType: string | null;
+      logo: string | null;
+      sectors: string[] | null;
+      description: string | null;
+      yearOfIncorporation: number | null;
+      city: string | null;
+      country: string | null;
+      companyHQ: string | null;
+      createdAt: string | null;
+      updatedAt: string | null;
+    } | null;
+  }
+
+  // ============================================
   // Route Parameter Schemas
   // ============================================
   export const UserIdParamsSchema = {
@@ -320,6 +372,130 @@ export namespace AdminSMEModel {
       step: { type: "integer", minimum: 1, maximum: 7 },
     },
     required: ["userId", "step"],
+  } as const;
+
+  export const ListSMEUsersQuerySchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      page: { type: "string", pattern: "^[0-9]+$" },
+      limit: { type: "string", pattern: "^[0-9]+$" },
+      onboardingStatus: {
+        type: "string",
+        enum: ["draft", "pending_invitation", "active"],
+      },
+      search: { type: "string", minLength: 1, maxLength: 100 },
+    },
+  } as const;
+
+  export const SMEUserListItemSchema = {
+    type: "object",
+    properties: {
+      userId: { type: "string" },
+      email: { type: "string" },
+      firstName: { type: ["string", "null"] },
+      lastName: { type: ["string", "null"] },
+      phone: { type: ["string", "null"] },
+      onboardingStatus: {
+        type: "string",
+        enum: ["draft", "pending_invitation", "active"],
+      },
+      onboardingStep: { type: ["integer", "null"] },
+      currentStep: { type: ["integer", "null"] },
+      completedSteps: { type: "array", items: { type: "integer" } },
+      business: {
+        type: ["object", "null"],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+        },
+      },
+      createdAt: { type: "string" },
+      updatedAt: { type: "string" },
+    },
+    required: [
+      "userId",
+      "email",
+      "onboardingStatus",
+      "currentStep",
+      "completedSteps",
+      "business",
+      "createdAt",
+      "updatedAt",
+    ],
+  } as const;
+
+  export const ListSMEUsersResponseSchema = {
+    type: "object",
+    properties: {
+      items: {
+        type: "array",
+        items: SMEUserListItemSchema,
+      },
+      total: { type: "integer" },
+      page: { type: ["integer", "null"] },
+      limit: { type: ["integer", "null"] },
+    },
+    required: ["items", "total"],
+  } as const;
+
+  export const GetSMEUserDetailResponseSchema = {
+    type: "object",
+    properties: {
+      userId: { type: "string" },
+      currentStep: { type: ["integer", "null"] },
+      completedSteps: { type: "array", items: { type: "integer" } },
+      user: {
+        type: "object",
+        properties: {
+          email: { type: "string" },
+          firstName: { type: ["string", "null"] },
+          lastName: { type: ["string", "null"] },
+          phone: { type: ["string", "null"] },
+          dob: { type: ["string", "null"] },
+          gender: { type: ["string", "null"] },
+          position: { type: ["string", "null"] },
+          onboardingStatus: { type: "string" },
+        },
+        required: ["email", "onboardingStatus"],
+      },
+      business: {
+        type: ["object", "null"],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          entityType: { type: ["string", "null"] },
+          logo: { type: ["string", "null"] },
+          sectors: { type: ["array", "null"], items: { type: "string" } },
+          description: { type: ["string", "null"] },
+          yearOfIncorporation: { type: ["integer", "null"] },
+          city: { type: ["string", "null"] },
+          country: { type: ["string", "null"] },
+          companyHQ: { type: ["string", "null"] },
+          createdAt: { type: ["string", "null"] },
+          updatedAt: { type: ["string", "null"] },
+        },
+      },
+    },
+    required: ["userId", "currentStep", "completedSteps", "user", "business"],
+  } as const;
+
+  export const BasicSuccessResponseSchema = {
+    type: "object",
+    properties: {
+      success: { type: "boolean" },
+      message: { type: ["string", "null"] },
+    },
+    required: ["success"],
+  } as const;
+
+  export const ErrorResponseSchema = {
+    type: "object",
+    properties: {
+      error: { type: "string" },
+      code: { type: "string" },
+    },
+    required: ["error", "code"],
   } as const;
 }
 

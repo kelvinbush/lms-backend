@@ -178,66 +178,67 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
 ## Phase 3: Webhook Handler Updates
 
 ### 3.1 Modify User Created Handler
-- [ ] Update `ClerkWebhookService.handleUserCreated()` to check for existing local user by email
-- [ ] If user exists with `draft` or `pending_invitation` status:
+- [x] Update `ClerkWebhookService.handleUserCreated()` to check for existing local user by email
+- [x] If user exists with `draft` or `pending_invitation` status:
   - Update with `clerkId`
   - Set `onboardingStatus: 'active'`
-  - Extract gender from Clerk metadata (unsafeMetadata)
-- [ ] If user doesn't exist, create new user (existing flow)
-- [ ] Handle metadata extraction for SME users
+  - Extract and update metadata from Clerk (gender, phone, dob) if provided
+  - Skip welcome email/OTP (user was already set up by admin)
+- [x] If user doesn't exist, create new user (existing flow)
+- [x] Handle metadata extraction for SME users
 
 ### 3.2 Update User Data Extraction
-- [ ] Modify `extractUserDataFromWebhook()` to handle SME users
-  - Gender required (from unsafeMetadata)
-  - Phone/dob optional for admin-created users
-  - Check for `isInternal` flag in publicMetadata (SME users should not have this)
+- [x] Modified webhook handler to handle SME users gracefully
+  - For pre-created users, use existing values as fallback
+  - Only update fields if provided in Clerk metadata
+  - Skip welcome email/OTP for admin-created users
 
 ---
 
 ## Phase 4: Admin Routes - Multi-Step Onboarding
 
 ### 4.1 Create Admin SME Routes
-- [ ] Create `src/routes/admin-sme.routes.ts`
-- [ ] Register routes in `server.ts` with prefix `/admin/sme`
+- [x] Create `src/routes/admin-sme.routes.ts`
+- [x] Register routes in `server.ts` with prefix `/admin/sme`
 
 ### 4.2 Step-by-Step Endpoints
-- [ ] `POST /admin/sme/onboarding/start` - Create user (Step 1)
+- [x] `POST /admin/sme/onboarding/start` - Create user (Step 1)
   - Body: email, firstName, lastName, phone, dob, gender, position
   - Returns: userId, onboardingState
 
-- [ ] `PUT /admin/sme/onboarding/:userId/step/1` - Save Step 1 (user info)
+- [x] `PUT /admin/sme/onboarding/:userId/step/1` - Save Step 1 (user info)
   - Body: email, firstName, lastName, phone, dob, gender, position
   - Returns: updated user, onboardingState
 
-- [ ] `PUT /admin/sme/onboarding/:userId/step/2` - Save Step 2 (business basic)
+- [x] `PUT /admin/sme/onboarding/:userId/step/2` - Save Step 2 (business basic)
   - Body: logo, name, entityType, year, sectors[], description, userGroupId, criteria[], noOfEmployees, website, videoLinks[], businessPhotos[]
   - Returns: business, onboardingState
 
-- [ ] `PUT /admin/sme/onboarding/:userId/step/3` - Save Step 3 (location)
+- [x] `PUT /admin/sme/onboarding/:userId/step/3` - Save Step 3 (location)
   - Body: countriesOfOperation[], companyHQ, city, registeredOfficeAddress, registeredOfficeCity, registeredOfficeZipCode
   - Returns: business, onboardingState
 
-- [ ] `PUT /admin/sme/onboarding/:userId/step/4` - Save Step 4 (personal docs)
+- [x] `PUT /admin/sme/onboarding/:userId/step/4` - Save Step 4 (personal docs)
   - Body: documents[] (docType, docUrl)
   - Returns: documents, onboardingState
 
-- [ ] `PUT /admin/sme/onboarding/:userId/step/5` - Save Step 5 (company info docs)
+- [x] `PUT /admin/sme/onboarding/:userId/step/5` - Save Step 5 (company info docs)
   - Body: documents[] (docType, docUrl, docPassword, isPasswordProtected)
   - Returns: documents, onboardingState
 
-- [ ] `PUT /admin/sme/onboarding/:userId/step/6` - Save Step 6 (financial docs)
+- [x] `PUT /admin/sme/onboarding/:userId/step/6` - Save Step 6 (financial docs)
   - Body: documents[] (docType, docUrl, docYear, docBankName, etc.)
   - Returns: documents, onboardingState
 
-- [ ] `PUT /admin/sme/onboarding/:userId/step/7` - Save Step 7 (permit & pitch)
+- [x] `PUT /admin/sme/onboarding/:userId/step/7` - Save Step 7 (permit & pitch)
   - Body: documents[] (docType, docUrl)
   - Returns: documents, onboardingState
 
 ### 4.3 Utility Endpoints
-- [ ] `GET /admin/sme/onboarding/:userId` - Get current onboarding state
+- [x] `GET /admin/sme/onboarding/:userId` - Get current onboarding state
   - Returns: user, business, all documents, progress (currentStep, completedSteps)
 
-- [ ] `POST /admin/sme/onboarding/:userId/invite` - Send/Resend invitation
+- [x] `POST /admin/sme/onboarding/:userId/invite` - Send/Resend invitation
   - Can be called at any time
   - Returns: invitationId, status
 
@@ -249,9 +250,9 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
   - Returns: user, business, documents, progress
 
 ### 4.4 Authorization
-- [ ] Add authorization middleware to all routes
-- [ ] Use `requireRole()` utility (admin, super-admin, member)
-- [ ] Ensure admin can only access their own created SMEs (or all if super-admin)
+- [x] Add authorization middleware to all routes
+- [x] Use `requireRole()` utility (admin, super-admin, member)
+- [ ] Ensure admin can only access their own created SMEs (or all if super-admin) - Future enhancement
 
 ---
 

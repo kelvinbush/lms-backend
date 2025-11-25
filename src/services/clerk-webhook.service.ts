@@ -32,57 +32,127 @@ export class ClerkWebhookService {
         unsafeMetaKeys: Object.keys((event as any)?.data?.unsafe_metadata || {}),
       });
 
-      // Extract and validate user data
-      const userDataResult = extractUserDataFromWebhook(event);
-      if (!userDataResult.success) {
-        logger.warn("[WEBHOOK user.created] extraction failed", {
-          error: userDataResult.error?.message,
-          missing: userDataResult.missingFields,
-        });
+      // Extract basic info first to check for existing user
+      const data = (event as any)?.data || {};
+      const clerkUserId = data.id;
+      const email_addresses = data.email_addresses || [];
+      const primary_email_address_id = data.primary_email_address_id;
+      const primaryEmail = Array.isArray(email_addresses)
+        ? (email_addresses.find((e: any) => e.id === primary_email_address_id)
+            ?.email_address ?? email_addresses[0]?.email_address)
+        : undefined;
+
+      if (!primaryEmail || !clerkUserId) {
         return {
           success: false,
           error: {
-            message: userDataResult.error?.message || `Missing required fields: ${userDataResult.missingFields?.join(", ")}`,
-            code: userDataResult.error?.code || "INVALID_METADATA",
+            message: "Missing email or clerkId in webhook payload",
+            code: "INVALID_WEBHOOK_PAYLOAD",
           },
         };
       }
 
-      // Create local user
+      // Check if local user already exists (for admin-created SME users)
+      const existingUser = await db.query.users.findFirst({
+        where: eq(users.email, primaryEmail),
+      });
+
       let userResult;
-      try {
-        userResult = await User.signUp(userDataResult.userData!);
-        logger.info("[WEBHOOK user.created] local user created", {
-          email: userDataResult.userData!.email,
-          clerkId: userDataResult.userData!.clerkId,
+      let user;
+
+      if (existingUser && (existingUser.onboardingStatus === "draft" || existingUser.onboardingStatus === "pending_invitation")) {
+        // User was pre-created by admin - link Clerk account
+        logger.info("[WEBHOOK user.created] Linking existing local user to Clerk account", {
+          email: primaryEmail,
+          userId: existingUser.id,
+          clerkId: clerkUserId,
         });
-      } catch (e: any) {
-        logger.error("[WEBHOOK user.created] local user creation failed", {
-          email: userDataResult.userData!.email,
-          error: e?.message,
+
+        // Extract metadata for updating user (use existing values as fallback)
+        const unsafeMetadata = data.unsafe_metadata || {};
+        const updateData: any = {
+          clerkId: clerkUserId,
+          onboardingStatus: "active" as any,
+          updatedAt: new Date(),
+        };
+
+        // Only update fields if they're provided in metadata, otherwise keep existing
+        if (unsafeMetadata.gender) updateData.gender = unsafeMetadata.gender;
+        if (unsafeMetadata.phoneNumber) updateData.phoneNumber = unsafeMetadata.phoneNumber;
+        if (unsafeMetadata.dob) {
+          const dob = typeof unsafeMetadata.dob === "string" 
+            ? new Date(unsafeMetadata.dob) 
+            : unsafeMetadata.dob;
+          if (!Number.isNaN(dob.getTime())) {
+            updateData.dob = dob;
+          }
+        }
+
+        // Update existing user with clerkId and set status to active
+        await db
+          .update(users)
+          .set(updateData)
+          .where(eq(users.id, existingUser.id));
+
+        user = await db.query.users.findFirst({
+          where: eq(users.id, existingUser.id),
         });
-        throw e;
+
+        userResult = { email: user!.email };
+      } else {
+        // New user - proceed with normal flow
+        // Extract and validate user data
+        const userDataResult = extractUserDataFromWebhook(event);
+        if (!userDataResult.success) {
+          logger.warn("[WEBHOOK user.created] extraction failed", {
+            error: userDataResult.error?.message,
+            missing: userDataResult.missingFields,
+          });
+          return {
+            success: false,
+            error: {
+              message: userDataResult.error?.message || `Missing required fields: ${userDataResult.missingFields?.join(", ")}`,
+              code: userDataResult.error?.code || "INVALID_METADATA",
+            },
+          };
+        }
+
+        // Create local user
+        try {
+          userResult = await User.signUp(userDataResult.userData!);
+          logger.info("[WEBHOOK user.created] local user created", {
+            email: userDataResult.userData!.email,
+            clerkId: userDataResult.userData!.clerkId,
+          });
+        } catch (e: any) {
+          logger.error("[WEBHOOK user.created] local user creation failed", {
+            email: userDataResult.userData!.email,
+            error: e?.message,
+          });
+          throw e;
+        }
+
+        // Fetch user for subsequent operations
+        user = await User.findByEmail(userDataResult.userData!.email);
+      }
+
+      if (!user) {
+        logger.error("[WEBHOOK user.created] user not found after creation/linking", {
+          email: primaryEmail,
+        });
+        return {
+          success: false,
+          error: {
+            message: "User not found after creation/linking",
+            code: "USER_NOT_FOUND",
+          },
+        };
       }
 
       // Extract metadata for internal user handling
       const publicMeta: any = (event as any)?.data?.public_metadata || (event as any)?.data?.publicMeta;
       const isInternal: boolean = publicMeta?.internal === true;
       const invitedRole: string | undefined = publicMeta?.role;
-
-      // Fetch user once for all subsequent operations (performance optimization)
-      const user = await User.findByEmail(userDataResult.userData!.email);
-      if (!user) {
-        logger.error("[WEBHOOK user.created] user not found after creation", {
-          email: userDataResult.userData!.email,
-        });
-        return {
-          success: false,
-          error: {
-            message: "User not found after creation",
-            code: "USER_NOT_FOUND",
-          },
-        };
-      }
 
       // Process role update and internal user operations in parallel where possible
       const operations: Promise<void>[] = [];
@@ -134,9 +204,12 @@ export class ClerkWebhookService {
 
       // Send welcome email and phone OTP for non-internal users (async, non-blocking)
       // Using Promise.allSettled to run in parallel without blocking on errors
-      if (!isInternal) {
+      // Skip for admin-created users (they were already set up)
+      const wasPreCreated = existingUser && (existingUser.onboardingStatus === "draft" || existingUser.onboardingStatus === "pending_invitation");
+      
+      if (!isInternal && !wasPreCreated && user.clerkId) {
         Promise.allSettled([
-          sendWelcomeEmail(userDataResult.userData!.firstName, userDataResult.userData!.email),
+          sendWelcomeEmail(user.firstName || "", user.email),
           User.sendPhoneVerificationOtp(user.clerkId),
         ]).then((results) => {
           results.forEach((result, index) => {

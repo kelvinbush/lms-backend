@@ -81,5 +81,107 @@ export abstract class AdminSMEStep1Service {
       throw httpError(500, "[CREATE_USER_ERROR] Failed to create SME user");
     }
   }
+
+  /**
+   * Update Step 1: Update user information
+   * Allows editing user info after initial creation
+   */
+  static async updateSMEUser(
+    userId: string,
+    payload: AdminSMEModel.Step1UserInfoBody,
+  ): Promise<AdminSMEModel.OnboardingStateResponse> {
+    try {
+      // Verify user exists
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      if (!user) {
+        throw httpError(404, "[USER_NOT_FOUND] User not found");
+      }
+
+      // Check if email is being changed and if new email already exists
+      if (payload.email !== user.email) {
+        const existingWithEmail = await db.query.users.findFirst({
+          where: eq(users.email, payload.email),
+        });
+        if (existingWithEmail && existingWithEmail.id !== userId) {
+          throw httpError(400, "[EMAIL_EXISTS] User with this email already exists");
+        }
+      }
+
+      // Ensure dob is a Date object
+      const dob = typeof payload.dob === "string" ? new Date(payload.dob) : payload.dob;
+
+      // Update user in transaction
+      await db.transaction(async (tx) => {
+        await tx
+          .update(users)
+          .set({
+            email: payload.email,
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            phoneNumber: payload.phone,
+            dob: dob,
+            gender: payload.gender,
+            position: payload.position,
+            updatedAt: new Date(),
+          } as any)
+          .where(eq(users.id, userId));
+
+        // Update onboarding progress
+        const progress = await tx.query.smeOnboardingProgress.findFirst({
+          where: eq(smeOnboardingProgress.userId, userId),
+        });
+
+        const completedSteps = (progress?.completedSteps as number[]) ?? [];
+        if (!completedSteps.includes(1)) {
+          completedSteps.push(1);
+        }
+
+        if (progress) {
+          await tx
+            .update(smeOnboardingProgress)
+            .set({
+              currentStep: 1,
+              completedSteps: completedSteps as any,
+              lastSavedAt: new Date(),
+              updatedAt: new Date(),
+            } as any)
+            .where(eq(smeOnboardingProgress.userId, userId));
+        } else {
+          await tx.insert(smeOnboardingProgress).values({
+            userId: userId,
+            currentStep: 1,
+            completedSteps: [1] as any,
+            lastSavedAt: new Date(),
+          } as any);
+        }
+
+        // Update user onboarding step
+        await tx
+          .update(users)
+          .set({
+            onboardingStep: 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+      });
+
+      logger.info("[AdminSME Step1] User updated", {
+        userId,
+      });
+
+      // Get onboarding state
+      return await AdminSMEService.getOnboardingState(userId);
+    } catch (error: any) {
+      logger.error("[AdminSME Step1] Error updating user", {
+        error: error?.message,
+        userId,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[UPDATE_USER_ERROR] Failed to update SME user");
+    }
+  }
 }
 

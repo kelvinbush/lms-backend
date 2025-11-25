@@ -2,7 +2,7 @@ import type { AdminSMEModel } from "./admin-sme.model";
 import { db } from "../../db";
 import { users, businessProfiles, smeOnboardingProgress } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull, or, like, sql, inArray, desc } from "drizzle-orm";
 import { httpError } from "./admin-sme.utils";
 import { AdminSMEStep1Service } from "./admin-sme.step1.service";
 import { AdminSMEStep2Service } from "./admin-sme.step2.service";
@@ -90,6 +90,13 @@ export abstract class AdminSMEService {
     return AdminSMEStep1Service.createSMEUser(payload);
   }
 
+  static async updateSMEUser(
+    userId: string,
+    payload: AdminSMEModel.Step1UserInfoBody,
+  ): Promise<AdminSMEModel.OnboardingStateResponse> {
+    return AdminSMEStep1Service.updateSMEUser(userId, payload);
+  }
+
   static async saveBusinessBasicInfo(
     userId: string,
     payload: AdminSMEModel.Step2BusinessBasicInfoBody,
@@ -137,5 +144,186 @@ export abstract class AdminSMEService {
     adminClerkId: string,
   ): Promise<AdminSMEModel.InvitationResponse> {
     return AdminSMEInvitationService.sendSMEInvitation(userId, adminClerkId);
+  }
+
+  /**
+   * List all SME users with optional filtering and pagination
+   */
+  static async listSMEUsers(
+    query: AdminSMEModel.ListSMEUsersQuery,
+  ): Promise<AdminSMEModel.ListSMEUsersResponse> {
+    try {
+      const page = query.page ? parseInt(query.page, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit, 10) : 50;
+      const offset = (page - 1) * limit;
+
+      // Build where conditions
+      const conditions: any[] = [isNull(users.deletedAt)];
+
+      // Filter by onboarding status
+      if (query.onboardingStatus) {
+        conditions.push(eq(users.onboardingStatus, query.onboardingStatus as any));
+      }
+
+      // Search by email, firstName, or lastName
+      if (query.search) {
+        const searchTerm = `%${query.search}%`;
+        const searchCondition = or(
+          like(users.email, searchTerm),
+          like(users.firstName, searchTerm),
+          like(users.lastName, searchTerm),
+        );
+        if (searchCondition) {
+          conditions.push(searchCondition);
+        }
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count
+      const totalResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(whereClause);
+      const total = Number(totalResult[0]?.count || 0);
+
+      // Get users with pagination
+      const userRows = await db
+        .select()
+        .from(users)
+        .where(whereClause)
+        .orderBy(desc(users.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      // Get onboarding progress for all users
+      const userIds = userRows.map((u) => u.id);
+      const progressMap = new Map<string, typeof smeOnboardingProgress.$inferSelect>();
+      if (userIds.length > 0) {
+        const progressRows = await db.query.smeOnboardingProgress.findMany({
+          where: inArray(smeOnboardingProgress.userId, userIds),
+        });
+        progressRows.forEach((p) => {
+          progressMap.set(p.userId, p);
+        });
+      }
+
+      // Get businesses for all users
+      const businessMap = new Map<string, typeof businessProfiles.$inferSelect>();
+      if (userIds.length > 0) {
+        const businessRows = await db.query.businessProfiles.findMany({
+          where: inArray(businessProfiles.userId, userIds),
+        });
+        businessRows.forEach((b) => {
+          businessMap.set(b.userId, b);
+        });
+      }
+
+      // Transform to response format
+      const items: AdminSMEModel.SMEUserListItem[] = userRows.map((user) => {
+        const progress = progressMap.get(user.id);
+        const business = businessMap.get(user.id);
+
+        return {
+          userId: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phoneNumber,
+          onboardingStatus: user.onboardingStatus as "draft" | "pending_invitation" | "active",
+          onboardingStep: user.onboardingStep,
+          currentStep: progress?.currentStep ?? null,
+          completedSteps: (progress?.completedSteps as number[]) ?? [],
+          business: business
+            ? {
+                id: business.id,
+                name: business.name,
+              }
+            : null,
+          createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
+          updatedAt: user.updatedAt?.toISOString() || new Date().toISOString(),
+        };
+      });
+
+      return {
+        items,
+        total,
+        page,
+        limit,
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error listing SME users", {
+        error: error?.message,
+        query,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[LIST_USERS_ERROR] Failed to list SME users");
+    }
+  }
+
+  /**
+   * Get detailed information about a single SME user
+   */
+  static async getSMEUserDetail(
+    userId: string,
+  ): Promise<AdminSMEModel.GetSMEUserDetailResponse> {
+    try {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      if (!user) {
+        throw httpError(404, "[USER_NOT_FOUND] User not found");
+      }
+
+      const progress = await db.query.smeOnboardingProgress.findFirst({
+        where: eq(smeOnboardingProgress.userId, userId),
+      });
+
+      const business = await db.query.businessProfiles.findFirst({
+        where: eq(businessProfiles.userId, userId),
+      });
+
+      return {
+        userId: user.id,
+        currentStep: progress?.currentStep ?? null,
+        completedSteps: (progress?.completedSteps as number[]) ?? [],
+        user: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phoneNumber,
+          dob: user.dob,
+          gender: user.gender,
+          position: user.position,
+          onboardingStatus: user.onboardingStatus as string,
+        },
+        business: business
+          ? {
+              id: business.id,
+              name: business.name,
+              entityType: business.entityType,
+              logo: business.logo,
+              sectors: (business.sectors as string[]) ?? null,
+              description: business.description,
+              yearOfIncorporation: business.yearOfIncorporation
+                ? parseInt(business.yearOfIncorporation, 10)
+                : null,
+              city: business.city,
+              country: business.country,
+              companyHQ: business.companyHQ,
+              createdAt: business.createdAt?.toISOString() || null,
+              updatedAt: business.updatedAt?.toISOString() || null,
+            }
+          : null,
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error getting SME user detail", {
+        error: error?.message,
+        userId,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[GET_USER_DETAIL_ERROR] Failed to get SME user detail");
+    }
   }
 }
