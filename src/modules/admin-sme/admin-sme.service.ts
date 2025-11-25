@@ -9,6 +9,9 @@ import { AdminSMEStep2Service } from "./admin-sme.step2.service";
 import { AdminSMEStep3Service } from "./admin-sme.step3.service";
 import { AdminSMEStep4Service } from "./admin-sme.step4.service";
 import { AdminSMEStep5Service } from "./admin-sme.step5.service";
+import { AdminSMEStep6Service } from "./admin-sme.step6.service";
+import { AdminSMEStep7Service } from "./admin-sme.step7.service";
+import { AdminSMEInvitationService } from "./admin-sme.invitation.service";
 
 // Re-export step services for convenience
 export { AdminSMEStep1Service } from "./admin-sme.step1.service";
@@ -16,6 +19,9 @@ export { AdminSMEStep2Service } from "./admin-sme.step2.service";
 export { AdminSMEStep3Service } from "./admin-sme.step3.service";
 export { AdminSMEStep4Service } from "./admin-sme.step4.service";
 export { AdminSMEStep5Service } from "./admin-sme.step5.service";
+export { AdminSMEStep6Service } from "./admin-sme.step6.service";
+export { AdminSMEStep7Service } from "./admin-sme.step7.service";
+export { AdminSMEInvitationService } from "./admin-sme.invitation.service";
 
 /**
  * Main Admin SME Service
@@ -110,5 +116,26 @@ export abstract class AdminSMEService {
     payload: AdminSMEModel.Step5CompanyInfoDocumentsBody,
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     return AdminSMEStep5Service.saveCompanyInfoDocuments(userId, payload);
+  }
+
+  static async saveFinancialDocuments(
+    userId: string,
+    payload: AdminSMEModel.Step6FinancialDocumentsBody,
+  ): Promise<AdminSMEModel.OnboardingStateResponse> {
+    return AdminSMEStep6Service.saveFinancialDocuments(userId, payload);
+  }
+
+  static async savePermitAndPitchDocuments(
+    userId: string,
+    payload: AdminSMEModel.Step7PermitAndPitchDocumentsBody,
+  ): Promise<AdminSMEModel.OnboardingStateResponse> {
+    return AdminSMEStep7Service.savePermitAndPitchDocuments(userId, payload);
+  }
+
+  static async sendSMEInvitation(
+    userId: string,
+    adminClerkId: string,
+  ): Promise<AdminSMEModel.InvitationResponse> {
+    return AdminSMEInvitationService.sendSMEInvitation(userId, adminClerkId);
   }
 }

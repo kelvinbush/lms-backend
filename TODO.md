@@ -135,29 +135,28 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
   - Update `onboardingStep` and `completedSteps`
 
 ### 2.6 Step 5: Business Documents - Company Info Service
-- [ ] `saveCompanyInfoDocuments(businessId, data)` - Save/update Step 5 data
+- [x] `saveCompanyInfoDocuments(userId, data)` - Save/update Step 5 data
   - Upsert business documents with types: CR1, CR2, CR8, CR12, certificate_of_incorporation, etc.
-  - Reuse existing BusinessDocuments service with admin override
+  - Admin version (works with userId, no clerkId required)
   - Update `onboardingStep` and `completedSteps`
 
 ### 2.7 Step 6: Business Documents - Financial Service
-- [ ] `saveFinancialDocuments(businessId, data)` - Save/update Step 6 data
+- [x] `saveFinancialDocuments(userId, data)` - Save/update Step 6 data
   - Upsert financial documents: annual_bank_statement, audited_financial_statements, income_statements, etc.
   - Handle year-based documents (docYear field)
+  - Handle bank-specific documents (docBankName field)
   - Update `onboardingStep` and `completedSteps`
 
 ### 2.8 Step 7: Business Documents - Permits & Pitch Deck Service
-- [ ] `savePermitAndPitchDocuments(businessId, data)` - Save/update Step 7 data
-  - Upsert: business_permit, pitch_deck, company_profile
+- [x] `savePermitAndPitchDocuments(userId, data)` - Save/update Step 7 data
+  - Upsert: business_permit, pitch_deck, business_plan, etc.
   - Update `onboardingStep` and `completedSteps`
-  - Optionally mark onboarding as "complete" (if all steps done)
 
 ### 2.9 Invitation Service
-- [ ] `sendSMEInvitation(userId, adminClerkId)` - Send Clerk invitation
+- [x] `sendSMEInvitation(userId, adminClerkId)` - Send Clerk invitation
   - Can be called at any time (even if steps incomplete)
-  - Create Clerk invitation with metadata (firstName, lastName, gender, email)
+  - Create Clerk invitation with metadata (firstName, lastName, gender, email, phone, dob)
   - Update user `onboardingStatus: 'pending_invitation'`
-  - Store invitation ID for tracking
   - Return invitation details
 
 ### 2.10 Get Onboarding State Service
