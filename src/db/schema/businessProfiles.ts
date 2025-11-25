@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, integer, numeric, varchar, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, integer, numeric, varchar, index, jsonb } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { createId } from "@paralleldrive/cuid2";
 
@@ -29,6 +29,16 @@ export const businessProfiles = pgTable(
   ownershipType: varchar("ownership_type", { length: 50 }),
   ownershipPercentage: integer("ownership_percentage"),
   isOwned: boolean("is_owned"),
+  // New fields for admin onboarding (all nullable for backward compatibility)
+  logo: text("logo"), // Logo URL
+  sectors: jsonb("sectors"), // Array of sectors (new field, keep old 'sector' for compatibility)
+  selectionCriteria: jsonb("selection_criteria"), // Array of strings (2xCriteria)
+  noOfEmployees: integer("no_of_employees"),
+  website: text("website"),
+  registeredOfficeAddress: text("registered_office_address"),
+  registeredOfficeCity: varchar("registered_office_city", { length: 100 }),
+  registeredOfficeZipCode: varchar("registered_office_zip_code", { length: 20 }),
+  companyHQ: varchar("company_hq", { length: 100 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),

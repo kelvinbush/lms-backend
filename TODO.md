@@ -22,30 +22,30 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
 ## Phase 1: Database Schema Updates
 
 ### 1.1 Users Table - Add Onboarding Fields
-- [ ] Add `onboardingStatus` enum: `draft`, `pending_invitation`, `active`
-- [ ] Add `onboardingStatus` column to users table (default: `draft`)
-- [ ] Add `onboardingStep` integer column (1-7, nullable)
-- [ ] Make `clerkId` nullable (will be null until invitation accepted)
-- [ ] Update user model types
+- [x] Add `onboardingStatus` enum: `draft`, `pending_invitation`, `active`
+- [x] Add `onboardingStatus` column to users table (default: `draft`)
+- [x] Add `onboardingStep` integer column (1-7, nullable)
+- [x] Make `clerkId` nullable (will be null until invitation accepted)
+- [x] Update user model types
 
 ### 1.2 Business Profiles - Add New Fields (All Nullable for Backward Compatibility)
-- [ ] Add `logo` text field (for logo URL)
-- [ ] Add `sectors` text array or JSON field (multiple sectors - new)
-- [ ] Keep existing `sector` varchar field (for backward compatibility)
-- [ ] Add `selectionCriteria` text array or JSON field (2xCriteria - optional, array of strings)
-- [ ] Add `noOfEmployees` integer field
-- [ ] Add `website` text field
-- [ ] Add `registeredOfficeAddress` text field
-- [ ] Add `registeredOfficeCity` varchar field
-- [ ] Add `registeredOfficeZipCode` varchar field
-- [ ] Add `companyHQ` varchar field
-- [ ] Update business model types
+- [x] Add `logo` text field (for logo URL)
+- [x] Add `sectors` text array or JSON field (multiple sectors - new)
+- [x] Keep existing `sector` varchar field (for backward compatibility)
+- [x] Add `selectionCriteria` text array or JSON field (2xCriteria - optional, array of strings)
+- [x] Add `noOfEmployees` integer field
+- [x] Add `website` text field
+- [x] Add `registeredOfficeAddress` text field
+- [x] Add `registeredOfficeCity` varchar field
+- [x] Add `registeredOfficeZipCode` varchar field
+- [x] Add `companyHQ` varchar field
+- [ ] Update business model types (will do when we create the service layer)
 
 ### 1.3 Business User Groups - Junction Table
-- [ ] Create `businessUserGroups` table schema
-- [ ] Fields: `id`, `businessId` (FK), `groupId` (FK), `createdAt`
-- [ ] Add unique constraint on (businessId, groupId)
-- [ ] Add indexes for queries
+- [x] Create `businessUserGroups` table schema
+- [x] Fields: `id`, `businessId` (FK), `groupId` (FK), `createdAt`
+- [x] Add unique constraint on (businessId, groupId)
+- [x] Add indexes for queries
 
 ### 1.4 Business Countries - Junction Table
 - [ ] Create `businessCountries` table schema

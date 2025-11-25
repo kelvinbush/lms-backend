@@ -14,3 +14,4 @@ export * from "./investorOpportunities";
 export * from "./investorOpportunityBookmarks";
 export * from "./userGroups";
 export * from "./userGroupMembers";
+export * from "./businessUserGroups";
