@@ -93,9 +93,13 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
 
 ### 2.1 Create Admin SME Module Structure
 - [x] Create `src/modules/admin-sme/` directory
-- [ ] Create `admin-sme.service.ts` with core business logic
+- [x] Create `admin-sme.service.ts` with shared utilities and orchestration
 - [x] Create `admin-sme.model.ts` with types and schemas for all 7 steps
-- [ ] Create `admin-sme.utils.ts` for helper functions (if needed)
+- [x] Create `admin-sme.utils.ts` for shared helper functions
+- [x] Refactor into separate step service files for maintainability:
+  - `admin-sme.step1.service.ts` - Step 1 (User Creation)
+  - `admin-sme.step2.service.ts` - Step 2 (Business Basic Info)
+  - Additional step files will be created as we implement them
 
 ### 2.2 Step 1: User Creation Service
 - [x] `createSMEUser()` - Create user with draft status
