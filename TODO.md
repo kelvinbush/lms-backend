@@ -107,7 +107,7 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
 - [x] `getOnboardingState()` - Get current onboarding state
 
 ### 2.3 Step 2: Business Basic Info Service
-- [ ] `saveBusinessBasicInfo(userId, data)` - Save/update Step 2 data
+- [x] `saveBusinessBasicInfo(userId, data)` - Save/update Step 2 data
   - Create or update business profile
   - Handle: logo, name, entityType, yearOfIncorporation, sectors (array), description
   - Handle: userGroupId (single for now, or multiple via junction table)

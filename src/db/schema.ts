@@ -14,4 +14,8 @@ export * from "./schema/documentRequests"
 export * from "./schema/userGroups"
 export * from "./schema/userGroupMembers"
 export * from "./schema/internalInvitations"
-export * from "./schema/smeOnboardingProgress"
+export * from "./schema/smeOnboardingProgress";
+export * from "./schema/businessUserGroups";
+export * from "./schema/businessCountries";
+export * from "./schema/businessPhotos";
+export * from "./schema/businessVideoLinks";
