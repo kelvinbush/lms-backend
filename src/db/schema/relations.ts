@@ -14,8 +14,13 @@ import { investorOpportunities } from "./investorOpportunities";
 import { investorOpportunityBookmarks } from "./investorOpportunityBookmarks";
 import { userGroups } from "./userGroups";
 import { userGroupMembers } from "./userGroupMembers";
+import { businessUserGroups } from "./businessUserGroups";
+import { businessCountries } from "./businessCountries";
+import { businessPhotos } from "./businessPhotos";
+import { businessVideoLinks } from "./businessVideoLinks";
+import { smeOnboardingProgress } from "./smeOnboardingProgress";
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   personalDocuments: many(personalDocuments),
   businessProfiles: many(businessProfiles),
   loanApplications: many(loanApplications),
@@ -25,6 +30,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   documentRequests: many(documentRequests, { relationName: "requestedFrom" }),
   investorOpportunityBookmarks: many(investorOpportunityBookmarks),
   groupMemberships: many(userGroupMembers),
+  onboardingProgress: one(smeOnboardingProgress),
 }));
 
 export const personalDocumentsRelations = relations(personalDocuments, ({ one }) => ({
@@ -41,6 +47,10 @@ export const businessProfilesRelations = relations(businessProfiles, ({ one, man
   }),
   documents: many(businessDocuments),
   loanApplications: many(loanApplications),
+  userGroups: many(businessUserGroups),
+  countries: many(businessCountries),
+  photos: many(businessPhotos),
+  videoLinks: many(businessVideoLinks),
 }));
 
 export const businessDocumentsRelations = relations(businessDocuments, ({ one }) => ({
@@ -179,5 +189,49 @@ export const documentRequestsRelations = relations(documentRequests, ({ one }) =
     fields: [documentRequests.requestedFrom],
     references: [users.id],
     relationName: "requestedFrom",
+  }),
+}));
+
+// Business User Groups Relations
+export const businessUserGroupsRelations = relations(businessUserGroups, ({ one }) => ({
+  business: one(businessProfiles, {
+    fields: [businessUserGroups.businessId],
+    references: [businessProfiles.id],
+  }),
+  group: one(userGroups, {
+    fields: [businessUserGroups.groupId],
+    references: [userGroups.id],
+  }),
+}));
+
+// Business Countries Relations
+export const businessCountriesRelations = relations(businessCountries, ({ one }) => ({
+  business: one(businessProfiles, {
+    fields: [businessCountries.businessId],
+    references: [businessProfiles.id],
+  }),
+}));
+
+// Business Photos Relations
+export const businessPhotosRelations = relations(businessPhotos, ({ one }) => ({
+  business: one(businessProfiles, {
+    fields: [businessPhotos.businessId],
+    references: [businessProfiles.id],
+  }),
+}));
+
+// Business Video Links Relations
+export const businessVideoLinksRelations = relations(businessVideoLinks, ({ one }) => ({
+  business: one(businessProfiles, {
+    fields: [businessVideoLinks.businessId],
+    references: [businessProfiles.id],
+  }),
+}));
+
+// SME Onboarding Progress Relations
+export const smeOnboardingProgressRelations = relations(smeOnboardingProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [smeOnboardingProgress.userId],
+    references: [users.id],
   }),
 }));

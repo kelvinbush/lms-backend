@@ -75,9 +75,17 @@ Enable admins (super-admin, admin, member) to create SME users through a 7-step 
 - [ ] Update business document model types (will do when we create the service layer)
 
 ### 1.9 Database Migrations
-- [ ] Create migration for all schema changes
-- [ ] Test migration on dev database
-- [ ] Ensure backward compatibility (existing data still works)
+- [ ] **MANUAL STEP**: Run `bun run db:generate` to generate migration SQL files
+- [ ] **MANUAL STEP**: Review generated migration files in `./drizzle/` directory
+- [ ] **MANUAL STEP**: Run `bun run db:push` to apply migrations to dev database
+- [ ] Test migration on dev database (verify all new tables/columns exist)
+- [ ] Ensure backward compatibility (existing data still works, existing queries still function)
+- [ ] **Note**: Migration will:
+  - Add `onboarding_status` enum and columns to users table
+  - Make `clerk_id` nullable in users table (may need data migration for existing users)
+  - Add new columns to business_profiles table
+  - Create new tables: business_user_groups, business_countries, business_photos, business_video_links, sme_onboarding_progress
+  - Add new document types to business_document_type enum
 
 ---
 
