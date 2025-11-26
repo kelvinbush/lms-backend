@@ -483,6 +483,7 @@ export class ClerkWebhookService {
 
   /**
    * Handles invitation email
+   * Determines if it's an internal user invitation or SME invitation and sends appropriate email
    */
   private static async handleInvitationEmail(
     toEmail: string,
@@ -494,23 +495,96 @@ export class ClerkWebhookService {
         inviteUrlPresent: !!inviteUrl,
       });
 
-      // Find latest pending internal invitation to get the intended role
-      const record = await db.query.internalInvitations.findFirst({
+      // First, check if this is an internal user invitation
+      const internalInviteRecord = await db.query.internalInvitations.findFirst({
         where: eq(internalInvitations.email, toEmail),
         orderBy: desc(internalInvitations.createdAt),
       });
 
-      const role: "super-admin" | "admin" | "member" = (record?.role as any) || "member";
-      logger.info("[WEBHOOK email.created] sending custom invite", { toEmail, role });
+      if (internalInviteRecord) {
+        // This is an internal user invitation
+        const role: "super-admin" | "admin" | "member" = (internalInviteRecord?.role as any) || "member";
+        logger.info("[WEBHOOK email.created] sending internal invite email", { toEmail, role });
+
+        const sendInvite = await emailService.sendInternalInviteEmail({
+          email: toEmail,
+          inviteUrl,
+          role,
+        });
+
+        if (!sendInvite.success) {
+          logger.error("[WEBHOOK email.created] failed to send custom internal invite email", {
+            toEmail,
+            error: sendInvite.error,
+          });
+          return {
+            success: false,
+            error: {
+              message: "Failed to send invitation email",
+              code: "INVITE_EMAIL_SEND_FAILED",
+            },
+          };
+        }
+
+        return {
+          success: true,
+          data: { received: true, messageId: sendInvite.messageId },
+        };
+      }
+
+      // Check if this is an SME invitation (user exists with draft or pending_invitation status)
+      const smeUser = await db.query.users.findFirst({
+        where: eq(users.email, toEmail),
+      });
+
+      if (smeUser && (smeUser.onboardingStatus === "draft" || smeUser.onboardingStatus === "pending_invitation")) {
+        // This is an SME invitation
+        logger.info("[WEBHOOK email.created] sending SME invite email", {
+          toEmail,
+          userId: smeUser.id,
+          onboardingStatus: smeUser.onboardingStatus,
+        });
+
+        const sendInvite = await emailService.sendSMEInviteEmail({
+          email: toEmail,
+          firstName: smeUser.firstName || "",
+          inviteUrl,
+        });
+
+        if (!sendInvite.success) {
+          logger.error("[WEBHOOK email.created] failed to send SME invite email", {
+            toEmail,
+            error: sendInvite.error,
+          });
+          return {
+            success: false,
+            error: {
+              message: "Failed to send SME invitation email",
+              code: "SME_INVITE_EMAIL_SEND_FAILED",
+            },
+          };
+        }
+
+        return {
+          success: true,
+          data: { received: true, messageId: sendInvite.messageId },
+        };
+      }
+
+      // Fallback: If no internal invitation record and no SME user found,
+      // default to internal invite (for backward compatibility)
+      logger.warn("[WEBHOOK email.created] no invitation record found, defaulting to internal invite", {
+        toEmail,
+      });
 
       const sendInvite = await emailService.sendInternalInviteEmail({
         email: toEmail,
         inviteUrl,
-        role,
+        role: "member",
       });
 
       if (!sendInvite.success) {
-        logger.error("[WEBHOOK email.created] failed to send custom internal invite email", {
+        logger.error("[WEBHOOK email.created] failed to send default invite email", {
           toEmail,
           error: sendInvite.error,
         });

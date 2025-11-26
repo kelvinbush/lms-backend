@@ -8,6 +8,7 @@ import InternalInviteTemplate from '../templates/email/internal-invite-template'
 import AccountDeactivationTemplate from '../templates/email/account-deactivation-template';
 import AccountReactivationTemplate from '../templates/email/account-reactivation-template';
 import WelcomeEmailTemplate from '../templates/email/welcome-email-template';
+import SMEInviteTemplate from '../templates/email/sme-invite-template';
 
 config({
   path: ".env.local"
@@ -231,6 +232,37 @@ export class EmailService {
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       logger.error('Error sending account reactivation email:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async sendSMEInviteEmail(params: { email: string; firstName: string; inviteUrl: string; supportEmail?: string; supportPhone?: string }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const html = await render(
+        SMEInviteTemplate({
+          firstName: params.firstName,
+          inviteUrl: params.inviteUrl,
+          supportEmail: params.supportEmail || process.env.SUPPORT_EMAIL || 'support@melaninkapital.com',
+          supportPhone: params.supportPhone || process.env.SUPPORT_PHONE || '+254 703 680 991',
+        })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || 'Melanin Kapital <nore@melaninkapital.com>',
+        to: [params.email],
+        subject: 'Welcome to Melanin Kapital - Your Journey Begins Now! 🚀',
+        html,
+      });
+
+      if (result.error) {
+        logger.error('Failed to send SME invitation email:', result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`SME invitation email sent to ${params.email}`, { messageId: result.data?.id });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error('Error sending SME invitation email:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
