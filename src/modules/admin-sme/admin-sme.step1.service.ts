@@ -31,7 +31,7 @@ export abstract class AdminSMEStep1Service {
       const dob = typeof payload.dob === "string" ? new Date(payload.dob) : payload.dob;
 
       // Create user in a transaction with onboarding progress
-      const result = await db.transaction(async (tx) => {
+      const { createdUser, createdProgress } = await db.transaction(async (tx) => {
         // Create user with draft status
         const [user] = await tx
           .insert(users)
@@ -49,27 +49,48 @@ export abstract class AdminSMEStep1Service {
           } as any)
           .returning();
 
-        // Create onboarding progress record
-        await tx.insert(smeOnboardingProgress).values({
-          userId: user.id,
-          currentStep: 1,
-          completedSteps: [1] as any, // Step 1 is completed
-          lastSavedAt: new Date(),
-        } as any);
+        // Create onboarding progress record and capture it
+        const [progress] = await tx
+          .insert(smeOnboardingProgress)
+          .values({
+            userId: user.id,
+            currentStep: 1,
+            completedSteps: [1] as any, // Step 1 is completed
+            lastSavedAt: new Date(),
+          } as any)
+          .returning();
 
-        return user;
+        return { createdUser: user, createdProgress: progress };
       });
 
       logger.info("[AdminSME Step1] User created", {
-        userId: result.id,
-        email: result.email,
+        userId: createdUser.id,
+        email: createdUser.email,
       });
 
-      // Get onboarding state
-      const onboardingState = await AdminSMEService.getOnboardingState(result.id);
+      // Return onboarding state from data we already have (no extra queries!)
+      const onboardingState: AdminSMEModel.OnboardingStateResponse = {
+        userId: createdUser.id,
+        currentStep: createdProgress.currentStep ?? 1,
+        completedSteps: (createdProgress.completedSteps as number[]) ?? [1],
+        user: {
+          email: createdUser.email,
+          firstName: createdUser.firstName,
+          lastName: createdUser.lastName,
+          phone: createdUser.phoneNumber,
+          dob: createdUser.dob,
+          gender: createdUser.gender,
+          position: createdUser.position,
+          onboardingStatus: createdUser.onboardingStatus as string,
+          idNumber: createdUser.idNumber,
+          taxNumber: createdUser.taxNumber,
+          idType: createdUser.idType,
+        },
+        business: null, // No business in Step 1
+      };
 
       return {
-        userId: result.id,
+        userId: createdUser.id,
         onboardingState,
       };
     } catch (error: any) {
@@ -114,8 +135,9 @@ export abstract class AdminSMEStep1Service {
       const dob = typeof payload.dob === "string" ? new Date(payload.dob) : payload.dob;
 
       // Update user in transaction
-      await db.transaction(async (tx) => {
-        await tx
+      const { updatedUser, progress } = await db.transaction(async (tx) => {
+        // Single update with all fields including onboardingStep (eliminates double update)
+        const [userResult] = await tx
           .update(users)
           .set({
             email: payload.email,
@@ -125,22 +147,25 @@ export abstract class AdminSMEStep1Service {
             dob: dob,
             gender: payload.gender,
             position: payload.position,
+            onboardingStep: 1, // Include in single update - no second update needed!
             updatedAt: new Date(),
           } as any)
-          .where(eq(users.id, userId));
+          .where(eq(users.id, userId))
+          .returning();
 
-        // Update onboarding progress
-        const progress = await tx.query.smeOnboardingProgress.findFirst({
+        // Update onboarding progress (query + conditional update/insert)
+        const existingProgress = await tx.query.smeOnboardingProgress.findFirst({
           where: eq(smeOnboardingProgress.userId, userId),
         });
 
-        const completedSteps = (progress?.completedSteps as number[]) ?? [];
+        const completedSteps = (existingProgress?.completedSteps as number[]) ?? [];
         if (!completedSteps.includes(1)) {
           completedSteps.push(1);
         }
 
-        if (progress) {
-          await tx
+        let progressResult: typeof smeOnboardingProgress.$inferSelect;
+        if (existingProgress) {
+          const [result] = await tx
             .update(smeOnboardingProgress)
             .set({
               currentStep: 1,
@@ -148,32 +173,49 @@ export abstract class AdminSMEStep1Service {
               lastSavedAt: new Date(),
               updatedAt: new Date(),
             } as any)
-            .where(eq(smeOnboardingProgress.userId, userId));
+            .where(eq(smeOnboardingProgress.userId, userId))
+            .returning();
+          progressResult = result;
         } else {
-          await tx.insert(smeOnboardingProgress).values({
-            userId: userId,
-            currentStep: 1,
-            completedSteps: [1] as any,
-            lastSavedAt: new Date(),
-          } as any);
+          const [result] = await tx
+            .insert(smeOnboardingProgress)
+            .values({
+              userId: userId,
+              currentStep: 1,
+              completedSteps: [1] as any,
+              lastSavedAt: new Date(),
+            } as any)
+            .returning();
+          progressResult = result;
         }
 
-        // Update user onboarding step
-        await tx
-          .update(users)
-          .set({
-            onboardingStep: 1,
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, userId));
+        return { updatedUser: userResult, progress: progressResult };
       });
 
       logger.info("[AdminSME Step1] User updated", {
         userId,
       });
 
-      // Get onboarding state
-      return await AdminSMEService.getOnboardingState(userId);
+      // Return onboarding state from data we already have (no extra queries!)
+      return {
+        userId: updatedUser.id,
+        currentStep: progress?.currentStep ?? 1,
+        completedSteps: (progress?.completedSteps as number[]) ?? [1],
+        user: {
+          email: updatedUser.email,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          phone: updatedUser.phoneNumber,
+          dob: updatedUser.dob,
+          gender: updatedUser.gender,
+          position: updatedUser.position,
+          onboardingStatus: updatedUser.onboardingStatus as string,
+          idNumber: updatedUser.idNumber,
+          taxNumber: updatedUser.taxNumber,
+          idType: updatedUser.idType,
+        },
+        business: null, // No business in Step 1
+      };
     } catch (error: any) {
       logger.error("[AdminSME Step1] Error updating user", {
         error: error?.message,
