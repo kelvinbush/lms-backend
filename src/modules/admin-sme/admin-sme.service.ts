@@ -1,6 +1,6 @@
 import type { AdminSMEModel } from "./admin-sme.model";
 import { db } from "../../db";
-import { users, businessProfiles, smeOnboardingProgress } from "../../db/schema";
+import { users, businessProfiles, smeOnboardingProgress, personalDocuments, businessDocuments } from "../../db/schema";
 import { logger } from "../../utils/logger";
 import { eq, and, isNull, or, like, sql, inArray, desc } from "drizzle-orm";
 import { httpError } from "./admin-sme.utils";
@@ -324,6 +324,128 @@ export abstract class AdminSMEService {
       });
       if (error?.status) throw error;
       throw httpError(500, "[GET_USER_DETAIL_ERROR] Failed to get SME user detail");
+    }
+  }
+
+  /**
+   * Get personal documents for an SME user
+   */
+  static async getPersonalDocuments(
+    userId: string,
+  ): Promise<AdminSMEModel.ListPersonalDocumentsResponse> {
+    try {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      if (!user) {
+        throw httpError(404, "[USER_NOT_FOUND] User not found");
+      }
+
+      const docs = await db.query.personalDocuments.findMany({
+        where: and(
+          eq(personalDocuments.userId, userId),
+          isNull(personalDocuments.deletedAt),
+        ),
+        columns: {
+          id: true,
+          docType: true,
+          docUrl: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: (docs, { desc }) => [desc(docs.createdAt)],
+      });
+
+      return {
+        success: true,
+        message: "Personal documents retrieved successfully",
+        data: docs.map((doc) => ({
+          id: doc.id,
+          docType: doc.docType || "",
+          docUrl: doc.docUrl || "",
+          createdAt: doc.createdAt?.toISOString() || "",
+          updatedAt: doc.updatedAt?.toISOString() || "",
+        })),
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error getting personal documents", {
+        error: error?.message,
+        userId,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[GET_PERSONAL_DOCS_ERROR] Failed to get personal documents");
+    }
+  }
+
+  /**
+   * Get business documents for an SME user
+   */
+  static async getBusinessDocuments(
+    userId: string,
+  ): Promise<AdminSMEModel.ListBusinessDocumentsResponse> {
+    try {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      if (!user) {
+        throw httpError(404, "[USER_NOT_FOUND] User not found");
+      }
+
+      const business = await db.query.businessProfiles.findFirst({
+        where: eq(businessProfiles.userId, userId),
+      });
+
+      if (!business) {
+        return {
+          success: true,
+          message: "Business documents retrieved successfully",
+          data: [],
+        };
+      }
+
+      const docs = await db.query.businessDocuments.findMany({
+        where: and(
+          eq(businessDocuments.businessId, business.id),
+          isNull(businessDocuments.deletedAt),
+        ),
+        columns: {
+          id: true,
+          docType: true,
+          docUrl: true,
+          isPasswordProtected: true,
+          docPassword: true,
+          docBankName: true,
+          docYear: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: (docs, { desc }) => [desc(docs.createdAt)],
+      });
+
+      return {
+        success: true,
+        message: "Business documents retrieved successfully",
+        data: docs.map((doc) => ({
+          id: doc.id,
+          docType: doc.docType,
+          docUrl: doc.docUrl || "",
+          isPasswordProtected: doc.isPasswordProtected || false,
+          docPassword: doc.docPassword || null,
+          docBankName: doc.docBankName || null,
+          docYear: doc.docYear || null,
+          createdAt: doc.createdAt?.toISOString() || "",
+          updatedAt: doc.updatedAt?.toISOString() || "",
+        })),
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error getting business documents", {
+        error: error?.message,
+        userId,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[GET_BUSINESS_DOCS_ERROR] Failed to get business documents");
     }
   }
 }

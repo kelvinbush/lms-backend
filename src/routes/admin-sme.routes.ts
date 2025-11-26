@@ -338,6 +338,72 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
     }
   );
 
+  // GET /admin/sme/users/:userId/documents/personal - Get personal documents
+  fastify.get(
+    "/admin/sme/users/:userId/documents/personal",
+    {
+      schema: {
+        params: AdminSMEModel.UserIdParamsSchema,
+        response: {
+          200: AdminSMEModel.ListPersonalDocumentsResponseSchema,
+          400: AdminSMEModel.ErrorResponseSchema,
+          401: AdminSMEModel.ErrorResponseSchema,
+          403: AdminSMEModel.ErrorResponseSchema,
+          404: AdminSMEModel.ErrorResponseSchema,
+          500: AdminSMEModel.ErrorResponseSchema,
+        },
+        tags: ["admin-sme"],
+      },
+    },
+    async (request: FastifyRequest<{ Params: { userId: string } }>, reply: FastifyReply) => {
+      try {
+        await requireRole(request, "member");
+        const result = await AdminSMEService.getPersonalDocuments(request.params.userId);
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        logger.error("[AdminSME Routes] Error getting personal documents", { error: error?.message });
+        return reply.code(status).send({ 
+          error: error?.message || "Internal error",
+          code: error?.code || "INTERNAL_ERROR"
+        });
+      }
+    }
+  );
+
+  // GET /admin/sme/users/:userId/documents/business - Get business documents
+  fastify.get(
+    "/admin/sme/users/:userId/documents/business",
+    {
+      schema: {
+        params: AdminSMEModel.UserIdParamsSchema,
+        response: {
+          200: AdminSMEModel.ListBusinessDocumentsResponseSchema,
+          400: AdminSMEModel.ErrorResponseSchema,
+          401: AdminSMEModel.ErrorResponseSchema,
+          403: AdminSMEModel.ErrorResponseSchema,
+          404: AdminSMEModel.ErrorResponseSchema,
+          500: AdminSMEModel.ErrorResponseSchema,
+        },
+        tags: ["admin-sme"],
+      },
+    },
+    async (request: FastifyRequest<{ Params: { userId: string } }>, reply: FastifyReply) => {
+      try {
+        await requireRole(request, "member");
+        const result = await AdminSMEService.getBusinessDocuments(request.params.userId);
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        logger.error("[AdminSME Routes] Error getting business documents", { error: error?.message });
+        return reply.code(status).send({ 
+          error: error?.message || "Internal error",
+          code: error?.code || "INTERNAL_ERROR"
+        });
+      }
+    }
+  );
+
   // POST /admin/sme/onboarding/:userId/invite - Send/Resend invitation
   fastify.post(
     "/admin/sme/onboarding/:userId/invite",

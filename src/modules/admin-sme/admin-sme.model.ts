@@ -353,6 +353,41 @@ export namespace AdminSMEModel {
   }
 
   // ============================================
+  // Document Response Types
+  // ============================================
+  export interface PersonalDocumentItem {
+    id: string;
+    docType: string;
+    docUrl: string;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  export interface ListPersonalDocumentsResponse {
+    success: boolean;
+    message: string;
+    data: PersonalDocumentItem[];
+  }
+
+  export interface BusinessDocumentItem {
+    id: string;
+    docType: string;
+    docUrl: string;
+    isPasswordProtected: boolean;
+    docPassword: string | null;
+    docBankName: string | null;
+    docYear: number | null;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  export interface ListBusinessDocumentsResponse {
+    success: boolean;
+    message: string;
+    data: BusinessDocumentItem[];
+  }
+
+  // ============================================
   // Route Parameter Schemas
   // ============================================
   export const UserIdParamsSchema = {
@@ -496,6 +531,60 @@ export namespace AdminSMEModel {
       code: { type: "string" },
     },
     required: ["error", "code"],
+  } as const;
+
+  export const PersonalDocumentItemSchema = {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      docType: { type: "string" },
+      docUrl: { type: "string" },
+      createdAt: { type: "string" },
+      updatedAt: { type: "string" },
+    },
+    required: ["id", "docType", "docUrl", "createdAt", "updatedAt"],
+  } as const;
+
+  export const ListPersonalDocumentsResponseSchema = {
+    type: "object",
+    properties: {
+      success: { type: "boolean" },
+      message: { type: "string" },
+      data: {
+        type: "array",
+        items: PersonalDocumentItemSchema,
+      },
+    },
+    required: ["success", "message", "data"],
+  } as const;
+
+  export const BusinessDocumentItemSchema = {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      docType: { type: "string" },
+      docUrl: { type: "string" },
+      isPasswordProtected: { type: "boolean" },
+      docPassword: { type: ["string", "null"] },
+      docBankName: { type: ["string", "null"] },
+      docYear: { type: ["integer", "null"] },
+      createdAt: { type: "string" },
+      updatedAt: { type: "string" },
+    },
+    required: ["id", "docType", "docUrl", "isPasswordProtected", "createdAt", "updatedAt"],
+  } as const;
+
+  export const ListBusinessDocumentsResponseSchema = {
+    type: "object",
+    properties: {
+      success: { type: "boolean" },
+      message: { type: "string" },
+      data: {
+        type: "array",
+        items: BusinessDocumentItemSchema,
+      },
+    },
+    required: ["success", "message", "data"],
   } as const;
 }
 

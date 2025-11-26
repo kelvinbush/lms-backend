@@ -515,7 +515,97 @@ Get the current onboarding state for a user (progress, completed steps, etc.).
 
 ---
 
-### 12. Send Invitation
+### 12. Get Personal Documents
+
+Get all personal documents for an SME user.
+
+**Endpoint:** `GET /admin/sme/users/:userId/documents/personal`
+
+**Path Parameters:**
+- `userId` (string, required) - The user ID
+
+**Request Example:**
+```bash
+GET /admin/sme/users/clx123abc/documents/personal
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Personal documents retrieved successfully",
+  "data": [
+    {
+      "id": "doc123",
+      "docType": "national_id",
+      "docUrl": "https://example.com/docs/national_id.pdf",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    },
+    {
+      "id": "doc124",
+      "docType": "passport",
+      "docUrl": "https://example.com/docs/passport.pdf",
+      "createdAt": "2024-01-15T11:00:00Z",
+      "updatedAt": "2024-01-15T11:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### 13. Get Business Documents
+
+Get all business documents for an SME user.
+
+**Endpoint:** `GET /admin/sme/users/:userId/documents/business`
+
+**Path Parameters:**
+- `userId` (string, required) - The user ID
+
+**Request Example:**
+```bash
+GET /admin/sme/users/clx123abc/documents/business
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Business documents retrieved successfully",
+  "data": [
+    {
+      "id": "bizdoc123",
+      "docType": "CR1",
+      "docUrl": "https://example.com/docs/cr1.pdf",
+      "isPasswordProtected": false,
+      "docPassword": null,
+      "docBankName": null,
+      "docYear": null,
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    },
+    {
+      "id": "bizdoc124",
+      "docType": "annual_bank_statement",
+      "docUrl": "https://example.com/docs/bank_statement_2023.pdf",
+      "isPasswordProtected": true,
+      "docPassword": "secure123",
+      "docBankName": "ABC Bank",
+      "docYear": 2023,
+      "createdAt": "2024-01-15T11:00:00Z",
+      "updatedAt": "2024-01-15T11:00:00Z"
+    }
+  ]
+}
+```
+
+**Note:** If the user doesn't have a business yet, an empty array will be returned.
+
+---
+
+### 14. Send Invitation
 
 Send or resend an invitation to the SME user via Clerk. This should be called after all 7 steps are completed.
 
@@ -646,6 +736,12 @@ All endpoints may return the following error responses:
 - Search by name/email: `?search=john`
 - Paginate: `?page=1&limit=20`
 
+### Fetching Documents
+
+- Get personal documents: `GET /admin/sme/users/:userId/documents/personal`
+- Get business documents: `GET /admin/sme/users/:userId/documents/business`
+- Both endpoints return all active (non-deleted) documents for the user
+
 ---
 
 ## Notes
@@ -654,7 +750,8 @@ All endpoints may return the following error responses:
 2. **Invitation Flow**: After sending an invitation, the user receives an email from Clerk. When they accept and complete setup, their status automatically changes to `active` via webhook
 3. **Step Updates**: You can update any step at any time by calling the corresponding PUT endpoint
 4. **Document Upsert**: Documents are upserted (insert or update) based on `docType`. If a document with the same type exists, it will be replaced
-5. **Business Photos**: Maximum 5 photos per business
-6. **Date Format**: Use ISO 8601 date format (YYYY-MM-DD) for dates
-7. **Pagination**: Default limit is 50 items per page. Maximum recommended limit is 100
+5. **Document Fetching**: Use the document endpoints to retrieve all uploaded documents for a user. Documents are returned in reverse chronological order (newest first)
+6. **Business Photos**: Maximum 5 photos per business
+7. **Date Format**: Use ISO 8601 date format (YYYY-MM-DD) for dates
+8. **Pagination**: Default limit is 50 items per page. Maximum recommended limit is 100
 
