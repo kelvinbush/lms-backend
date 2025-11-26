@@ -1,6 +1,16 @@
 import type { AdminSMEModel } from "./admin-sme.model";
 import { db } from "../../db";
-import { users, businessProfiles, smeOnboardingProgress, personalDocuments, businessDocuments } from "../../db/schema";
+import {
+  users,
+  businessProfiles,
+  smeOnboardingProgress,
+  personalDocuments,
+  businessDocuments,
+  businessUserGroups,
+  businessCountries,
+  businessPhotos,
+  businessVideoLinks,
+} from "../../db/schema";
 import { logger } from "../../utils/logger";
 import { eq, and, isNull, or, like, sql, inArray, desc } from "drizzle-orm";
 import { httpError } from "./admin-sme.utils";
@@ -284,6 +294,60 @@ export abstract class AdminSMEService {
         where: eq(businessProfiles.userId, userId),
       });
 
+      // If business exists, load related data needed for detailed response
+      let userGroupIds: string[] = [];
+      let countriesOfOperation: string[] = [];
+      let videoLinks: { url: string; source: string | null }[] = [];
+      let photos: string[] = [];
+
+      if (business) {
+        const [groupRows, countryRows, videoRows, photoRows] = await Promise.all([
+          db.query.businessUserGroups.findMany({
+            where: eq(businessUserGroups.businessId, business.id),
+            columns: {
+              groupId: true,
+            },
+          }),
+          db.query.businessCountries.findMany({
+            where: eq(businessCountries.businessId, business.id),
+            columns: {
+              country: true,
+            },
+          }),
+          db.query.businessVideoLinks.findMany({
+            where: and(
+              eq(businessVideoLinks.businessId, business.id),
+              isNull(businessVideoLinks.deletedAt),
+            ),
+            columns: {
+              videoUrl: true,
+              source: true,
+              displayOrder: true,
+            },
+            orderBy: (tbl, { asc }) => [asc(tbl.displayOrder)],
+          }),
+          db.query.businessPhotos.findMany({
+            where: and(
+              eq(businessPhotos.businessId, business.id),
+              isNull(businessPhotos.deletedAt),
+            ),
+            columns: {
+              photoUrl: true,
+              displayOrder: true,
+            },
+            orderBy: (tbl, { asc }) => [asc(tbl.displayOrder)],
+          }),
+        ]);
+
+        userGroupIds = groupRows.map((g) => g.groupId);
+        countriesOfOperation = countryRows.map((c) => c.country);
+        videoLinks = videoRows.map((v) => ({
+          url: v.videoUrl,
+          source: v.source ?? null,
+        }));
+        photos = photoRows.map((p) => p.photoUrl);
+      }
+
       return {
         userId: user.id,
         currentStep: progress?.currentStep ?? null,
@@ -312,6 +376,16 @@ export abstract class AdminSMEService {
               city: business.city,
               country: business.country,
               companyHQ: business.companyHQ,
+              noOfEmployees: business.noOfEmployees ?? null,
+              website: business.website ?? null,
+              selectionCriteria: (business.selectionCriteria as string[]) ?? null,
+              userGroupIds,
+              countriesOfOperation: countriesOfOperation.length > 0 ? countriesOfOperation : null,
+              registeredOfficeAddress: business.registeredOfficeAddress ?? null,
+              registeredOfficeCity: business.registeredOfficeCity ?? null,
+              registeredOfficeZipCode: business.registeredOfficeZipCode ?? null,
+              videoLinks,
+              businessPhotos: photos,
               createdAt: business.createdAt?.toISOString() || null,
               updatedAt: business.updatedAt?.toISOString() || null,
             }

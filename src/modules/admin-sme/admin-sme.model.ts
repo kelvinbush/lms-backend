@@ -347,6 +347,23 @@ export namespace AdminSMEModel {
       city: string | null;
       country: string | null;
       companyHQ: string | null;
+      // Step 2 extended fields
+      noOfEmployees: number | null;
+      website: string | null;
+      selectionCriteria: string[] | null;
+      userGroupIds: string[]; // A business can belong to multiple programs/user groups
+      // Step 3 extended fields
+      countriesOfOperation: string[] | null;
+      registeredOfficeAddress: string | null;
+      registeredOfficeCity: string | null;
+      registeredOfficeZipCode: string | null;
+      // Media from Step 2
+      videoLinks: Array<{
+        url: string;
+        source: string | null;
+      }>;
+      businessPhotos: string[];
+      // Timestamps
       createdAt: string | null;
       updatedAt: string | null;
     } | null;
@@ -507,6 +524,38 @@ export namespace AdminSMEModel {
           city: { type: ["string", "null"] },
           country: { type: ["string", "null"] },
           companyHQ: { type: ["string", "null"] },
+          noOfEmployees: { type: ["integer", "null"] },
+          website: { type: ["string", "null"] },
+          selectionCriteria: {
+            type: ["array", "null"],
+            items: { type: "string" },
+          },
+          userGroupIds: {
+            type: "array",
+            items: { type: "string" },
+          },
+          countriesOfOperation: {
+            type: ["array", "null"],
+            items: { type: "string" },
+          },
+          registeredOfficeAddress: { type: ["string", "null"] },
+          registeredOfficeCity: { type: ["string", "null"] },
+          registeredOfficeZipCode: { type: ["string", "null"] },
+          videoLinks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                url: { type: "string" },
+                source: { type: ["string", "null"] },
+              },
+              required: ["url"],
+            },
+          },
+          businessPhotos: {
+            type: "array",
+            items: { type: "string" },
+          },
           createdAt: { type: ["string", "null"] },
           updatedAt: { type: ["string", "null"] },
         },
