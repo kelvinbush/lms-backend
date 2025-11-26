@@ -6,6 +6,43 @@ import { requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
 
 export async function adminSMERoutes(fastify: FastifyInstance) {
+  // GET /admin/sme/entrepreneurs - List entrepreneurs for admin table
+  fastify.get(
+    "/admin/sme/entrepreneurs",
+    {
+      schema: {
+        querystring: AdminSMEModel.ListSMEUsersQuerySchema,
+        response: {
+          200: AdminSMEModel.EntrepreneurListResponseSchema,
+          400: AdminSMEModel.ErrorResponseSchema,
+          401: AdminSMEModel.ErrorResponseSchema,
+          403: AdminSMEModel.ErrorResponseSchema,
+          500: AdminSMEModel.ErrorResponseSchema,
+        },
+        tags: ["admin-sme"],
+      },
+    },
+    async (
+      request: FastifyRequest<{ Querystring: AdminSMEModel.ListSMEUsersQuery }>,
+      reply: FastifyReply,
+    ) => {
+      try {
+        await requireRole(request, "member");
+        const result = await AdminSMEService.listEntrepreneurs(request.query);
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        logger.error("[AdminSME Routes] Error listing entrepreneurs", {
+          error: error?.message,
+        });
+        return reply.code(status).send({
+          error: error?.message || "Internal error",
+          code: error?.code || "INTERNAL_ERROR",
+        });
+      }
+    },
+  );
+
   // GET /admin/sme/users - List all SME users
   fastify.get(
     "/admin/sme/users",

@@ -405,6 +405,116 @@ export namespace AdminSMEModel {
   }
 
   // ============================================
+  // Entrepreneur List Types
+  // ============================================
+  export interface EntrepreneurListItem {
+    // Identity
+    userId: string;
+    createdAt: string;
+
+    // Registered user
+    imageUrl: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    phone: string | null;
+
+    // Onboarding / status
+    onboardingStatus: "draft" | "pending_invitation" | "active";
+    businessProfileProgress: number;
+
+    // Business summary
+    business: {
+      id: string;
+      name: string;
+      sectors: string[];
+      country: string | null;
+    } | null;
+
+    // User groups (programs)
+    userGroups: {
+      id: string;
+      name: string;
+    }[];
+
+    // Aggregated flags
+    hasCompleteProfile: boolean;
+    hasPendingActivation: boolean;
+  }
+
+  export interface EntrepreneurListResponse {
+    items: EntrepreneurListItem[];
+    total: number;
+    page?: number;
+    limit?: number;
+  }
+
+  export const EntrepreneurListItemSchema = {
+    type: "object",
+    properties: {
+      userId: { type: "string" },
+      createdAt: { type: "string" },
+      imageUrl: { type: ["string", "null"] },
+      firstName: { type: ["string", "null"] },
+      lastName: { type: ["string", "null"] },
+      email: { type: "string" },
+      phone: { type: ["string", "null"] },
+      onboardingStatus: {
+        type: "string",
+        enum: ["draft", "pending_invitation", "active"],
+      },
+      businessProfileProgress: { type: "number" },
+      business: {
+        type: ["object", "null"],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          sectors: { type: "array", items: { type: "string" } },
+          country: { type: ["string", "null"] },
+        },
+      },
+      userGroups: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+          },
+          required: ["id", "name"],
+        },
+      },
+      hasCompleteProfile: { type: "boolean" },
+      hasPendingActivation: { type: "boolean" },
+    },
+    required: [
+      "userId",
+      "createdAt",
+      "email",
+      "onboardingStatus",
+      "businessProfileProgress",
+      "business",
+      "userGroups",
+      "hasCompleteProfile",
+      "hasPendingActivation",
+    ],
+  } as const;
+
+  export const EntrepreneurListResponseSchema = {
+    type: "object",
+    properties: {
+      items: {
+        type: "array",
+        items: EntrepreneurListItemSchema,
+      },
+      total: { type: "integer" },
+      page: { type: ["integer", "null"] },
+      limit: { type: ["integer", "null"] },
+    },
+    required: ["items", "total"],
+  } as const;
+
+  // ============================================
   // Route Parameter Schemas
   // ============================================
   export const UserIdParamsSchema = {

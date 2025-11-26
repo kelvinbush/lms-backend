@@ -10,6 +10,7 @@ import {
   businessCountries,
   businessPhotos,
   businessVideoLinks,
+  userGroups,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
 import { eq, and, isNull, or, like, sql, inArray, desc } from "drizzle-orm";
@@ -268,6 +269,157 @@ export abstract class AdminSMEService {
       });
       if (error?.status) throw error;
       throw httpError(500, "[LIST_USERS_ERROR] Failed to list SME users");
+    }
+  }
+
+  /**
+   * List entrepreneurs for admin table view
+   */
+  static async listEntrepreneurs(
+    query: AdminSMEModel.ListSMEUsersQuery,
+  ): Promise<AdminSMEModel.EntrepreneurListResponse> {
+    try {
+      const page = query.page ? parseInt(query.page, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit, 10) : 50;
+      const offset = (page - 1) * limit;
+
+      // Build where conditions (reuse logic from listSMEUsers)
+      const conditions: any[] = [isNull(users.deletedAt)];
+
+      if (query.onboardingStatus) {
+        conditions.push(eq(users.onboardingStatus, query.onboardingStatus as any));
+      }
+
+      if (query.search) {
+        const searchTerm = `%${query.search}%`;
+        const searchCondition = or(
+          like(users.email, searchTerm),
+          like(users.firstName, searchTerm),
+          like(users.lastName, searchTerm),
+        );
+        if (searchCondition) {
+          conditions.push(searchCondition);
+        }
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Total count
+      const totalResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(whereClause);
+      const total = Number(totalResult[0]?.count || 0);
+
+      // Users page
+      const userRows = await db
+        .select()
+        .from(users)
+        .where(whereClause)
+        .orderBy(desc(users.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      const userIds = userRows.map((u) => u.id);
+
+      // Progress
+      const progressMap = new Map<string, typeof smeOnboardingProgress.$inferSelect>();
+      if (userIds.length > 0) {
+        const progressRows = await db.query.smeOnboardingProgress.findMany({
+          where: inArray(smeOnboardingProgress.userId, userIds),
+        });
+        progressRows.forEach((p) => {
+          progressMap.set(p.userId, p);
+        });
+      }
+
+      // Businesses
+      const businessByUserId = new Map<string, typeof businessProfiles.$inferSelect>();
+      const businessIds: string[] = [];
+      if (userIds.length > 0) {
+        const businessRows = await db.query.businessProfiles.findMany({
+          where: inArray(businessProfiles.userId, userIds),
+        });
+        businessRows.forEach((b) => {
+          businessByUserId.set(b.userId, b);
+          businessIds.push(b.id);
+        });
+      }
+
+      // User groups (programs) per business
+      const userGroupsByBusinessId = new Map<string, { id: string; name: string }[]>();
+      if (businessIds.length > 0) {
+        const groupRows = await db
+          .select({
+            businessId: businessUserGroups.businessId,
+            id: userGroups.id,
+            name: userGroups.name,
+          })
+          .from(businessUserGroups)
+          .innerJoin(userGroups, eq(businessUserGroups.groupId, userGroups.id))
+          .where(inArray(businessUserGroups.businessId, businessIds));
+
+        for (const row of groupRows) {
+          const arr = userGroupsByBusinessId.get(row.businessId) ?? [];
+          arr.push({ id: row.id, name: row.name });
+          userGroupsByBusinessId.set(row.businessId, arr);
+        }
+      }
+
+      const TOTAL_STEPS = 7;
+
+      const items: AdminSMEModel.EntrepreneurListItem[] = userRows.map((user) => {
+        const progress = progressMap.get(user.id);
+        const business = businessByUserId.get(user.id);
+        const completedSteps = (progress?.completedSteps as number[]) ?? [];
+        const completedCount = completedSteps.length;
+        const businessProfileProgress =
+          TOTAL_STEPS > 0 ? Math.round((completedCount / TOTAL_STEPS) * 100) : 0;
+
+        const groups =
+          business && userGroupsByBusinessId.get(business.id)
+            ? userGroupsByBusinessId.get(business.id)!
+            : [];
+
+        return {
+          userId: user.id,
+          createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
+          imageUrl: user.imageUrl || null,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phone: user.phoneNumber,
+          onboardingStatus: user.onboardingStatus as "draft" | "pending_invitation" | "active",
+          businessProfileProgress,
+          business: business
+            ? {
+                id: business.id,
+                name: business.name,
+                sectors:
+                  (business.sectors as string[]) ??
+                  (business.sector ? [business.sector] : []),
+                country: business.country,
+              }
+            : null,
+          userGroups: groups,
+          hasCompleteProfile: completedCount === TOTAL_STEPS,
+          hasPendingActivation: user.onboardingStatus === "pending_invitation",
+        };
+      });
+
+      return {
+        items,
+        total,
+        page,
+        limit,
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error listing entrepreneurs", {
+        error: error?.message,
+        query,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[LIST_ENTREPRENEURS_ERROR] Failed to list entrepreneurs");
     }
   }
 
