@@ -13,7 +13,7 @@ import {
   userGroups,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { eq, and, isNull, or, like, sql, inArray, desc } from "drizzle-orm";
+import { eq, and, isNull, or, like, sql, inArray, desc, notInArray } from "drizzle-orm";
 import { httpError } from "./admin-sme.utils";
 import { AdminSMEStep1Service } from "./admin-sme.step1.service";
 import { AdminSMEStep2Service } from "./admin-sme.step2.service";
@@ -285,6 +285,14 @@ export abstract class AdminSMEService {
 
       // Build where conditions (reuse logic from listSMEUsers)
       const conditions: any[] = [isNull(users.deletedAt)];
+
+      // Exclude internal/admin users (super-admin, admin, member)
+      conditions.push(
+        or(
+          isNull(users.role),
+          notInArray(users.role, ["super-admin", "admin", "member"]),
+        ),
+      );
 
       if (query.onboardingStatus) {
         conditions.push(eq(users.onboardingStatus, query.onboardingStatus as any));
