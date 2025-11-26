@@ -113,13 +113,16 @@ export abstract class AdminSMEStep4Service {
           } as any);
         }
 
-        // Update user onboarding step
+        // Update user onboarding step and ID fields
         await tx
           .update(users)
           .set({
             onboardingStep: 4,
+            idNumber: payload.idNumber ?? null,
+            taxNumber: payload.taxNumber ?? null,
+            idType: payload.idType ?? null,
             updatedAt: new Date(),
-          })
+          } as any)
           .where(eq(users.id, userId));
       });
 

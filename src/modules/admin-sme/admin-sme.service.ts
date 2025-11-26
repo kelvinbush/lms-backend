@@ -76,6 +76,9 @@ export abstract class AdminSMEService {
           gender: user.gender,
           position: user.position,
           onboardingStatus: user.onboardingStatus as string,
+          idNumber: user.idNumber,
+          taxNumber: user.taxNumber,
+          idType: user.idType,
         },
         business: business
           ? {
@@ -521,6 +524,9 @@ export abstract class AdminSMEService {
           gender: user.gender,
           position: user.position,
           onboardingStatus: user.onboardingStatus as string,
+          idNumber: user.idNumber,
+          taxNumber: user.taxNumber,
+          idType: user.idType,
         },
         business: business
           ? {

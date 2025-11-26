@@ -131,6 +131,9 @@ export namespace AdminSMEModel {
       docType: string;
       docUrl: string;
     }>;
+    idNumber?: string;
+    taxNumber?: string;
+    idType?: string;
   }
 
   export const Step4PersonalDocumentsBodySchema = {
@@ -148,6 +151,9 @@ export namespace AdminSMEModel {
           required: ["docType", "docUrl"],
         },
       },
+      idNumber: { type: "string", maxLength: 50 },
+      taxNumber: { type: "string", maxLength: 50 },
+      idType: { type: "string", maxLength: 50 },
     },
     required: ["documents"],
   } as const;
@@ -281,6 +287,9 @@ export namespace AdminSMEModel {
       gender: string | null;
       position: string | null;
       onboardingStatus: string;
+      idNumber: string | null;
+      taxNumber: string | null;
+      idType: string | null;
     };
     business: {
       id: string | null;
@@ -618,6 +627,9 @@ export namespace AdminSMEModel {
           gender: { type: ["string", "null"] },
           position: { type: ["string", "null"] },
           onboardingStatus: { type: "string" },
+          idNumber: { type: ["string", "null"] },
+          taxNumber: { type: ["string", "null"] },
+          idType: { type: ["string", "null"] }, 
         },
         required: ["email", "onboardingStatus"],
       },

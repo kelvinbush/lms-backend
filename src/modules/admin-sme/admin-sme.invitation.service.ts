@@ -34,12 +34,16 @@ export abstract class AdminSMEInvitationService {
         throw httpError(400, "[USER_ACTIVE] User already has an active account");
       }
 
-      // Check if user already has a pending invitation
+      // If user already has a pending invitation, we still allow resend.
+      // Clerk may return a duplicate invitation error if one exists for this email.
       if (user.onboardingStatus === "pending_invitation") {
-        logger.info("[AdminSME Invitation] User already has pending invitation, will create new one", {
-          userId,
-          email: user.email,
-        });
+        logger.info(
+          "[AdminSME Invitation] User already has pending invitation, will attempt to revoke/replace",
+          {
+            userId,
+            email: user.email,
+          },
+        );
       }
 
       // Prepare Clerk invitation metadata
@@ -79,15 +83,76 @@ export abstract class AdminSMEInvitationService {
           invitationId: invitation?.id,
         });
       } catch (e: any) {
-        const err: any = new Error(
-          e?.errors?.[0]?.message || e?.message || "Failed to create invitation",
-        );
-        err.status = e?.status || 400;
-        logger.error("[AdminSME Invitation] Clerk invitation failed", {
-          email: user.email,
-          error: err.message,
-        });
-        throw err;
+        const clerkMessage: string =
+          e?.errors?.[0]?.message || e?.message || "Failed to create invitation";
+
+        // If Clerk reports a duplicate invitation, try to revoke existing and create a fresh one
+        if (String(clerkMessage).toLowerCase().includes("duplicate invitation")) {
+          logger.warn("[AdminSME Invitation] Duplicate invitation detected, attempting revoke + resend", {
+            email: user.email,
+            userId,
+          });
+
+          try {
+            // Best-effort: list active invitations for this email and revoke them
+            const list: any = await (clerkClient.invitations as any).getInvitationList?.({
+              emailAddress: user.email,
+            });
+
+            if (list?.data?.length) {
+              for (const inv of list.data) {
+                try {
+                  await clerkClient.invitations.revokeInvitation(inv.id as any);
+                } catch (revokeErr: any) {
+                  logger.warn("[AdminSME Invitation] Failed to revoke existing invitation", {
+                    email: user.email,
+                    invitationId: inv.id,
+                    error: revokeErr?.message,
+                  });
+                }
+              }
+            }
+
+            // Try creating a fresh invitation after revoking
+            invitation = await clerkClient.invitations.createInvitation({
+              emailAddress: user.email,
+              publicMetadata: { internal: false },
+              unsafeMetadata: {
+                firstName: user.firstName,
+                lastName: user.lastName,
+                gender: user.gender,
+                phoneNumber: user.phoneNumber,
+                dob: user.dob ? user.dob.toISOString() : undefined,
+              },
+              redirectUrl,
+            } as any);
+
+            logger.info("[AdminSME Invitation] New Clerk invitation created after revocation", {
+              email: user.email,
+              invitationId: invitation?.id,
+            });
+          } catch (reissueError: any) {
+            const err: any = new Error(
+              reissueError?.errors?.[0]?.message ||
+                reissueError?.message ||
+                "Failed to reissue invitation",
+            );
+            err.status = reissueError?.status || 400;
+            logger.error("[AdminSME Invitation] Failed to reissue invitation after duplicate", {
+              email: user.email,
+              error: err.message,
+            });
+            throw err;
+          }
+        } else {
+          const err: any = new Error(clerkMessage);
+          err.status = e?.status || 400;
+          logger.error("[AdminSME Invitation] Clerk invitation failed", {
+            email: user.email,
+            error: err.message,
+          });
+          throw err;
+        }
       }
 
       // Update user status to pending_invitation
