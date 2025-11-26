@@ -6,6 +6,39 @@ import { requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
 
 export async function adminSMERoutes(fastify: FastifyInstance) {
+  // GET /admin/sme/entrepreneurs/stats - Stats for entrepreneurs
+  fastify.get(
+    "/admin/sme/entrepreneurs/stats",
+    {
+      schema: {
+        response: {
+          200: AdminSMEModel.EntrepreneursStatsResponseSchema,
+          400: AdminSMEModel.ErrorResponseSchema,
+          401: AdminSMEModel.ErrorResponseSchema,
+          403: AdminSMEModel.ErrorResponseSchema,
+          500: AdminSMEModel.ErrorResponseSchema,
+        },
+        tags: ["admin-sme"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await requireRole(request, "member");
+        const result = await AdminSMEService.getEntrepreneursStats();
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        logger.error("[AdminSME Routes] Error getting entrepreneurs stats", {
+          error: error?.message,
+        });
+        return reply.code(status).send({
+          error: error?.message || "Internal error",
+          code: error?.code || "INTERNAL_ERROR",
+        });
+      }
+    },
+  );
+
   // PUT /admin/sme/users/:userId/financial-details - Save financial details
   fastify.put(
     "/admin/sme/users/:userId/financial-details",

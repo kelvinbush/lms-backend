@@ -407,6 +407,26 @@ export namespace AdminSMEModel {
   }
 
   // ============================================
+  // Entrepreneurs Stats Types
+  // ============================================
+  export interface StatMetric {
+    value: number;
+    deltaPercent: number;
+  }
+
+  export interface EntrepreneursStatsResponse {
+    period: {
+      current: string;
+      previous: string;
+    };
+    totalSMEs: StatMetric;
+    completeProfiles: StatMetric;
+    incompleteProfiles: StatMetric;
+    pendingActivation: StatMetric;
+    smesWithLoans: StatMetric;
+  }
+
+  // ============================================
   // Document Response Types
   // ============================================
   export interface PersonalDocumentItem {
@@ -762,6 +782,68 @@ export namespace AdminSMEModel {
       },
     },
     required: ["success", "message", "data"],
+  } as const;
+
+  export const EntrepreneursStatsResponseSchema = {
+    type: "object",
+    properties: {
+      period: {
+        type: "object",
+        properties: {
+          current: { type: "string" },
+          previous: { type: "string" },
+        },
+        required: ["current", "previous"],
+      },
+      totalSMEs: {
+        type: "object",
+        properties: {
+          value: { type: "number" },
+          deltaPercent: { type: "number" },
+        },
+        required: ["value", "deltaPercent"],
+      },
+      completeProfiles: {
+        type: "object",
+        properties: {
+          value: { type: "number" },
+          deltaPercent: { type: "number" },
+        },
+        required: ["value", "deltaPercent"],
+      },
+      incompleteProfiles: {
+        type: "object",
+        properties: {
+          value: { type: "number" },
+          deltaPercent: { type: "number" },
+        },
+        required: ["value", "deltaPercent"],
+      },
+      pendingActivation: {
+        type: "object",
+        properties: {
+          value: { type: "number" },
+          deltaPercent: { type: "number" },
+        },
+        required: ["value", "deltaPercent"],
+      },
+      smesWithLoans: {
+        type: "object",
+        properties: {
+          value: { type: "number" },
+          deltaPercent: { type: "number" },
+        },
+        required: ["value", "deltaPercent"],
+      },
+    },
+    required: [
+      "period",
+      "totalSMEs",
+      "completeProfiles",
+      "incompleteProfiles",
+      "pendingActivation",
+      "smesWithLoans",
+    ],
   } as const;
 
   export const BusinessDocumentItemSchema = {

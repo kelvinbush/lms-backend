@@ -11,6 +11,7 @@ import {
   businessPhotos,
   businessVideoLinks,
   userGroups,
+  loanApplications,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
 import { eq, and, isNull, or, like, sql, inArray, desc, notInArray } from "drizzle-orm";
@@ -513,6 +514,148 @@ export abstract class AdminSMEService {
       if (error?.status) throw error;
       throw httpError(500, "[SAVE_FINANCIAL_DETAILS_ERROR] Failed to save financial details");
     }
+  }
+
+  /**
+   * Get aggregated stats for entrepreneurs (SMEs) for admin dashboard
+   * For now, we compute stats for the current calendar month vs previous month.
+   */
+  static async getEntrepreneursStats(): Promise<AdminSMEModel.EntrepreneursStatsResponse> {
+    try {
+      const now = new Date();
+      const currentStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const currentEnd = now;
+      const previousStart = new Date(
+        currentStart.getFullYear(),
+        currentStart.getMonth() - 1,
+        1,
+        0,
+        0,
+        0,
+        0,
+      );
+      const previousEnd = new Date(currentStart.getTime() - 1);
+
+      const formatPeriod = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+      const period = {
+        current: formatPeriod(currentStart),
+        previous: formatPeriod(previousStart),
+      };
+
+      const isEntrepreneurCondition = and(
+        isNull(users.deletedAt),
+        or(isNull(users.role), notInArray(users.role, ["super-admin", "admin", "member"])),
+      );
+
+      const buildWhereForPeriod = (start: Date, end: Date) =>
+        and(
+          isEntrepreneurCondition,
+          sql`users.created_at BETWEEN ${start.toISOString()} AND ${end.toISOString()}`,
+        );
+
+      const [currentAgg, previousAgg] = await Promise.all([
+        this.computeEntrepreneurAggregates(buildWhereForPeriod(currentStart, currentEnd)),
+        this.computeEntrepreneurAggregates(buildWhereForPeriod(previousStart, previousEnd)),
+      ]);
+
+      function delta(current: number, previous: number): number {
+        if (previous === 0) {
+          return current > 0 ? 100 : 0;
+        }
+        return ((current - previous) / previous) * 100;
+      }
+
+      return {
+        period,
+        totalSMEs: {
+          value: currentAgg.total,
+          deltaPercent: delta(currentAgg.total, previousAgg.total),
+        },
+        completeProfiles: {
+          value: currentAgg.completeProfiles,
+          deltaPercent: delta(currentAgg.completeProfiles, previousAgg.completeProfiles),
+        },
+        incompleteProfiles: {
+          value: currentAgg.incompleteProfiles,
+          deltaPercent: delta(currentAgg.incompleteProfiles, previousAgg.incompleteProfiles),
+        },
+        pendingActivation: {
+          value: currentAgg.pendingActivation,
+          deltaPercent: delta(currentAgg.pendingActivation, previousAgg.pendingActivation),
+        },
+        smesWithLoans: {
+          value: currentAgg.smesWithLoans,
+          deltaPercent: delta(currentAgg.smesWithLoans, previousAgg.smesWithLoans),
+        },
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error getting entrepreneurs stats", {
+        error: error?.message,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[GET_ENTREPRENEURS_STATS_ERROR] Failed to get entrepreneurs stats");
+    }
+  }
+
+  /**
+   * Helper to compute aggregates for a given period filter
+   */
+  private static async computeEntrepreneurAggregates(whereClause: any): Promise<{
+    total: number;
+    completeProfiles: number;
+    incompleteProfiles: number;
+    pendingActivation: number;
+    smesWithLoans: number;
+  }> {
+    // Total, complete, pendingActivation in one aggregate query
+    const [row] = await db
+      .select({
+        total: sql<number>`count(*)`,
+        completeProfiles: sql<number>`count(*) filter (
+          where jsonb_array_length("sme_onboarding_progress"."completed_steps") = 7
+        )`,
+        pendingActivation: sql<number>`count(*) filter (
+          where "users"."onboarding_status" = 'pending_invitation'
+        )`,
+      })
+      .from(users)
+      .leftJoin(
+        smeOnboardingProgress,
+        eq(smeOnboardingProgress.userId, users.id),
+      )
+      .where(whereClause);
+
+    const total = Number(row?.total || 0);
+    const completeProfiles = Number(row?.completeProfiles || 0);
+    const pendingActivation = Number(row?.pendingActivation || 0);
+    const incompleteProfiles = Math.max(total - completeProfiles, 0);
+
+    // SMEs with loans: count distinct users that have at least one loan application
+    const [loanRow] = await db
+      .select({
+        count: sql<number>`count(distinct "users"."id")`,
+      })
+      .from(users)
+      .innerJoin(
+        loanApplications,
+        and(
+          eq(loanApplications.userId, users.id),
+          isNull(loanApplications.deletedAt),
+        ),
+      )
+      .where(whereClause);
+
+    const smesWithLoans = Number(loanRow?.count || 0);
+
+    return {
+      total,
+      completeProfiles,
+      incompleteProfiles,
+      pendingActivation,
+      smesWithLoans,
+    };
   }
 
   /**
