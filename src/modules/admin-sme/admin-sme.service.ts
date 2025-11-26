@@ -447,6 +447,102 @@ export abstract class AdminSMEService {
   }
 
   /**
+   * Update entrepreneur details (consolidated endpoint)
+   * Updates all user personal details including core info and metadata fields in a single transaction
+   */
+  static async updateEntrepreneurDetails(
+    userId: string,
+    payload: AdminSMEModel.UpdateEntrepreneurDetailsBody,
+  ): Promise<AdminSMEModel.UpdateEntrepreneurDetailsResponse> {
+    try {
+      // Verify user exists
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      if (!user) {
+        throw httpError(404, "[USER_NOT_FOUND] User not found");
+      }
+
+      // Check if email is being changed and if new email already exists
+      if (payload.email !== user.email) {
+        const existingWithEmail = await db.query.users.findFirst({
+          where: eq(users.email, payload.email),
+        });
+        if (existingWithEmail && existingWithEmail.id !== userId) {
+          throw httpError(409, "[EMAIL_EXISTS] User with this email already exists");
+        }
+      }
+
+      // Ensure dob is a Date object or null
+      const dob =
+        payload.dob === undefined || payload.dob === null
+          ? null
+          : typeof payload.dob === "string"
+            ? new Date(payload.dob)
+            : payload.dob;
+
+      // Validate dob is not in the future
+      if (dob && dob > new Date()) {
+        throw httpError(400, "[INVALID_DOB] Date of birth cannot be in the future");
+      }
+
+      // Update user in a single transaction
+      const { updatedUser } = await db.transaction(async (tx) => {
+        // Single update with all fields
+        const [userResult] = await tx
+          .update(users)
+          .set({
+            email: payload.email,
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            phoneNumber: payload.phone || null,
+            dob: dob,
+            gender: payload.gender,
+            position: payload.position ?? null,
+            idNumber: payload.idNumber ?? null,
+            taxNumber: payload.taxNumber ?? null,
+            idType: payload.idType ?? null,
+            updatedAt: new Date(),
+          } as any)
+          .where(eq(users.id, userId))
+          .returning();
+
+        return { updatedUser: userResult };
+      });
+
+      logger.info("[AdminSME] Entrepreneur details updated", {
+        userId,
+        email: updatedUser.email,
+      });
+
+      return {
+        userId: updatedUser.id,
+        user: {
+          email: updatedUser.email,
+          firstName: updatedUser.firstName || "",
+          lastName: updatedUser.lastName || "",
+          phone: updatedUser.phoneNumber,
+          dob: updatedUser.dob,
+          gender: updatedUser.gender,
+          position: updatedUser.position,
+          idNumber: updatedUser.idNumber,
+          taxNumber: updatedUser.taxNumber,
+          idType: updatedUser.idType,
+          onboardingStatus: updatedUser.onboardingStatus as string,
+        },
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error updating entrepreneur details", {
+        error: error?.message,
+        userId,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[UPDATE_ENTREPRENEUR_DETAILS_ERROR] Failed to update entrepreneur details");
+    }
+  }
+
+  /**
    * Save financial details (business financial summary) for an SME user
    */
   static async saveFinancialDetails(

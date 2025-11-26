@@ -39,6 +39,53 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
     },
   );
 
+  // PUT /admin/sme/users/:userId/details - Update entrepreneur details (consolidated)
+  fastify.put(
+    "/admin/sme/users/:userId/details",
+    {
+      schema: {
+        params: AdminSMEModel.UserIdParamsSchema,
+        body: AdminSMEModel.UpdateEntrepreneurDetailsBodySchema,
+        response: {
+          200: AdminSMEModel.UpdateEntrepreneurDetailsResponseSchema,
+          400: AdminSMEModel.ErrorResponseSchema,
+          401: AdminSMEModel.ErrorResponseSchema,
+          403: AdminSMEModel.ErrorResponseSchema,
+          404: AdminSMEModel.ErrorResponseSchema,
+          409: AdminSMEModel.ErrorResponseSchema,
+          500: AdminSMEModel.ErrorResponseSchema,
+        },
+        tags: ["admin-sme"],
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { userId: string };
+        Body: AdminSMEModel.UpdateEntrepreneurDetailsBody;
+      }>,
+      reply: FastifyReply,
+    ) => {
+      try {
+        await requireRole(request, "member");
+        const result = await AdminSMEService.updateEntrepreneurDetails(
+          request.params.userId,
+          request.body,
+        );
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        logger.error("[AdminSME Routes] Error updating entrepreneur details", {
+          error: error?.message,
+          userId: request.params.userId,
+        });
+        return reply.code(status).send({
+          error: error?.message || "Internal error",
+          code: error?.code || "INTERNAL_ERROR",
+        });
+      }
+    },
+  );
+
   // PUT /admin/sme/users/:userId/financial-details - Save financial details
   fastify.put(
     "/admin/sme/users/:userId/financial-details",

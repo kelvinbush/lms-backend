@@ -407,6 +407,41 @@ export namespace AdminSMEModel {
   }
 
   // ============================================
+  // Update Entrepreneur Details (Consolidated)
+  // ============================================
+  export interface UpdateEntrepreneurDetailsBody {
+    // Core user information (from Step 1)
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    dob?: string | Date;
+    gender: string;
+    position?: string;
+    // User metadata fields (stored in users table)
+    idNumber?: string | null;
+    taxNumber?: string | null;
+    idType?: string | null;
+  }
+
+  export interface UpdateEntrepreneurDetailsResponse {
+    userId: string;
+    user: {
+      email: string;
+      firstName: string; // Required in response (will be empty string if null in DB)
+      lastName: string; // Required in response (will be empty string if null in DB)
+      phone: string | null;
+      dob: Date | null;
+      gender: string | null;
+      position: string | null;
+      idNumber: string | null;
+      taxNumber: string | null;
+      idType: string | null;
+      onboardingStatus: string;
+    };
+  }
+
+  // ============================================
   // Entrepreneurs Stats Types
   // ============================================
   export interface StatMetric {
@@ -890,6 +925,49 @@ export namespace AdminSMEModel {
       },
       defaultReason: { type: ["string", "null"] },
     },
+  } as const;
+
+  export const UpdateEntrepreneurDetailsBodySchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      email: { type: "string", format: "email" },
+      firstName: { type: "string", minLength: 1, maxLength: 100 },
+      lastName: { type: "string", minLength: 1, maxLength: 100 },
+      phone: { type: "string", maxLength: 32 },
+      dob: { type: ["string", "null"], format: "date" },
+      gender: { type: "string", minLength: 1, maxLength: 20 },
+      position: { type: ["string", "null"], maxLength: 50 },
+      idNumber: { type: ["string", "null"], maxLength: 50 },
+      taxNumber: { type: ["string", "null"], maxLength: 50 },
+      idType: { type: ["string", "null"], maxLength: 50 },
+    },
+    required: ["email", "firstName", "lastName", "gender"],
+  } as const;
+
+  export const UpdateEntrepreneurDetailsResponseSchema = {
+    type: "object",
+    properties: {
+      userId: { type: "string" },
+      user: {
+        type: "object",
+        properties: {
+          email: { type: "string" },
+          firstName: { type: "string" },
+          lastName: { type: "string" },
+          phone: { type: ["string", "null"] },
+          dob: { type: ["string", "null"] },
+          gender: { type: ["string", "null"] },
+          position: { type: ["string", "null"] },
+          idNumber: { type: ["string", "null"] },
+          taxNumber: { type: ["string", "null"] },
+          idType: { type: ["string", "null"] },
+          onboardingStatus: { type: "string" },
+        },
+        required: ["email", "firstName", "lastName", "onboardingStatus"],
+      },
+    },
+    required: ["userId", "user"],
   } as const;
 }
 
