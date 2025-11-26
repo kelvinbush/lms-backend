@@ -84,6 +84,17 @@ export abstract class AdminSMEService {
           ? {
               id: business.id,
               name: business.name,
+              averageMonthlyTurnover: business.avgMonthlyTurnover
+                ? Number(business.avgMonthlyTurnover)
+                : null,
+              averageYearlyTurnover: business.avgYearlyTurnover
+                ? Number(business.avgYearlyTurnover)
+                : null,
+              previousLoans: business.borrowingHistory ?? null,
+              loanAmount: business.amountBorrowed ? Number(business.amountBorrowed) : null,
+              defaultCurrency: business.currency ?? null,
+              recentLoanStatus: business.loanStatus ?? null,
+              defaultReason: business.defaultReason ?? null,
             }
           : null,
       };
@@ -435,6 +446,76 @@ export abstract class AdminSMEService {
   }
 
   /**
+   * Save financial details (business financial summary) for an SME user
+   */
+  static async saveFinancialDetails(
+    userId: string,
+    payload: AdminSMEModel.SaveFinancialDetailsBody,
+  ): Promise<AdminSMEModel.OnboardingStateResponse> {
+    try {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      if (!user) {
+        throw httpError(404, "[USER_NOT_FOUND] User not found");
+      }
+
+      const business = await db.query.businessProfiles.findFirst({
+        where: eq(businessProfiles.userId, userId),
+      });
+
+      if (!business) {
+        throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found for financial details");
+      }
+
+      await db
+        .update(businessProfiles)
+        .set({
+          avgMonthlyTurnover:
+            payload.averageMonthlyTurnover !== undefined && payload.averageMonthlyTurnover !== null
+              ? (payload.averageMonthlyTurnover as any)
+              : null,
+          avgYearlyTurnover:
+            payload.averageYearlyTurnover !== undefined && payload.averageYearlyTurnover !== null
+              ? (payload.averageYearlyTurnover as any)
+              : null,
+          borrowingHistory:
+            payload.previousLoans !== undefined ? payload.previousLoans : business.borrowingHistory,
+          amountBorrowed:
+            payload.loanAmount !== undefined && payload.loanAmount !== null
+              ? (payload.loanAmount as any)
+              : null,
+          currency:
+            payload.defaultCurrency !== undefined ? payload.defaultCurrency : business.currency,
+          loanStatus:
+            payload.recentLoanStatus !== undefined
+              ? (payload.recentLoanStatus as string | null)
+              : business.loanStatus,
+          defaultReason:
+            payload.defaultReason !== undefined ? payload.defaultReason : business.defaultReason,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(businessProfiles.id, business.id));
+
+      logger.info("[AdminSME] Financial details updated", {
+        userId,
+        businessId: business.id,
+      });
+
+      // Return updated onboarding state (used by admin screens)
+      return await AdminSMEService.getOnboardingState(userId);
+    } catch (error: any) {
+      logger.error("[AdminSME] Error saving financial details", {
+        error: error?.message,
+        userId,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[SAVE_FINANCIAL_DETAILS_ERROR] Failed to save financial details");
+    }
+  }
+
+  /**
    * Get detailed information about a single SME user
    */
   static async getSMEUserDetail(
@@ -546,6 +627,18 @@ export abstract class AdminSMEService {
               website: business.website ?? null,
               selectionCriteria: (business.selectionCriteria as string[]) ?? null,
               userGroupIds,
+              // Financial details
+              averageMonthlyTurnover: business.avgMonthlyTurnover
+                ? Number(business.avgMonthlyTurnover)
+                : null,
+              averageYearlyTurnover: business.avgYearlyTurnover
+                ? Number(business.avgYearlyTurnover)
+                : null,
+              previousLoans: business.borrowingHistory ?? null,
+              loanAmount: business.amountBorrowed ? Number(business.amountBorrowed) : null,
+              defaultCurrency: business.currency ?? null,
+              recentLoanStatus: business.loanStatus ?? null,
+              defaultReason: business.defaultReason ?? null,
               countriesOfOperation: countriesOfOperation.length > 0 ? countriesOfOperation : null,
               registeredOfficeAddress: business.registeredOfficeAddress ?? null,
               registeredOfficeCity: business.registeredOfficeCity ?? null,

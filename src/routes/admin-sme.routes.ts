@@ -6,6 +6,51 @@ import { requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
 
 export async function adminSMERoutes(fastify: FastifyInstance) {
+  // PUT /admin/sme/users/:userId/financial-details - Save financial details
+  fastify.put(
+    "/admin/sme/users/:userId/financial-details",
+    {
+      schema: {
+        params: AdminSMEModel.UserIdParamsSchema,
+        body: AdminSMEModel.SaveFinancialDetailsBodySchema,
+        response: {
+          200: { type: "object" }, // OnboardingStateResponse
+          400: AdminSMEModel.ErrorResponseSchema,
+          401: AdminSMEModel.ErrorResponseSchema,
+          403: AdminSMEModel.ErrorResponseSchema,
+          404: AdminSMEModel.ErrorResponseSchema,
+          500: AdminSMEModel.ErrorResponseSchema,
+        },
+        tags: ["admin-sme"],
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { userId: string };
+        Body: AdminSMEModel.SaveFinancialDetailsBody;
+      }>,
+      reply: FastifyReply,
+    ) => {
+      try {
+        await requireRole(request, "member");
+        const result = await AdminSMEService.saveFinancialDetails(
+          request.params.userId,
+          request.body,
+        );
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        logger.error("[AdminSME Routes] Error saving financial details", {
+          error: error?.message,
+        });
+        return reply.code(status).send({
+          error: error?.message || "Internal error",
+          code: error?.code || "INTERNAL_ERROR",
+        });
+      }
+    },
+  );
+
   // GET /admin/sme/entrepreneurs - List entrepreneurs for admin table
   fastify.get(
     "/admin/sme/entrepreneurs",

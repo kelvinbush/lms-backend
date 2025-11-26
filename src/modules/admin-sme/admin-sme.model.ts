@@ -294,7 +294,14 @@ export namespace AdminSMEModel {
     business: {
       id: string | null;
       name: string | null;
-      // Add other business fields as needed
+      // Financial details (summary)
+      averageMonthlyTurnover: number | null;
+      averageYearlyTurnover: number | null;
+      previousLoans: boolean | null;
+      loanAmount: number | null;
+      defaultCurrency: string | null;
+      recentLoanStatus: string | null;
+      defaultReason: string | null;
     } | null;
   }
 
@@ -361,6 +368,14 @@ export namespace AdminSMEModel {
       website: string | null;
       selectionCriteria: string[] | null;
       userGroupIds: string[]; // A business can belong to multiple programs/user groups
+      // Financial details (full)
+      averageMonthlyTurnover: number | null;
+      averageYearlyTurnover: number | null;
+      previousLoans: boolean | null;
+      loanAmount: number | null;
+      defaultCurrency: string | null;
+      recentLoanStatus: string | null;
+      defaultReason: string | null;
       // Step 3 extended fields
       countriesOfOperation: string[] | null;
       registeredOfficeAddress: string | null;
@@ -376,6 +391,19 @@ export namespace AdminSMEModel {
       createdAt: string | null;
       updatedAt: string | null;
     } | null;
+  }
+
+  // ============================================
+  // Financial Details Types
+  // ============================================
+  export interface SaveFinancialDetailsBody {
+    averageMonthlyTurnover?: number | null;
+    averageYearlyTurnover?: number | null;
+    previousLoans?: boolean | null;
+    loanAmount?: number | null;
+    defaultCurrency?: string | null;
+    recentLoanStatus?: "fully_repaid" | "currently_repaying" | "defaulted" | null;
+    defaultReason?: string | null;
   }
 
   // ============================================
@@ -646,6 +674,13 @@ export namespace AdminSMEModel {
           city: { type: ["string", "null"] },
           country: { type: ["string", "null"] },
           companyHQ: { type: ["string", "null"] },
+          averageMonthlyTurnover: { type: ["number", "null"] },
+          averageYearlyTurnover: { type: ["number", "null"] },
+          previousLoans: { type: ["boolean", "null"] },
+          loanAmount: { type: ["number", "null"] },
+          defaultCurrency: { type: ["string", "null"] },
+          recentLoanStatus: { type: ["string", "null"] },
+          defaultReason: { type: ["string", "null"] },
           noOfEmployees: { type: ["integer", "null"] },
           website: { type: ["string", "null"] },
           selectionCriteria: {
@@ -756,6 +791,23 @@ export namespace AdminSMEModel {
       },
     },
     required: ["success", "message", "data"],
+  } as const;
+
+  export const SaveFinancialDetailsBodySchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      averageMonthlyTurnover: { type: ["number", "null"] },
+      averageYearlyTurnover: { type: ["number", "null"] },
+      previousLoans: { type: ["boolean", "null"] },
+      loanAmount: { type: ["number", "null"] },
+      defaultCurrency: { type: ["string", "null"] },
+      recentLoanStatus: {
+        type: ["string", "null"],
+        enum: ["fully_repaid", "currently_repaying", "defaulted", null],
+      },
+      defaultReason: { type: ["string", "null"] },
+    },
   } as const;
 }
 
