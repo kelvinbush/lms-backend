@@ -40,15 +40,44 @@ export abstract class AdminSMEAuditService {
         return;
       }
 
+      // Helper to remove undefined values from objects before stringifying
+      // Only includes properties that have actual values (not undefined)
+      const cleanObject = (obj: Record<string, any> | undefined): Record<string, any> | null => {
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+        const cleaned: Record<string, any> = {};
+        for (const [key, value] of Object.entries(obj)) {
+          // Only include properties that are not undefined
+          // Include null values as they can be meaningful (e.g., explicitly clearing a field)
+          if (value !== undefined) {
+            cleaned[key] = value;
+          }
+        }
+        // Only return non-empty objects
+        return Object.keys(cleaned).length > 0 ? cleaned : null;
+      };
+
+      const cleanedDetails = cleanObject(params.details);
+      const cleanedBeforeData = cleanObject(params.beforeData);
+      const cleanedAfterData = cleanObject(params.afterData);
+
+      // Debug logging to help diagnose empty details
+      if (params.details && !cleanedDetails) {
+        logger.debug("[AdminSME Audit] Details object was empty after cleaning", {
+          action: params.action,
+          originalKeys: Object.keys(params.details),
+          originalValues: Object.values(params.details),
+        });
+      }
+
       // Insert audit trail entry
       await db.insert(adminSMEAuditTrail).values({
         adminUserId: adminUser.id,
         smeUserId: params.smeUserId,
         action: params.action,
         description: params.description || null,
-        details: params.details ? JSON.stringify(params.details) : null,
-        beforeData: params.beforeData ? JSON.stringify(params.beforeData) : null,
-        afterData: params.afterData ? JSON.stringify(params.afterData) : null,
+        details: cleanedDetails ? JSON.stringify(cleanedDetails) : null,
+        beforeData: cleanedBeforeData ? JSON.stringify(cleanedBeforeData) : null,
+        afterData: cleanedAfterData ? JSON.stringify(cleanedAfterData) : null,
         ipAddress: params.ipAddress || null,
         userAgent: params.userAgent || null,
       } as any);

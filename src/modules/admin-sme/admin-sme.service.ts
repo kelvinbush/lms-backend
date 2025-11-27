@@ -1091,6 +1091,21 @@ export abstract class AdminSMEService {
         });
       }
 
+      // Helper to parse JSON and return null for empty objects
+      const parseJsonOrNull = (jsonString: string | null): Record<string, any> | null => {
+        if (!jsonString) return null;
+        try {
+          const parsed = JSON.parse(jsonString);
+          // Return null for empty objects instead of {}
+          if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+            return Object.keys(parsed).length > 0 ? parsed : null;
+          }
+          return parsed;
+        } catch {
+          return null;
+        }
+      };
+
       // Transform to response format
       const items: AdminSMEModel.AuditTrailItem[] = auditRows.map((entry) => {
         const adminUser = adminUserMap.get(entry.adminUserId);
@@ -1099,9 +1114,9 @@ export abstract class AdminSMEService {
           id: entry.id,
           action: entry.action,
           description: entry.description || null,
-          details: entry.details ? JSON.parse(entry.details) : null,
-          beforeData: entry.beforeData ? JSON.parse(entry.beforeData) : null,
-          afterData: entry.afterData ? JSON.parse(entry.afterData) : null,
+          details: parseJsonOrNull(entry.details),
+          beforeData: parseJsonOrNull(entry.beforeData),
+          afterData: parseJsonOrNull(entry.afterData),
           adminUser: {
             id: adminUser?.id || entry.adminUserId,
             email: adminUser?.email || "Unknown",

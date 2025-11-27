@@ -13,6 +13,17 @@ import { eq } from "drizzle-orm";
 /**
  * Helper to log admin action (non-blocking)
  */
+// Helper to build details object, only including properties with actual values
+function buildDetailsObject(source: Record<string, any>, fields: string[]): Record<string, any> | undefined {
+  const details: Record<string, any> = {};
+  for (const field of fields) {
+    if (source[field] !== undefined) {
+      details[field] = source[field];
+    }
+  }
+  return Object.keys(details).length > 0 ? details : undefined;
+}
+
 async function logAdminAction(
   request: FastifyRequest,
   smeUserId: string,
@@ -112,22 +123,32 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         );
         
         // Log audit action (non-blocking)
+        // Only include properties that actually have values
+        const details = buildDetailsObject(request.body, [
+          "email",
+          "firstName",
+          "lastName",
+          "phone",
+          "gender",
+          "position",
+        ]);
+        // Add computed fields if the source fields exist
+        if (details && request.body.idNumber !== undefined) {
+          details.hasIdNumber = !!request.body.idNumber;
+        }
+        if (details && request.body.taxNumber !== undefined) {
+          details.hasTaxNumber = !!request.body.taxNumber;
+        }
+        if (details && request.body.idType !== undefined) {
+          details.idType = request.body.idType;
+        }
+        
         logAdminAction(
           request,
           request.params.userId,
           "user_details_updated",
           `Updated entrepreneur details for ${request.body.email}`,
-          {
-            email: request.body.email,
-            firstName: request.body.firstName,
-            lastName: request.body.lastName,
-            phone: request.body.phone,
-            gender: request.body.gender,
-            position: request.body.position,
-            hasIdNumber: !!request.body.idNumber,
-            hasTaxNumber: !!request.body.taxNumber,
-            idType: request.body.idType,
-          },
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
