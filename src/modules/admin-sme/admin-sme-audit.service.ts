@@ -43,23 +43,8 @@ export abstract class AdminSMEAuditService {
       // Helper to safely stringify objects (filters out undefined, keeps null)
       const stringifyObject = (obj: Record<string, any> | undefined): string | null => {
         if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
-          logger.info("[AdminSME Audit] stringifyObject: invalid input", {
-            obj,
-            objType: typeof obj,
-            isArray: Array.isArray(obj),
-          });
           return null;
         }
-        
-        logger.info("[AdminSME Audit] stringifyObject: processing", {
-          inputKeys: Object.keys(obj),
-          inputEntries: Object.entries(obj).map(([k, v]) => ({
-            key: k,
-            value: v,
-            type: typeof v,
-            isUndefined: v === undefined,
-          })),
-        });
         
         // Filter out undefined values, keep null (null is meaningful)
         const cleaned: Record<string, any> = {};
@@ -69,29 +54,9 @@ export abstract class AdminSMEAuditService {
           }
         }
         
-        logger.info("[AdminSME Audit] stringifyObject: after cleaning", {
-          cleanedKeys: Object.keys(cleaned),
-          cleanedEntries: Object.entries(cleaned),
-          willStringify: Object.keys(cleaned).length > 0,
-        });
-        
         // Only stringify if there are actual properties
-        const result = Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
-        logger.info("[AdminSME Audit] stringifyObject: result", {
-          result,
-          resultLength: result?.length,
-        });
-        return result;
+        return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
       };
-
-      const detailsJson = stringifyObject(params.details);
-      
-      logger.info("[AdminSME Audit] About to insert", {
-        action: params.action,
-        hasDetails: !!params.details,
-        detailsJson,
-        detailsJsonLength: detailsJson?.length,
-      });
 
       // Insert audit trail entry
       await db.insert(adminSMEAuditTrail).values({
@@ -99,7 +64,7 @@ export abstract class AdminSMEAuditService {
         smeUserId: params.smeUserId,
         action: params.action,
         description: params.description || null,
-        details: detailsJson,
+        details: stringifyObject(params.details),
         beforeData: stringifyObject(params.beforeData),
         afterData: stringifyObject(params.afterData),
         ipAddress: params.ipAddress || null,

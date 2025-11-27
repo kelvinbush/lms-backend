@@ -459,9 +459,9 @@ export namespace AdminSMEModel {
       id: { type: "string" },
       action: { type: "string" },
       description: { type: ["string", "null"] },
-      details: { type: ["object", "null"] },
-      beforeData: { type: ["object", "null"] },
-      afterData: { type: ["object", "null"] },
+      details: { type: ["object", "null"], additionalProperties: true },
+      beforeData: { type: ["object", "null"], additionalProperties: true },
+      afterData: { type: ["object", "null"], additionalProperties: true },
       adminUser: {
         type: "object",
         properties: {
