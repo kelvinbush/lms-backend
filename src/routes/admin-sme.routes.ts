@@ -11,16 +11,53 @@ import { users } from "../db/schema";
 import { eq } from "drizzle-orm";
 
 /**
- * Helper to log admin action (non-blocking)
+ * Helper to build audit details object
+ * Only includes properties that actually exist in the source object (handles partial updates)
+ * Supports field mapping (e.g., { sourceField: 'targetField' }) and computed values
  */
-// Helper to build details object, only including properties with actual values
-function buildDetailsObject(source: Record<string, any>, fields: string[]): Record<string, any> | undefined {
+function buildAuditDetails(
+  source: Record<string, any>,
+  config: {
+    // Direct field mappings: source field name -> target field name (or same if string)
+    fields?: string[] | Record<string, string>;
+    // Computed fields: function that returns a value if condition is met
+    computed?: Array<{
+      key: string;
+      value: any;
+      condition?: (source: Record<string, any>) => boolean;
+    }>;
+  },
+): Record<string, any> | undefined {
   const details: Record<string, any> = {};
-  for (const field of fields) {
-    if (source[field] !== undefined) {
-      details[field] = source[field];
+
+  // Handle direct field mappings
+  if (config.fields) {
+    if (Array.isArray(config.fields)) {
+      // Simple array: include field if it exists in source
+      for (const field of config.fields) {
+        if (field in source) {
+          details[field] = source[field];
+        }
+      }
+    } else {
+      // Object mapping: { sourceField: 'targetField' }
+      for (const [sourceField, targetField] of Object.entries(config.fields)) {
+        if (sourceField in source) {
+          details[targetField] = source[sourceField];
+        }
+      }
     }
   }
+
+  // Handle computed fields
+  if (config.computed) {
+    for (const computed of config.computed) {
+      if (!computed.condition || computed.condition(source)) {
+        details[computed.key] = computed.value;
+      }
+    }
+  }
+
   return Object.keys(details).length > 0 ? details : undefined;
 }
 
@@ -123,25 +160,13 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         );
         
         // Log audit action (non-blocking)
-        // Only include properties that actually have values
-        const details = buildDetailsObject(request.body, [
-          "email",
-          "firstName",
-          "lastName",
-          "phone",
-          "gender",
-          "position",
-        ]);
-        // Add computed fields if the source fields exist
-        if (details && request.body.idNumber !== undefined) {
-          details.hasIdNumber = !!request.body.idNumber;
-        }
-        if (details && request.body.taxNumber !== undefined) {
-          details.hasTaxNumber = !!request.body.taxNumber;
-        }
-        if (details && request.body.idType !== undefined) {
-          details.idType = request.body.idType;
-        }
+        const details = buildAuditDetails(request.body, {
+          fields: ["email", "firstName", "lastName", "phone", "gender", "position", "idType"],
+          computed: [
+            { key: "hasIdNumber", value: !!request.body.idNumber, condition: (src) => "idNumber" in src },
+            { key: "hasTaxNumber", value: !!request.body.taxNumber, condition: (src) => "taxNumber" in src },
+          ],
+        });
         
         logAdminAction(
           request,
@@ -199,20 +224,26 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         );
         
         // Log audit action (non-blocking)
+        const details = buildAuditDetails(request.body, {
+          fields: [
+            "averageMonthlyTurnover",
+            "averageYearlyTurnover",
+            "previousLoans",
+            "loanAmount",
+            "defaultCurrency",
+            "recentLoanStatus",
+          ],
+          computed: [
+            { key: "hasDefaultReason", value: !!request.body.defaultReason, condition: (src) => "defaultReason" in src },
+          ],
+        });
+        
         logAdminAction(
           request,
           request.params.userId,
           "financial_details_updated",
           `Updated financial details`,
-          {
-            averageMonthlyTurnover: request.body.averageMonthlyTurnover,
-            averageYearlyTurnover: request.body.averageYearlyTurnover,
-            previousLoans: request.body.previousLoans,
-            loanAmount: request.body.loanAmount,
-            defaultCurrency: request.body.defaultCurrency,
-            recentLoanStatus: request.body.recentLoanStatus,
-            hasDefaultReason: !!request.body.defaultReason,
-          },
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
@@ -360,19 +391,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.createSMEUser(request.body);
         
         // Log audit action (non-blocking)
+        const details = buildAuditDetails(request.body, {
+          fields: ["email", "firstName", "lastName", "phone", "gender", "position"],
+        });
+        
         logAdminAction(
           request,
           result.userId,
           "user_created",
           `Created SME user: ${request.body.email}`,
-          {
-            email: request.body.email,
-            firstName: request.body.firstName,
-            lastName: request.body.lastName,
-            phone: request.body.phone,
-            gender: request.body.gender,
-            position: request.body.position,
-          },
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
@@ -407,19 +435,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.updateSMEUser(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
+        const details = buildAuditDetails(request.body, {
+          fields: ["email", "firstName", "lastName", "phone", "gender", "position"],
+        });
+        
         logAdminAction(
           request,
           request.params.userId,
           "step_1_saved",
           `Updated user information for ${request.body.email}`,
-          {
-            email: request.body.email,
-            firstName: request.body.firstName,
-            lastName: request.body.lastName,
-            phone: request.body.phone,
-            gender: request.body.gender,
-            position: request.body.position,
-          },
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
@@ -453,27 +478,31 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.saveBusinessBasicInfo(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
-        // Only include properties that are actually present in the request body
-        const details: Record<string, any> = {};
-        if ("name" in request.body) details.businessName = request.body.name;
-        if ("entityType" in request.body) details.entityType = request.body.entityType;
-        if ("year" in request.body) details.yearOfIncorporation = request.body.year;
-        if ("sectors" in request.body) details.sectors = request.body.sectors;
-        if ("description" in request.body) details.hasDescription = !!request.body.description;
-        if ("userGroupId" in request.body) details.userGroupId = request.body.userGroupId;
-        if ("criteria" in request.body) details.criteria = request.body.criteria;
-        if ("noOfEmployees" in request.body) details.noOfEmployees = request.body.noOfEmployees;
-        if ("website" in request.body) details.hasWebsite = !!request.body.website;
-        if ("videoLinks" in request.body) details.videoLinkCount = request.body.videoLinks?.length || 0;
-        if ("businessPhotos" in request.body) details.businessPhotoCount = request.body.businessPhotos?.length || 0;
-        if ("logo" in request.body) details.hasLogo = !!request.body.logo;
+        const details = buildAuditDetails(request.body, {
+          fields: {
+            name: "businessName",
+            entityType: "entityType",
+            year: "yearOfIncorporation",
+            sectors: "sectors",
+            userGroupId: "userGroupId",
+            criteria: "criteria",
+            noOfEmployees: "noOfEmployees",
+          },
+          computed: [
+            { key: "hasDescription", value: !!request.body.description, condition: (src) => "description" in src },
+            { key: "hasWebsite", value: !!request.body.website, condition: (src) => "website" in src },
+            { key: "hasLogo", value: !!request.body.logo, condition: (src) => "logo" in src },
+            { key: "videoLinkCount", value: request.body.videoLinks?.length || 0, condition: (src) => "videoLinks" in src },
+            { key: "businessPhotoCount", value: request.body.businessPhotos?.length || 0, condition: (src) => "businessPhotos" in src },
+          ],
+        });
         
         logAdminAction(
           request,
           request.params.userId,
           "step_2_saved",
           `Saved business basic info: ${request.body.name || "N/A"}`,
-          Object.keys(details).length > 0 ? details : undefined,
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
@@ -507,19 +536,19 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.saveLocationInfo(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
+        const details = buildAuditDetails(request.body, {
+          fields: ["countriesOfOperation", "companyHQ", "city", "registeredOfficeCity", "registeredOfficeZipCode"],
+          computed: [
+            { key: "hasRegisteredOfficeAddress", value: !!request.body.registeredOfficeAddress, condition: (src) => "registeredOfficeAddress" in src },
+          ],
+        });
+        
         logAdminAction(
           request,
           request.params.userId,
           "step_3_saved",
           `Saved location info`,
-          {
-            countriesOfOperation: request.body.countriesOfOperation,
-            companyHQ: request.body.companyHQ,
-            city: request.body.city,
-            hasRegisteredOfficeAddress: !!request.body.registeredOfficeAddress,
-            registeredOfficeCity: request.body.registeredOfficeCity,
-            registeredOfficeZipCode: request.body.registeredOfficeZipCode,
-          },
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
@@ -553,18 +582,22 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.savePersonalDocuments(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
+        const details = buildAuditDetails(request.body, {
+          fields: ["idType"],
+          computed: [
+            { key: "documentCount", value: request.body.documents?.length || 0, condition: (src) => "documents" in src },
+            { key: "documentTypes", value: request.body.documents?.map((d) => d.docType) || [], condition: (src) => "documents" in src },
+            { key: "hasIdNumber", value: !!request.body.idNumber, condition: (src) => "idNumber" in src },
+            { key: "hasTaxNumber", value: !!request.body.taxNumber, condition: (src) => "taxNumber" in src },
+          ],
+        });
+        
         logAdminAction(
           request,
           request.params.userId,
           "step_4_saved",
           `Saved personal documents (${request.body.documents?.length || 0} documents)`,
-          {
-            documentCount: request.body.documents?.length || 0,
-            documentTypes: request.body.documents?.map((d) => d.docType) || [],
-            hasIdNumber: !!request.body.idNumber,
-            hasTaxNumber: !!request.body.taxNumber,
-            idType: request.body.idType,
-          },
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
@@ -598,16 +631,20 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.saveCompanyInfoDocuments(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
+        const details = buildAuditDetails(request.body, {
+          computed: [
+            { key: "documentCount", value: request.body.documents?.length || 0, condition: (src) => "documents" in src },
+            { key: "documentTypes", value: request.body.documents?.map((d) => d.docType) || [], condition: (src) => "documents" in src },
+            { key: "passwordProtectedCount", value: request.body.documents?.filter((d) => d.isPasswordProtected).length || 0, condition: (src) => "documents" in src },
+          ],
+        });
+        
         logAdminAction(
           request,
           request.params.userId,
           "step_5_saved",
           `Saved company info documents (${request.body.documents?.length || 0} documents)`,
-          {
-            documentCount: request.body.documents?.length || 0,
-            documentTypes: request.body.documents?.map((d) => d.docType) || [],
-            passwordProtectedCount: request.body.documents?.filter((d) => d.isPasswordProtected).length || 0,
-          },
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
@@ -641,18 +678,22 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.saveFinancialDocuments(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
+        const details = buildAuditDetails(request.body, {
+          computed: [
+            { key: "documentCount", value: request.body.documents?.length || 0, condition: (src) => "documents" in src },
+            { key: "documentTypes", value: request.body.documents?.map((d) => d.docType) || [], condition: (src) => "documents" in src },
+            { key: "passwordProtectedCount", value: request.body.documents?.filter((d) => d.isPasswordProtected).length || 0, condition: (src) => "documents" in src },
+            { key: "hasBankName", value: request.body.documents?.some((d) => d.docBankName) || false, condition: (src) => "documents" in src },
+            { key: "hasYear", value: request.body.documents?.some((d) => d.docYear) || false, condition: (src) => "documents" in src },
+          ],
+        });
+        
         logAdminAction(
           request,
           request.params.userId,
           "step_6_saved",
           `Saved financial documents (${request.body.documents?.length || 0} documents)`,
-          {
-            documentCount: request.body.documents?.length || 0,
-            documentTypes: request.body.documents?.map((d) => d.docType) || [],
-            passwordProtectedCount: request.body.documents?.filter((d) => d.isPasswordProtected).length || 0,
-            hasBankName: request.body.documents?.some((d) => d.docBankName) || false,
-            hasYear: request.body.documents?.some((d) => d.docYear) || false,
-          },
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
@@ -686,16 +727,20 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.savePermitAndPitchDocuments(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
+        const details = buildAuditDetails(request.body, {
+          computed: [
+            { key: "documentCount", value: request.body.documents?.length || 0, condition: (src) => "documents" in src },
+            { key: "documentTypes", value: request.body.documents?.map((d) => d.docType) || [], condition: (src) => "documents" in src },
+            { key: "passwordProtectedCount", value: request.body.documents?.filter((d) => d.isPasswordProtected).length || 0, condition: (src) => "documents" in src },
+          ],
+        });
+        
         logAdminAction(
           request,
           request.params.userId,
           "step_7_saved",
           `Saved permits & pitch deck documents (${request.body.documents?.length || 0} documents)`,
-          {
-            documentCount: request.body.documents?.length || 0,
-            documentTypes: request.body.documents?.map((d) => d.docType) || [],
-            passwordProtectedCount: request.body.documents?.filter((d) => d.isPasswordProtected).length || 0,
-          },
+          details,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
