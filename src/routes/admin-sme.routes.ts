@@ -453,25 +453,27 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.saveBusinessBasicInfo(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
+        // Only include properties that are actually present in the request body
+        const details: Record<string, any> = {};
+        if ("name" in request.body) details.businessName = request.body.name;
+        if ("entityType" in request.body) details.entityType = request.body.entityType;
+        if ("year" in request.body) details.yearOfIncorporation = request.body.year;
+        if ("sectors" in request.body) details.sectors = request.body.sectors;
+        if ("description" in request.body) details.hasDescription = !!request.body.description;
+        if ("userGroupId" in request.body) details.userGroupId = request.body.userGroupId;
+        if ("criteria" in request.body) details.criteria = request.body.criteria;
+        if ("noOfEmployees" in request.body) details.noOfEmployees = request.body.noOfEmployees;
+        if ("website" in request.body) details.hasWebsite = !!request.body.website;
+        if ("videoLinks" in request.body) details.videoLinkCount = request.body.videoLinks?.length || 0;
+        if ("businessPhotos" in request.body) details.businessPhotoCount = request.body.businessPhotos?.length || 0;
+        if ("logo" in request.body) details.hasLogo = !!request.body.logo;
+        
         logAdminAction(
           request,
           request.params.userId,
           "step_2_saved",
-          `Saved business basic info: ${request.body.name}`,
-          {
-            businessName: request.body.name,
-            entityType: request.body.entityType,
-            yearOfIncorporation: request.body.year,
-            sectors: request.body.sectors,
-            hasDescription: !!request.body.description,
-            userGroupId: request.body.userGroupId,
-            criteria: request.body.criteria,
-            noOfEmployees: request.body.noOfEmployees,
-            hasWebsite: !!request.body.website,
-            videoLinkCount: request.body.videoLinks?.length || 0,
-            businessPhotoCount: request.body.businessPhotos?.length || 0,
-            hasLogo: !!request.body.logo,
-          },
+          `Saved business basic info: ${request.body.name || "N/A"}`,
+          Object.keys(details).length > 0 ? details : undefined,
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
