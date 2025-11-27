@@ -859,19 +859,20 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         // Log audit action (check if it's a resend by checking onboarding status)
         const smeUser = await db.query.users.findFirst({
           where: eq(users.id, request.params.userId),
-          columns: { onboardingStatus: true },
+          columns: { onboardingStatus: true, email: true },
         });
         const isResend = smeUser?.onboardingStatus === "pending_invitation";
+        const smeEmail = smeUser?.email || "Unknown";
         
         // Log audit action (non-blocking)
         logAdminAction(
           request,
           request.params.userId,
           isResend ? "invitation_resent" : "invitation_sent",
-          isResend ? `Resent invitation to SME user (${result.email})` : `Sent invitation to SME user (${result.email})`,
+          isResend ? `Resent invitation to SME user (${smeEmail})` : `Sent invitation to SME user (${smeEmail})`,
           {
             invitationId: result.invitationId,
-            email: result.email,
+            email: smeEmail,
             isResend,
           },
         ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
