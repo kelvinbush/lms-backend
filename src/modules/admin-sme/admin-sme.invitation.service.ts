@@ -1,8 +1,8 @@
 import type { AdminSMEModel } from "./admin-sme.model";
 import { db } from "../../db";
-import { users } from "../../db/schema";
+import { users, businessProfiles } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { clerkClient } from "@clerk/fastify";
 import { httpError } from "./admin-sme.utils";
 
@@ -27,6 +27,18 @@ export abstract class AdminSMEInvitationService {
 
       if (!user) {
         throw httpError(404, "[USER_NOT_FOUND] User not found");
+      }
+
+      // Check if user has a business (required before sending invitation)
+      const business = await db.query.businessProfiles.findFirst({
+        where: and(
+          eq(businessProfiles.userId, userId),
+          isNull(businessProfiles.deletedAt)
+        ),
+      });
+
+      if (!business) {
+        throw httpError(400, "[NO_BUSINESS] User must have a business profile before invitation can be sent. Please complete Step 2 first.");
       }
 
       // Check if user already has an active Clerk account

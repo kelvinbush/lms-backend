@@ -7,7 +7,7 @@ import fastifyPlugin from 'fastify-plugin';
 import fastifyCors from '@fastify/cors';
 
 export const corsPlugin = fastifyPlugin(async (fastify: FastifyInstance) => {
-  const appUrl = process.env.APP_URL;
+  const appUrl = process.env.APPS_URL_CORS;
   const nodeEnv = process.env.NODE_ENV || 'development';
 
   // Build origin checker: support comma-separated APP_URL list

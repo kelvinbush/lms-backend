@@ -31,7 +31,7 @@ export class InternalUsersService {
 
     await InternalUsersService.requireSuperAdminOrThrow(invitedByClerkUserId);
 
-    const appUrl = process.env.APP_URL?.replace(/\/$/, "");
+    const appUrl = process.env.ADMIN_URL?.replace(/\/$/, "");
     if (!appUrl) {
       const err: any = new Error("APP_URL is not configured");
       err.status = 500;
@@ -101,7 +101,7 @@ export class InternalUsersService {
 
     // Step 3: Batch fetch Clerk user statuses (fixes N+1 query problem)
     const clerkUserStatuses = await this.batchFetchClerkUserStatuses(
-      localUsers.map((u) => u.clerkId),
+      localUsers.map((u) => u.clerkId).filter((id): id is string => id !== null),
     );
 
     // Step 4: Transform invitations to items
@@ -224,11 +224,16 @@ export class InternalUsersService {
     clerkStatuses: Map<string, { isActive: boolean; error?: string }>,
   ): InternalUsersModel.ListedUserItem[] {
     return localUsers.map((user) => {
-      // Get Clerk status (default to inactive if not found)
-      const clerkStatus = clerkStatuses.get(user.clerkId) || {
-        isActive: false,
-        error: "Clerk status not found",
-      };
+      // Get Clerk status (default to inactive if not found or no clerkId)
+      const clerkStatus = user.clerkId
+        ? clerkStatuses.get(user.clerkId) || {
+            isActive: false,
+            error: "Clerk status not found",
+          }
+        : {
+            isActive: false,
+            error: "No Clerk ID",
+          };
 
       return {
         name:
@@ -238,7 +243,7 @@ export class InternalUsersService {
         email: user.email,
         role: user.role as InternalUsersModel.Role,
         status: clerkStatus.isActive ? ("active" as const) : ("inactive" as const),
-        clerkId: user.clerkId,
+        clerkId: user.clerkId || undefined,
         createdAt: user.createdAt?.toISOString(),
         updatedAt: user.updatedAt?.toISOString(),
       };

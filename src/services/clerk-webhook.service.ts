@@ -8,6 +8,7 @@ import { User } from "../modules/user/user.service";
 import { emailService } from "./email.service";
 import { UserDeletionService } from "./user-deletion.service";
 import type { WebhookEvent } from "@clerk/fastify";
+import { clerkClient } from "@clerk/fastify";
 
 export interface ClerkWebhookHandlerResult {
   success: boolean;
@@ -201,6 +202,30 @@ export class ClerkWebhookService {
 
       // Wait for all operations to complete
       await Promise.allSettled(operations);
+
+      // Update Clerk publicMetadata for SME users (non-internal users)
+      if (!isInternal && user.clerkId) {
+        try {
+          await clerkClient.users.updateUser(user.clerkId, {
+            publicMetadata: {
+              isPhoneVerified: true,
+              onBoardingStage: 1,
+              isInternal: false,
+            },
+          });
+          logger.info("[WEBHOOK user.created] Updated Clerk publicMetadata for SME user", {
+            email: user.email,
+            clerkId: user.clerkId,
+          });
+        } catch (e: any) {
+          logger.error("[WEBHOOK user.created] Failed to update Clerk publicMetadata", {
+            email: user.email,
+            clerkId: user.clerkId,
+            error: e?.message,
+          });
+          // Do not fail the request if metadata update fails
+        }
+      }
 
       // Send welcome email and phone OTP for non-internal users (async, non-blocking)
       // Using Promise.allSettled to run in parallel without blocking on errors
