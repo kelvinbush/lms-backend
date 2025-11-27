@@ -43,7 +43,7 @@ export abstract class AdminSMEAuditService {
       // Helper to safely stringify objects (filters out undefined, keeps null)
       const stringifyObject = (obj: Record<string, any> | undefined): string | null => {
         if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
-          logger.debug("[AdminSME Audit] stringifyObject: invalid input", {
+          logger.info("[AdminSME Audit] stringifyObject: invalid input", {
             obj,
             objType: typeof obj,
             isArray: Array.isArray(obj),
@@ -51,7 +51,7 @@ export abstract class AdminSMEAuditService {
           return null;
         }
         
-        logger.debug("[AdminSME Audit] stringifyObject: processing", {
+        logger.info("[AdminSME Audit] stringifyObject: processing", {
           inputKeys: Object.keys(obj),
           inputEntries: Object.entries(obj).map(([k, v]) => ({
             key: k,
@@ -69,7 +69,7 @@ export abstract class AdminSMEAuditService {
           }
         }
         
-        logger.debug("[AdminSME Audit] stringifyObject: after cleaning", {
+        logger.info("[AdminSME Audit] stringifyObject: after cleaning", {
           cleanedKeys: Object.keys(cleaned),
           cleanedEntries: Object.entries(cleaned),
           willStringify: Object.keys(cleaned).length > 0,
@@ -77,7 +77,7 @@ export abstract class AdminSMEAuditService {
         
         // Only stringify if there are actual properties
         const result = Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
-        logger.debug("[AdminSME Audit] stringifyObject: result", {
+        logger.info("[AdminSME Audit] stringifyObject: result", {
           result,
           resultLength: result?.length,
         });
@@ -86,7 +86,7 @@ export abstract class AdminSMEAuditService {
 
       const detailsJson = stringifyObject(params.details);
       
-      logger.debug("[AdminSME Audit] About to insert", {
+      logger.info("[AdminSME Audit] About to insert", {
         action: params.action,
         hasDetails: !!params.details,
         detailsJson,

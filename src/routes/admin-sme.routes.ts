@@ -480,7 +480,7 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.saveBusinessBasicInfo(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
-        logger.debug("[AdminSME Routes] Building audit details for step_2", {
+        logger.info("[AdminSME Routes] Building audit details for step_2", {
           requestBodyKeys: Object.keys(request.body),
           requestBodyEntries: Object.entries(request.body).map(([k, v]) => ({
             key: k,
@@ -510,7 +510,7 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
           ],
         });
         
-        logger.debug("[AdminSME Routes] Built audit details", {
+        logger.info("[AdminSME Routes] Built audit details", {
           details,
           detailsType: typeof details,
           detailsKeys: details ? Object.keys(details) : [],

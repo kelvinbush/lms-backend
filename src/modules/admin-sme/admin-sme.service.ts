@@ -1094,18 +1094,18 @@ export abstract class AdminSMEService {
       // Helper to parse JSON and return null for empty objects
       const parseJsonOrNull = (jsonString: string | null): Record<string, any> | null => {
         if (!jsonString) {
-          logger.debug("[AdminSME] parseJsonOrNull: null or empty input");
+          logger.info("[AdminSME] parseJsonOrNull: null or empty input");
           return null;
         }
         
-        logger.debug("[AdminSME] parseJsonOrNull: parsing", {
+        logger.info("[AdminSME] parseJsonOrNull: parsing", {
           jsonString,
           jsonStringLength: jsonString.length,
         });
         
         try {
           const parsed = JSON.parse(jsonString);
-          logger.debug("[AdminSME] parseJsonOrNull: parsed", {
+          logger.info("[AdminSME] parseJsonOrNull: parsed", {
             parsed,
             parsedType: typeof parsed,
             isArray: Array.isArray(parsed),
@@ -1115,7 +1115,7 @@ export abstract class AdminSMEService {
           // Return null for empty objects instead of {}
           if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
             const result = Object.keys(parsed).length > 0 ? parsed : null;
-            logger.debug("[AdminSME] parseJsonOrNull: result", {
+            logger.info("[AdminSME] parseJsonOrNull: result", {
               result,
               resultKeys: result ? Object.keys(result) : [],
             });
