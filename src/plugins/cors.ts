@@ -19,8 +19,14 @@ export const corsPlugin = fastifyPlugin(async (fastify: FastifyInstance) => {
       if (!origin) return cb(null, true);
 
       if (allowedOrigins.length > 0) {
-        const ok = allowedOrigins.some(allowed => origin === allowed);
-        return cb(null, ok);
+        // Check if the origin matches any allowed origin
+        const matchedOrigin = allowedOrigins.find(allowed => origin === allowed);
+        if (matchedOrigin) {
+          // Return the origin string to allow this specific origin
+          return cb(null, matchedOrigin);
+        }
+        // Origin not in allowed list
+        return cb(null, false);
       }
 
       // If not explicitly configured, allow all in non-production to ease local dev
