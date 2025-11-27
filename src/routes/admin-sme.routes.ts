@@ -111,14 +111,24 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
           request.body,
         );
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           "user_details_updated",
           `Updated entrepreneur details for ${request.body.email}`,
-          { email: request.body.email },
-        );
+          {
+            email: request.body.email,
+            firstName: request.body.firstName,
+            lastName: request.body.lastName,
+            phone: request.body.phone,
+            gender: request.body.gender,
+            position: request.body.position,
+            hasIdNumber: !!request.body.idNumber,
+            hasTaxNumber: !!request.body.taxNumber,
+            idType: request.body.idType,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -167,17 +177,22 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
           request.body,
         );
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           "financial_details_updated",
           `Updated financial details`,
-          { 
-            hasMonthlyTurnover: request.body.averageMonthlyTurnover !== undefined,
-            hasYearlyTurnover: request.body.averageYearlyTurnover !== undefined,
+          {
+            averageMonthlyTurnover: request.body.averageMonthlyTurnover,
+            averageYearlyTurnover: request.body.averageYearlyTurnover,
+            previousLoans: request.body.previousLoans,
+            loanAmount: request.body.loanAmount,
+            defaultCurrency: request.body.defaultCurrency,
+            recentLoanStatus: request.body.recentLoanStatus,
+            hasDefaultReason: !!request.body.defaultReason,
           },
-        );
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -323,14 +338,21 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         await requireRole(request, "member"); // admin, super-admin, or member can create SMEs
         const result = await AdminSMEService.createSMEUser(request.body);
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           result.userId,
           "user_created",
           `Created SME user: ${request.body.email}`,
-          { email: request.body.email, firstName: request.body.firstName, lastName: request.body.lastName },
-        );
+          {
+            email: request.body.email,
+            firstName: request.body.firstName,
+            lastName: request.body.lastName,
+            phone: request.body.phone,
+            gender: request.body.gender,
+            position: request.body.position,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -363,14 +385,21 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         await requireRole(request, "member");
         const result = await AdminSMEService.updateSMEUser(request.params.userId, request.body);
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           "step_1_saved",
           `Updated user information for ${request.body.email}`,
-          { email: request.body.email },
-        );
+          {
+            email: request.body.email,
+            firstName: request.body.firstName,
+            lastName: request.body.lastName,
+            phone: request.body.phone,
+            gender: request.body.gender,
+            position: request.body.position,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -402,14 +431,27 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         await requireRole(request, "member");
         const result = await AdminSMEService.saveBusinessBasicInfo(request.params.userId, request.body);
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           "step_2_saved",
           `Saved business basic info: ${request.body.name}`,
-          { businessName: request.body.name, entityType: request.body.entityType },
-        );
+          {
+            businessName: request.body.name,
+            entityType: request.body.entityType,
+            yearOfIncorporation: request.body.year,
+            sectors: request.body.sectors,
+            hasDescription: !!request.body.description,
+            userGroupId: request.body.userGroupId,
+            criteria: request.body.criteria,
+            noOfEmployees: request.body.noOfEmployees,
+            hasWebsite: !!request.body.website,
+            videoLinkCount: request.body.videoLinks?.length || 0,
+            businessPhotoCount: request.body.businessPhotos?.length || 0,
+            hasLogo: !!request.body.logo,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -441,14 +483,21 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         await requireRole(request, "member");
         const result = await AdminSMEService.saveLocationInfo(request.params.userId, request.body);
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           "step_3_saved",
           `Saved location info`,
-          { countriesOfOperation: request.body.countriesOfOperation, companyHQ: request.body.companyHQ },
-        );
+          {
+            countriesOfOperation: request.body.countriesOfOperation,
+            companyHQ: request.body.companyHQ,
+            city: request.body.city,
+            hasRegisteredOfficeAddress: !!request.body.registeredOfficeAddress,
+            registeredOfficeCity: request.body.registeredOfficeCity,
+            registeredOfficeZipCode: request.body.registeredOfficeZipCode,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -480,14 +529,20 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         await requireRole(request, "member");
         const result = await AdminSMEService.savePersonalDocuments(request.params.userId, request.body);
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           "step_4_saved",
           `Saved personal documents (${request.body.documents?.length || 0} documents)`,
-          { documentCount: request.body.documents?.length || 0 },
-        );
+          {
+            documentCount: request.body.documents?.length || 0,
+            documentTypes: request.body.documents?.map((d) => d.docType) || [],
+            hasIdNumber: !!request.body.idNumber,
+            hasTaxNumber: !!request.body.taxNumber,
+            idType: request.body.idType,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -519,14 +574,18 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         await requireRole(request, "member");
         const result = await AdminSMEService.saveCompanyInfoDocuments(request.params.userId, request.body);
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           "step_5_saved",
           `Saved company info documents (${request.body.documents?.length || 0} documents)`,
-          { documentCount: request.body.documents?.length || 0 },
-        );
+          {
+            documentCount: request.body.documents?.length || 0,
+            documentTypes: request.body.documents?.map((d) => d.docType) || [],
+            passwordProtectedCount: request.body.documents?.filter((d) => d.isPasswordProtected).length || 0,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -558,14 +617,20 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         await requireRole(request, "member");
         const result = await AdminSMEService.saveFinancialDocuments(request.params.userId, request.body);
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           "step_6_saved",
           `Saved financial documents (${request.body.documents?.length || 0} documents)`,
-          { documentCount: request.body.documents?.length || 0 },
-        );
+          {
+            documentCount: request.body.documents?.length || 0,
+            documentTypes: request.body.documents?.map((d) => d.docType) || [],
+            passwordProtectedCount: request.body.documents?.filter((d) => d.isPasswordProtected).length || 0,
+            hasBankName: request.body.documents?.some((d) => d.docBankName) || false,
+            hasYear: request.body.documents?.some((d) => d.docYear) || false,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -597,14 +662,18 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         await requireRole(request, "member");
         const result = await AdminSMEService.savePermitAndPitchDocuments(request.params.userId, request.body);
         
-        // Log audit action
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           "step_7_saved",
           `Saved permits & pitch deck documents (${request.body.documents?.length || 0} documents)`,
-          { documentCount: request.body.documents?.length || 0 },
-        );
+          {
+            documentCount: request.body.documents?.length || 0,
+            documentTypes: request.body.documents?.map((d) => d.docType) || [],
+            passwordProtectedCount: request.body.documents?.filter((d) => d.isPasswordProtected).length || 0,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
@@ -794,13 +863,18 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         });
         const isResend = smeUser?.onboardingStatus === "pending_invitation";
         
-        await logAdminAction(
+        // Log audit action (non-blocking)
+        logAdminAction(
           request,
           request.params.userId,
           isResend ? "invitation_resent" : "invitation_sent",
-          isResend ? "Resent invitation to SME user" : "Sent invitation to SME user",
-          { invitationId: result.invitationId },
-        );
+          isResend ? `Resent invitation to SME user (${result.email})` : `Sent invitation to SME user (${result.email})`,
+          {
+            invitationId: result.invitationId,
+            email: result.email,
+            isResend,
+          },
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
         
         return reply.send(result);
       } catch (error: any) {
