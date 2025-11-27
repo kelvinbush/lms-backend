@@ -40,34 +40,58 @@ export abstract class AdminSMEAuditService {
         return;
       }
 
-      // Helper to remove undefined values from objects before stringifying
-      // Only includes properties that have actual values (not undefined)
-      const cleanObject = (obj: Record<string, any> | undefined): Record<string, any> | null => {
-        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+      // Helper to safely stringify objects (filters out undefined, keeps null)
+      const stringifyObject = (obj: Record<string, any> | undefined): string | null => {
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+          logger.debug("[AdminSME Audit] stringifyObject: invalid input", {
+            obj,
+            objType: typeof obj,
+            isArray: Array.isArray(obj),
+          });
+          return null;
+        }
+        
+        logger.debug("[AdminSME Audit] stringifyObject: processing", {
+          inputKeys: Object.keys(obj),
+          inputEntries: Object.entries(obj).map(([k, v]) => ({
+            key: k,
+            value: v,
+            type: typeof v,
+            isUndefined: v === undefined,
+          })),
+        });
+        
+        // Filter out undefined values, keep null (null is meaningful)
         const cleaned: Record<string, any> = {};
         for (const [key, value] of Object.entries(obj)) {
-          // Only include properties that are not undefined
-          // Include null values as they can be meaningful (e.g., explicitly clearing a field)
           if (value !== undefined) {
             cleaned[key] = value;
           }
         }
-        // Only return non-empty objects
-        return Object.keys(cleaned).length > 0 ? cleaned : null;
+        
+        logger.debug("[AdminSME Audit] stringifyObject: after cleaning", {
+          cleanedKeys: Object.keys(cleaned),
+          cleanedEntries: Object.entries(cleaned),
+          willStringify: Object.keys(cleaned).length > 0,
+        });
+        
+        // Only stringify if there are actual properties
+        const result = Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
+        logger.debug("[AdminSME Audit] stringifyObject: result", {
+          result,
+          resultLength: result?.length,
+        });
+        return result;
       };
 
-      const cleanedDetails = cleanObject(params.details);
-      const cleanedBeforeData = cleanObject(params.beforeData);
-      const cleanedAfterData = cleanObject(params.afterData);
-
-      // Debug logging to help diagnose empty details
-      if (params.details && !cleanedDetails) {
-        logger.debug("[AdminSME Audit] Details object was empty after cleaning", {
-          action: params.action,
-          originalKeys: Object.keys(params.details),
-          originalValues: Object.values(params.details),
-        });
-      }
+      const detailsJson = stringifyObject(params.details);
+      
+      logger.debug("[AdminSME Audit] About to insert", {
+        action: params.action,
+        hasDetails: !!params.details,
+        detailsJson,
+        detailsJsonLength: detailsJson?.length,
+      });
 
       // Insert audit trail entry
       await db.insert(adminSMEAuditTrail).values({
@@ -75,9 +99,9 @@ export abstract class AdminSMEAuditService {
         smeUserId: params.smeUserId,
         action: params.action,
         description: params.description || null,
-        details: cleanedDetails ? JSON.stringify(cleanedDetails) : null,
-        beforeData: cleanedBeforeData ? JSON.stringify(cleanedBeforeData) : null,
-        afterData: cleanedAfterData ? JSON.stringify(cleanedAfterData) : null,
+        details: detailsJson,
+        beforeData: stringifyObject(params.beforeData),
+        afterData: stringifyObject(params.afterData),
         ipAddress: params.ipAddress || null,
         userAgent: params.userAgent || null,
       } as any);

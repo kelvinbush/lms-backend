@@ -12,8 +12,7 @@ import { eq } from "drizzle-orm";
 
 /**
  * Helper to build audit details object
- * Only includes properties that actually exist in the source object (handles partial updates)
- * Supports field mapping (e.g., { sourceField: 'targetField' }) and computed values
+ * Only includes properties that actually exist AND have non-undefined values in the source object
  */
 function buildAuditDetails(
   source: Record<string, any>,
@@ -33,16 +32,16 @@ function buildAuditDetails(
   // Handle direct field mappings
   if (config.fields) {
     if (Array.isArray(config.fields)) {
-      // Simple array: include field if it exists in source
+      // Simple array: include field if it exists AND has a non-undefined value
       for (const field of config.fields) {
-        if (field in source) {
+        if (field in source && source[field] !== undefined) {
           details[field] = source[field];
         }
       }
     } else {
       // Object mapping: { sourceField: 'targetField' }
       for (const [sourceField, targetField] of Object.entries(config.fields)) {
-        if (sourceField in source) {
+        if (sourceField in source && source[sourceField] !== undefined) {
           details[targetField] = source[sourceField];
         }
       }
@@ -53,7 +52,10 @@ function buildAuditDetails(
   if (config.computed) {
     for (const computed of config.computed) {
       if (!computed.condition || computed.condition(source)) {
-        details[computed.key] = computed.value;
+        // Only add computed field if value is not undefined
+        if (computed.value !== undefined) {
+          details[computed.key] = computed.value;
+        }
       }
     }
   }
@@ -478,6 +480,17 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
         const result = await AdminSMEService.saveBusinessBasicInfo(request.params.userId, request.body);
         
         // Log audit action (non-blocking)
+        logger.debug("[AdminSME Routes] Building audit details for step_2", {
+          requestBodyKeys: Object.keys(request.body),
+          requestBodyEntries: Object.entries(request.body).map(([k, v]) => ({
+            key: k,
+            value: v,
+            type: typeof v,
+            isUndefined: v === undefined,
+            inObject: k in request.body,
+          })),
+        });
+        
         const details = buildAuditDetails(request.body, {
           fields: {
             name: "businessName",
@@ -495,6 +508,17 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
             { key: "videoLinkCount", value: request.body.videoLinks?.length || 0, condition: (src) => "videoLinks" in src },
             { key: "businessPhotoCount", value: request.body.businessPhotos?.length || 0, condition: (src) => "businessPhotos" in src },
           ],
+        });
+        
+        logger.debug("[AdminSME Routes] Built audit details", {
+          details,
+          detailsType: typeof details,
+          detailsKeys: details ? Object.keys(details) : [],
+          detailsEntries: details ? Object.entries(details).map(([k, v]) => ({
+            key: k,
+            value: v,
+            type: typeof v,
+          })) : [],
         });
         
         logAdminAction(
