@@ -48,22 +48,22 @@ export abstract class AdminSMEService {
     userId: string,
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
+      // Execute all queries in parallel for better performance
+      const [user, progress, business] = await Promise.all([
+        db.query.users.findFirst({
+          where: eq(users.id, userId),
+        }),
+        db.query.smeOnboardingProgress.findFirst({
+          where: eq(smeOnboardingProgress.userId, userId),
+        }),
+        db.query.businessProfiles.findFirst({
+          where: eq(businessProfiles.userId, userId),
+        }),
+      ]);
 
       if (!user) {
         throw httpError(404, "[USER_NOT_FOUND] User not found");
       }
-
-      const progress = await db.query.smeOnboardingProgress.findFirst({
-        where: eq(smeOnboardingProgress.userId, userId),
-      });
-
-      // Get business if it exists
-      const business = await db.query.businessProfiles.findFirst({
-        where: eq(businessProfiles.userId, userId),
-      });
 
       return {
         userId: user.id,

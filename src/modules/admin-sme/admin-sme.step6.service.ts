@@ -8,7 +8,7 @@ import {
   smeOnboardingProgress,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import { httpError } from "./admin-sme.utils";
 import { AdminSMEService } from "./admin-sme.service";
 
@@ -26,27 +26,6 @@ export abstract class AdminSMEStep6Service {
     payload: AdminSMEModel.Step6FinancialDocumentsBody,
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
-      // Verify user exists
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
-
-      if (!user) {
-        throw httpError(404, "[USER_NOT_FOUND] User not found");
-      }
-
-      // Get business (must exist from Step 2)
-      const business = await db.query.businessProfiles.findFirst({
-        where: and(
-          eq(businessProfiles.userId, userId),
-          isNull(businessProfiles.deletedAt)
-        ),
-      });
-
-      if (!business) {
-        throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found. Please complete Step 2 first.");
-      }
-
       // Normalize to array
       const docsArray = payload.documents;
 
@@ -87,28 +66,77 @@ export abstract class AdminSMEStep6Service {
         }
       }
 
-      // Execute in transaction
-      await db.transaction(async (tx) => {
-        // Upsert documents (for financial docs, we use businessId + docType + docYear + docBankName as unique key)
-        for (const doc of normalized) {
-          // Check if document exists (matching all composite key fields)
-          const existing = await tx.query.businessDocuments.findFirst({
-            where: and(
-              eq(businessDocuments.businessId, business.id),
-              eq(businessDocuments.docType, doc.docType as any),
-              isNull(businessDocuments.deletedAt)
-              // Note: We'd need to check docYear and docBankName too, but Drizzle query builder
-              // doesn't easily support nullable field comparisons. We'll handle uniqueness via
-              // the unique constraint in the database schema.
-            ),
-          });
+      // Execute in transaction - all queries inside for consistency and performance
+      const { updatedUser, updatedBusiness, progressResult } = await db.transaction(async (tx) => {
+        // Verify user exists
+        const user = await tx.query.users.findFirst({
+          where: eq(users.id, userId),
+        });
 
-          // For now, we'll do a simple upsert per docType
-          // The database unique constraint will prevent true duplicates
-          // In a production system, you might want to query more carefully
+        if (!user) {
+          throw httpError(404, "[USER_NOT_FOUND] User not found");
+        }
+
+        // Get business (must exist from Step 2)
+        const business = await tx.query.businessProfiles.findFirst({
+          where: and(
+            eq(businessProfiles.userId, userId),
+            isNull(businessProfiles.deletedAt)
+          ),
+        });
+
+        if (!business) {
+          throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found. Please complete Step 2 first.");
+        }
+
+        // Get existing progress to compute completed steps
+        const existingProgress = await tx.query.smeOnboardingProgress.findFirst({
+          where: eq(smeOnboardingProgress.userId, userId),
+        });
+
+        const completedSteps = (existingProgress?.completedSteps as number[]) ?? [];
+        if (!completedSteps.includes(6)) {
+          completedSteps.push(6);
+        }
+
+        // Batch query: Get all existing documents for these types in one query
+        // Note: We match by docType only (as per original logic), uniqueness handled by DB constraint
+        const existingDocs = await tx.query.businessDocuments.findMany({
+          where: and(
+            eq(businessDocuments.businessId, business.id),
+            inArray(businessDocuments.docType, normalized.map((d) => d.docType as any)),
+            isNull(businessDocuments.deletedAt)
+          ),
+        });
+
+        // Group existing by docType (take first match per type, as original logic)
+        const existingByType = new Map<string, typeof businessDocuments.$inferSelect>();
+        for (const doc of existingDocs) {
+          if (!existingByType.has(doc.docType)) {
+            existingByType.set(doc.docType, doc);
+          }
+        }
+
+        // Prepare batch operations
+        const toUpdate: Array<{ id: string; doc: typeof normalized[0] }> = [];
+        const toInsert: typeof normalized = [];
+
+        for (const doc of normalized) {
+          const existing = existingByType.get(doc.docType);
           if (existing) {
-            // Update existing (matching docType)
-            await tx
+            toUpdate.push({ id: existing.id, doc });
+          } else {
+            toInsert.push(doc);
+          }
+        }
+
+        // Prepare parallel operations
+        const parallelOps: Promise<any>[] = [];
+
+        // Batch updates
+        for (const { id, doc } of toUpdate) {
+          parallelOps.push(
+            tx
               .update(businessDocuments)
               .set({
                 docUrl: doc.docUrl,
@@ -118,67 +146,113 @@ export abstract class AdminSMEStep6Service {
                 docBankName: doc.docBankName,
                 updatedAt: new Date(),
               } as any)
-              .where(eq(businessDocuments.id, existing.id));
-          } else {
-            // Insert new
-            await tx.insert(businessDocuments).values({
-              businessId: business.id,
-              docType: doc.docType as any,
-              docUrl: doc.docUrl,
-              isPasswordProtected: doc.isPasswordProtected,
-              docPassword: doc.docPassword,
-              docYear: doc.docYear,
-              docBankName: doc.docBankName,
-            } as any);
-          }
+              .where(eq(businessDocuments.id, id))
+          );
         }
 
-        // Update onboarding progress
-        const progress = await tx.query.smeOnboardingProgress.findFirst({
-          where: eq(smeOnboardingProgress.userId, userId),
-        });
-
-        const completedSteps = (progress?.completedSteps as number[]) ?? [];
-        if (!completedSteps.includes(6)) {
-          completedSteps.push(6);
+        // Batch insert
+        if (toInsert.length > 0) {
+          parallelOps.push(
+            tx.insert(businessDocuments).values(
+              toInsert.map((doc) => ({
+                businessId: business.id,
+                docType: doc.docType as any,
+                docUrl: doc.docUrl,
+                isPasswordProtected: doc.isPasswordProtected,
+                docPassword: doc.docPassword,
+                docYear: doc.docYear,
+                docBankName: doc.docBankName,
+              })) as any
+            )
+          );
         }
 
-        if (progress) {
-          await tx
-            .update(smeOnboardingProgress)
-            .set({
-              currentStep: 6,
-              completedSteps: completedSteps as any,
-              lastSavedAt: new Date(),
-              updatedAt: new Date(),
-            } as any)
-            .where(eq(smeOnboardingProgress.userId, userId));
-        } else {
-          await tx.insert(smeOnboardingProgress).values({
-            userId: userId,
-            currentStep: 6,
-            completedSteps: [6] as any,
-            lastSavedAt: new Date(),
-          } as any);
-        }
+        // Update onboarding progress - return the result
+        const progressPromise = existingProgress
+          ? tx
+              .update(smeOnboardingProgress)
+              .set({
+                currentStep: 6,
+                completedSteps: completedSteps as any,
+                lastSavedAt: new Date(),
+                updatedAt: new Date(),
+              } as any)
+              .where(eq(smeOnboardingProgress.userId, userId))
+              .returning()
+              .then(([result]) => result)
+          : tx
+              .insert(smeOnboardingProgress)
+              .values({
+                userId: userId,
+                currentStep: 6,
+                completedSteps: [6] as any,
+                lastSavedAt: new Date(),
+              } as any)
+              .returning()
+              .then(([result]) => result);
 
-        // Update user onboarding step
-        await tx
+        // Update user onboarding step - return the result
+        const userUpdatePromise = tx
           .update(users)
           .set({
             onboardingStep: 6,
             updatedAt: new Date(),
           })
-          .where(eq(users.id, userId));
+          .where(eq(users.id, userId))
+          .returning()
+          .then(([result]) => result);
+
+        // Execute all operations in parallel
+        const [progressResult, updatedUser] = await Promise.all([
+          progressPromise,
+          userUpdatePromise,
+          ...parallelOps,
+        ]);
+
+        return { updatedUser, updatedBusiness: business, progressResult };
       });
 
       logger.info("[AdminSME Step6] Step 6 saved", {
         userId,
-        businessId: business.id,
+        businessId: updatedBusiness.id,
       });
 
-      // Return updated onboarding state
-      return await AdminSMEService.getOnboardingState(userId);
+      // Return onboarding state from data we already have (no extra queries!)
+      return {
+        userId: updatedUser.id,
+        currentStep: progressResult?.currentStep ?? 6,
+        completedSteps: (progressResult?.completedSteps as number[]) ?? [6],
+        user: {
+          email: updatedUser.email,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          phone: updatedUser.phoneNumber,
+          dob: updatedUser.dob,
+          gender: updatedUser.gender,
+          position: updatedUser.position,
+          onboardingStatus: updatedUser.onboardingStatus as string,
+          idNumber: updatedUser.idNumber,
+          taxNumber: updatedUser.taxNumber,
+          idType: updatedUser.idType,
+        },
+        business: updatedBusiness
+          ? {
+              id: updatedBusiness.id,
+              name: updatedBusiness.name,
+              averageMonthlyTurnover: updatedBusiness.avgMonthlyTurnover
+                ? Number(updatedBusiness.avgMonthlyTurnover)
+                : null,
+              averageYearlyTurnover: updatedBusiness.avgYearlyTurnover
+                ? Number(updatedBusiness.avgYearlyTurnover)
+                : null,
+              previousLoans: updatedBusiness.borrowingHistory ?? null,
+              loanAmount: updatedBusiness.amountBorrowed ? Number(updatedBusiness.amountBorrowed) : null,
+              defaultCurrency: updatedBusiness.currency ?? null,
+              recentLoanStatus: updatedBusiness.loanStatus ?? null,
+              defaultReason: updatedBusiness.defaultReason ?? null,
+            }
+          : null,
+      };
     } catch (error: any) {
       logger.error("[AdminSME Step6] Error saving Step 6", {
         error: error?.message,
