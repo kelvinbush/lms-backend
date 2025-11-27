@@ -407,6 +407,100 @@ export namespace AdminSMEModel {
   }
 
   // ============================================
+  // Audit Trail
+  // ============================================
+  export interface AuditTrailItem {
+    id: string;
+    action: string;
+    description: string | null;
+    details: Record<string, any> | null;
+    beforeData: Record<string, any> | null;
+    afterData: Record<string, any> | null;
+    adminUser: {
+      id: string;
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+    };
+    ipAddress: string | null;
+    userAgent: string | null;
+    createdAt: string;
+  }
+
+  export interface ListAuditTrailQuery {
+    page?: string;
+    limit?: string;
+    action?: string; // Filter by action type
+  }
+
+  export interface ListAuditTrailResponse {
+    items: AuditTrailItem[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }
+
+  export const ListAuditTrailQuerySchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      page: { type: "string", pattern: "^[0-9]+$" },
+      limit: { type: "string", pattern: "^[0-9]+$" },
+      action: { type: "string" },
+    },
+  } as const;
+
+  export const AuditTrailItemSchema = {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      action: { type: "string" },
+      description: { type: ["string", "null"] },
+      details: { type: ["object", "null"] },
+      beforeData: { type: ["object", "null"] },
+      afterData: { type: ["object", "null"] },
+      adminUser: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          email: { type: "string" },
+          firstName: { type: ["string", "null"] },
+          lastName: { type: ["string", "null"] },
+        },
+        required: ["id", "email"],
+      },
+      ipAddress: { type: ["string", "null"] },
+      userAgent: { type: ["string", "null"] },
+      createdAt: { type: "string", format: "date-time" },
+    },
+    required: ["id", "action", "adminUser", "createdAt"],
+  } as const;
+
+  export const ListAuditTrailResponseSchema = {
+    type: "object",
+    properties: {
+      items: {
+        type: "array",
+        items: AuditTrailItemSchema,
+      },
+      pagination: {
+        type: "object",
+        properties: {
+          page: { type: "integer" },
+          limit: { type: "integer" },
+          total: { type: "integer" },
+          totalPages: { type: "integer" },
+        },
+        required: ["page", "limit", "total", "totalPages"],
+      },
+    },
+    required: ["items", "pagination"],
+  } as const;
+
+  // ============================================
   // Update Entrepreneur Details (Consolidated)
   // ============================================
   export interface UpdateEntrepreneurDetailsBody {

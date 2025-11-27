@@ -19,3 +19,4 @@ export * from "./schema/businessUserGroups";
 export * from "./schema/businessCountries";
 export * from "./schema/businessPhotos";
 export * from "./schema/businessVideoLinks";
+export * from "./schema/adminSMEAuditTrail";

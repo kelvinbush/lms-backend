@@ -19,3 +19,4 @@ export * from "./businessCountries";
 export * from "./businessPhotos";
 export * from "./businessVideoLinks";
 export * from "./smeOnboardingProgress";
+export * from "./adminSMEAuditTrail";

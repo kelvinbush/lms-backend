@@ -4,6 +4,45 @@ import { AdminSMEService } from "../modules/admin-sme/admin-sme.service";
 import { AdminSMEModel } from "../modules/admin-sme/admin-sme.model";
 import { requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
+import { AdminSMEAuditService } from "../modules/admin-sme/admin-sme-audit.service";
+import type { AdminSMEAuditAction } from "../db/schema/adminSMEAuditTrail";
+import { db } from "../db";
+import { users } from "../db/schema";
+import { eq } from "drizzle-orm";
+
+/**
+ * Helper to log admin action (non-blocking)
+ */
+async function logAdminAction(
+  request: FastifyRequest,
+  smeUserId: string,
+  action: AdminSMEAuditAction,
+  description?: string,
+  details?: Record<string, any>,
+): Promise<void> {
+  try {
+    const { userId: adminClerkId } = getAuth(request);
+    if (!adminClerkId) return;
+
+    const metadata = AdminSMEAuditService.extractRequestMetadata(request);
+    
+    await AdminSMEAuditService.logAction({
+      adminClerkId,
+      smeUserId,
+      action,
+      description,
+      details,
+      ...metadata,
+    });
+  } catch (error: any) {
+    // Non-blocking: don't fail the request if audit logging fails
+    logger.warn("[AdminSME Routes] Failed to log audit action", {
+      error: error?.message,
+      action,
+      smeUserId,
+    });
+  }
+}
 
 export async function adminSMERoutes(fastify: FastifyInstance) {
   // GET /admin/sme/entrepreneurs/stats - Stats for entrepreneurs
@@ -71,6 +110,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
           request.params.userId,
           request.body,
         );
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          request.params.userId,
+          "user_details_updated",
+          `Updated entrepreneur details for ${request.body.email}`,
+          { email: request.body.email },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -117,6 +166,19 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
           request.params.userId,
           request.body,
         );
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          request.params.userId,
+          "financial_details_updated",
+          `Updated financial details`,
+          { 
+            hasMonthlyTurnover: request.body.averageMonthlyTurnover !== undefined,
+            hasYearlyTurnover: request.body.averageYearlyTurnover !== undefined,
+          },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -260,6 +322,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
       try {
         await requireRole(request, "member"); // admin, super-admin, or member can create SMEs
         const result = await AdminSMEService.createSMEUser(request.body);
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          result.userId,
+          "user_created",
+          `Created SME user: ${request.body.email}`,
+          { email: request.body.email, firstName: request.body.firstName, lastName: request.body.lastName },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -290,6 +362,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
       try {
         await requireRole(request, "member");
         const result = await AdminSMEService.updateSMEUser(request.params.userId, request.body);
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          request.params.userId,
+          "step_1_saved",
+          `Updated user information for ${request.body.email}`,
+          { email: request.body.email },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -319,6 +401,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
       try {
         await requireRole(request, "member");
         const result = await AdminSMEService.saveBusinessBasicInfo(request.params.userId, request.body);
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          request.params.userId,
+          "step_2_saved",
+          `Saved business basic info: ${request.body.name}`,
+          { businessName: request.body.name, entityType: request.body.entityType },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -348,6 +440,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
       try {
         await requireRole(request, "member");
         const result = await AdminSMEService.saveLocationInfo(request.params.userId, request.body);
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          request.params.userId,
+          "step_3_saved",
+          `Saved location info`,
+          { countriesOfOperation: request.body.countriesOfOperation, companyHQ: request.body.companyHQ },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -377,6 +479,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
       try {
         await requireRole(request, "member");
         const result = await AdminSMEService.savePersonalDocuments(request.params.userId, request.body);
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          request.params.userId,
+          "step_4_saved",
+          `Saved personal documents (${request.body.documents?.length || 0} documents)`,
+          { documentCount: request.body.documents?.length || 0 },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -406,6 +518,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
       try {
         await requireRole(request, "member");
         const result = await AdminSMEService.saveCompanyInfoDocuments(request.params.userId, request.body);
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          request.params.userId,
+          "step_5_saved",
+          `Saved company info documents (${request.body.documents?.length || 0} documents)`,
+          { documentCount: request.body.documents?.length || 0 },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -435,6 +557,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
       try {
         await requireRole(request, "member");
         const result = await AdminSMEService.saveFinancialDocuments(request.params.userId, request.body);
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          request.params.userId,
+          "step_6_saved",
+          `Saved financial documents (${request.body.documents?.length || 0} documents)`,
+          { documentCount: request.body.documents?.length || 0 },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -464,6 +596,16 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
       try {
         await requireRole(request, "member");
         const result = await AdminSMEService.savePermitAndPitchDocuments(request.params.userId, request.body);
+        
+        // Log audit action
+        await logAdminAction(
+          request,
+          request.params.userId,
+          "step_7_saved",
+          `Saved permits & pitch deck documents (${request.body.documents?.length || 0} documents)`,
+          { documentCount: request.body.documents?.length || 0 },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;
@@ -566,6 +708,52 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
     }
   );
 
+  // GET /admin/sme/users/:userId/audit-trail - Get audit trail for SME user
+  fastify.get(
+    "/admin/sme/users/:userId/audit-trail",
+    {
+      schema: {
+        params: AdminSMEModel.UserIdParamsSchema,
+        querystring: AdminSMEModel.ListAuditTrailQuerySchema,
+        response: {
+          200: AdminSMEModel.ListAuditTrailResponseSchema,
+          400: AdminSMEModel.ErrorResponseSchema,
+          401: AdminSMEModel.ErrorResponseSchema,
+          403: AdminSMEModel.ErrorResponseSchema,
+          404: AdminSMEModel.ErrorResponseSchema,
+          500: AdminSMEModel.ErrorResponseSchema,
+        },
+        tags: ["admin-sme"],
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { userId: string };
+        Querystring: AdminSMEModel.ListAuditTrailQuery;
+      }>,
+      reply: FastifyReply,
+    ) => {
+      try {
+        await requireRole(request, "member");
+        const result = await AdminSMEService.getAuditTrail(
+          request.params.userId,
+          request.query,
+        );
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        logger.error("[AdminSME Routes] Error getting audit trail", {
+          error: error?.message,
+          userId: request.params.userId,
+        });
+        return reply.code(status).send({
+          error: error?.message || "Internal error",
+          code: error?.code || "INTERNAL_ERROR",
+        });
+      }
+    },
+  );
+
   // POST /admin/sme/onboarding/:userId/invite - Send/Resend invitation
   fastify.post(
     "/admin/sme/onboarding/:userId/invite",
@@ -598,6 +786,22 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
           return reply.code(401).send({ error: "Unauthorized" });
         }
         const result = await AdminSMEService.sendSMEInvitation(request.params.userId, userId);
+        
+        // Log audit action (check if it's a resend by checking onboarding status)
+        const smeUser = await db.query.users.findFirst({
+          where: eq(users.id, request.params.userId),
+          columns: { onboardingStatus: true },
+        });
+        const isResend = smeUser?.onboardingStatus === "pending_invitation";
+        
+        await logAdminAction(
+          request,
+          request.params.userId,
+          isResend ? "invitation_resent" : "invitation_sent",
+          isResend ? "Resent invitation to SME user" : "Sent invitation to SME user",
+          { invitationId: result.invitationId },
+        );
+        
         return reply.send(result);
       } catch (error: any) {
         const status = error?.status || 500;

@@ -12,6 +12,7 @@ import {
   businessVideoLinks,
   userGroups,
   loanApplications,
+  adminSMEAuditTrail,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
 import { eq, and, isNull, or, like, sql, inArray, desc, notInArray } from "drizzle-orm";
@@ -1018,6 +1019,119 @@ export abstract class AdminSMEService {
       });
       if (error?.status) throw error;
       throw httpError(500, "[GET_BUSINESS_DOCS_ERROR] Failed to get business documents");
+    }
+  }
+
+  /**
+   * Get audit trail for a specific SME user
+   */
+  static async getAuditTrail(
+    smeUserId: string,
+    query: AdminSMEModel.ListAuditTrailQuery,
+  ): Promise<AdminSMEModel.ListAuditTrailResponse> {
+    try {
+      // Verify SME user exists
+      const smeUser = await db.query.users.findFirst({
+        where: eq(users.id, smeUserId),
+        columns: { id: true },
+      });
+
+      if (!smeUser) {
+        throw httpError(404, "[USER_NOT_FOUND] SME user not found");
+      }
+
+      const page = query.page ? parseInt(query.page, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit, 10) : 50;
+      const offset = (page - 1) * limit;
+
+      // Build where conditions
+      const conditions: any[] = [eq(adminSMEAuditTrail.smeUserId, smeUserId)];
+
+      // Filter by action type
+      if (query.action) {
+        conditions.push(eq(adminSMEAuditTrail.action, query.action as any));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count
+      const totalResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(adminSMEAuditTrail)
+        .where(whereClause);
+      const total = Number(totalResult[0]?.count || 0);
+
+      // Get audit trail entries with pagination
+      const auditRows = await db
+        .select()
+        .from(adminSMEAuditTrail)
+        .where(whereClause)
+        .orderBy(desc(adminSMEAuditTrail.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      // Get admin users for all entries
+      const adminUserIds = [...new Set(auditRows.map((a) => a.adminUserId))];
+      const adminUserMap = new Map<
+        string,
+        { id: string; email: string; firstName: string | null; lastName: string | null }
+      >();
+      if (adminUserIds.length > 0) {
+        const adminUsers = await db.query.users.findMany({
+          where: inArray(users.id, adminUserIds),
+          columns: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        });
+        adminUsers.forEach((u) => {
+          adminUserMap.set(u.id, u);
+        });
+      }
+
+      // Transform to response format
+      const items: AdminSMEModel.AuditTrailItem[] = auditRows.map((entry) => {
+        const adminUser = adminUserMap.get(entry.adminUserId);
+
+        return {
+          id: entry.id,
+          action: entry.action,
+          description: entry.description || null,
+          details: entry.details ? JSON.parse(entry.details) : null,
+          beforeData: entry.beforeData ? JSON.parse(entry.beforeData) : null,
+          afterData: entry.afterData ? JSON.parse(entry.afterData) : null,
+          adminUser: {
+            id: adminUser?.id || entry.adminUserId,
+            email: adminUser?.email || "Unknown",
+            firstName: adminUser?.firstName || null,
+            lastName: adminUser?.lastName || null,
+          },
+          ipAddress: entry.ipAddress || null,
+          userAgent: entry.userAgent || null,
+          createdAt: entry.createdAt.toISOString(),
+        };
+      });
+
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        items,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+        },
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error getting audit trail", {
+        error: error?.message,
+        smeUserId,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[GET_AUDIT_TRAIL_ERROR] Failed to get audit trail");
     }
   }
 }
