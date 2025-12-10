@@ -1,10 +1,12 @@
 import {
   type loanProducts,
   loanTermUnitEnum,
-  interestTypeEnum,
   interestRatePeriodEnum,
   repaymentFrequencyEnum,
   amortizationMethodEnum,
+  interestCollectionMethodEnum,
+  interestRecognitionCriteriaEnum,
+  gracePeriodUnitEnum,
   productStatusEnum,
 } from "../../db/schema";
 
@@ -13,10 +15,6 @@ export namespace LoanProductsModel {
   export const LoanTermUnitEnum = loanTermUnitEnum.enumValues;
   export type LoanTermUnit = (typeof loanProducts.$inferSelect)["termUnit"];
 
-  // Interest type values derived from DB enum
-  export const InterestTypeEnum = interestTypeEnum.enumValues;
-  export type InterestType = (typeof loanProducts.$inferSelect)["interestType"];
-
   // Additional pricing enums
   export const InterestRatePeriodEnum = interestRatePeriodEnum.enumValues;
   export type InterestRatePeriod = (typeof loanProducts.$inferSelect)["ratePeriod"];
@@ -24,37 +22,54 @@ export namespace LoanProductsModel {
   export type RepaymentFrequency = (typeof loanProducts.$inferSelect)["repaymentFrequency"];
   export const AmortizationMethodEnum = amortizationMethodEnum.enumValues;
   export type AmortizationMethod = (typeof loanProducts.$inferSelect)["amortizationMethod"];
+  export const InterestCollectionMethodEnum = interestCollectionMethodEnum.enumValues;
+  export type InterestCollectionMethod = (typeof loanProducts.$inferSelect)["interestCollectionMethod"];
+  export const InterestRecognitionCriteriaEnum = interestRecognitionCriteriaEnum.enumValues;
+  export type InterestRecognitionCriteria = (typeof loanProducts.$inferSelect)["interestRecognitionCriteria"];
+  export const GracePeriodUnitEnum = gracePeriodUnitEnum.enumValues;
+  export type GracePeriodUnit = (typeof loanProducts.$inferSelect)["maxGraceUnit"];
 
   // Product status values derived from DB enum
   export const ProductStatusEnum = productStatusEnum.enumValues;
   export type ProductStatus = (typeof loanProducts.$inferSelect)["status"];
 
+  // Loan fee configuration (for inline fee creation)
+  export interface LoanFeeConfiguration {
+    loanFeeId?: string; // Optional, ID of existing loan fee
+    feeName?: string; // Required if loanFeeId not provided
+    calculationMethod: 'flat' | 'percentage';
+    rate: number;
+    collectionRule: 'upfront' | 'end_of_term';
+    allocationMethod: string;
+    calculationBasis: 'principal' | 'total_disbursed';
+  }
+
   // Create product input
   export interface CreateLoanProductBody {
     name: string;
     slug?: string;
-    imageUrl?: string;
     summary?: string;
     description?: string;
+    organizationId: string; // Required
+    userGroupIds: string[]; // Required, array of user group IDs
     currency: string; // ISO 4217 preferred
     minAmount: number; // decimal
     maxAmount: number; // decimal
     minTerm: number;   // integer, in termUnit
     maxTerm: number;   // integer, in termUnit
     termUnit: LoanTermUnit;
+    availabilityStartDate?: string; // ISO 8601 date string (YYYY-MM-DD)
+    availabilityEndDate?: string; // ISO 8601 date string (YYYY-MM-DD)
+    repaymentFrequency: RepaymentFrequency;
+    maxGracePeriod?: number;
+    maxGraceUnit?: GracePeriodUnit;
     interestRate: number; // percentage value (e.g., 12.5)
-    interestType?: InterestType; // default: fixed
-    ratePeriod?: InterestRatePeriod; // default: per_year
-    amortizationMethod?: AmortizationMethod; // default: reducing_balance
-    repaymentFrequency?: RepaymentFrequency; // default: monthly
-    processingFeeRate?: number; // optional %
-    processingFeeFlat?: number; // optional flat amount
-    lateFeeRate?: number; // optional %
-    lateFeeFlat?: number; // optional flat amount
-    prepaymentPenaltyRate?: number; // optional %
-    gracePeriodDays?: number; // default 0
+    ratePeriod: InterestRatePeriod;
+    amortizationMethod: AmortizationMethod;
+    interestCollectionMethod: InterestCollectionMethod;
+    interestRecognitionCriteria: InterestRecognitionCriteria;
+    fees?: LoanFeeConfiguration[]; // Optional array of loan fees
     status?: ProductStatus; // default: draft
-    changeReason?: string; // Required for status changes
     isActive?: boolean;
   }
 
@@ -62,26 +77,27 @@ export namespace LoanProductsModel {
   export interface EditLoanProductBody {
     name?: string;
     slug?: string;
-    imageUrl?: string;
     summary?: string;
     description?: string;
+    organizationId?: string;
+    userGroupIds?: string[]; // Array of user group IDs
     currency?: string;
     minAmount?: number;
     maxAmount?: number;
     minTerm?: number;
     maxTerm?: number;
     termUnit?: LoanTermUnit;
+    availabilityStartDate?: string; // ISO 8601 date string (YYYY-MM-DD)
+    availabilityEndDate?: string; // ISO 8601 date string (YYYY-MM-DD)
+    repaymentFrequency?: RepaymentFrequency;
+    maxGracePeriod?: number;
+    maxGraceUnit?: GracePeriodUnit;
     interestRate?: number;
-    interestType?: InterestType;
     ratePeriod?: InterestRatePeriod;
     amortizationMethod?: AmortizationMethod;
-    repaymentFrequency?: RepaymentFrequency;
-    processingFeeRate?: number;
-    processingFeeFlat?: number;
-    lateFeeRate?: number;
-    lateFeeFlat?: number;
-    prepaymentPenaltyRate?: number;
-    gracePeriodDays?: number;
+    interestCollectionMethod?: InterestCollectionMethod;
+    interestRecognitionCriteria?: InterestRecognitionCriteria;
+    fees?: LoanFeeConfiguration[]; // Array of loan fees
     status?: ProductStatus;
     changeReason?: string;
     isActive?: boolean;
@@ -102,7 +118,6 @@ export namespace LoanProductsModel {
     minTerm?: string;
     maxTerm?: string;
     termUnit?: LoanTermUnit;
-    interestType?: InterestType;
     ratePeriod?: InterestRatePeriod;
     amortizationMethod?: AmortizationMethod;
     repaymentFrequency?: RepaymentFrequency;
@@ -118,40 +133,62 @@ export namespace LoanProductsModel {
     additionalProperties: false,
     properties: {
       name: { type: "string", minLength: 1, maxLength: 150 },
-      slug: { type: "string" },
-      imageUrl: { type: "string" },
+      slug: { type: "string", maxLength: 180 },
       summary: { type: "string" },
       description: { type: "string" },
+      organizationId: { type: "string", minLength: 1 },
+      userGroupIds: { type: "array", items: { type: "string" }, minItems: 1 },
       currency: { type: "string", minLength: 1, maxLength: 10 },
       minAmount: { type: "number", minimum: 0 },
       maxAmount: { type: "number", minimum: 0 },
       minTerm: { type: "integer", minimum: 0 },
       maxTerm: { type: "integer", minimum: 0 },
       termUnit: { type: "string", enum: LoanTermUnitEnum },
+      availabilityStartDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      availabilityEndDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      repaymentFrequency: { type: "string", enum: RepaymentFrequencyEnum },
+      maxGracePeriod: { type: "integer", minimum: 0 },
+      maxGraceUnit: { type: "string", enum: GracePeriodUnitEnum },
       interestRate: { type: "number", minimum: 0 },
-      interestType: { type: "string", enum: InterestTypeEnum },
       ratePeriod: { type: "string", enum: InterestRatePeriodEnum },
       amortizationMethod: { type: "string", enum: AmortizationMethodEnum },
-      repaymentFrequency: { type: "string", enum: RepaymentFrequencyEnum },
-      processingFeeRate: { type: "number", minimum: 0 },
-      processingFeeFlat: { type: "number", minimum: 0 },
-      lateFeeRate: { type: "number", minimum: 0 },
-      lateFeeFlat: { type: "number", minimum: 0 },
-    prepaymentPenaltyRate: { type: "number", minimum: 0 },
-    gracePeriodDays: { type: "integer", minimum: 0 },
-    status: { type: "string", enum: ProductStatusEnum },
-    changeReason: { type: "string", minLength: 1, maxLength: 500 },
-    isActive: { type: "boolean" },
+      interestCollectionMethod: { type: "string", enum: InterestCollectionMethodEnum },
+      interestRecognitionCriteria: { type: "string", enum: InterestRecognitionCriteriaEnum },
+      fees: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            loanFeeId: { type: "string" },
+            feeName: { type: "string" },
+            calculationMethod: { type: "string", enum: ["flat", "percentage"] },
+            rate: { type: "number", minimum: 0 },
+            collectionRule: { type: "string", enum: ["upfront", "end_of_term"] },
+            allocationMethod: { type: "string" },
+            calculationBasis: { type: "string", enum: ["principal", "total_disbursed"] },
+          },
+          required: ["calculationMethod", "rate", "collectionRule", "allocationMethod", "calculationBasis"],
+        },
+      },
+      status: { type: "string", enum: ProductStatusEnum },
+      isActive: { type: "boolean" },
     },
     required: [
       "name",
+      "organizationId",
+      "userGroupIds",
       "currency",
       "minAmount",
       "maxAmount",
       "minTerm",
       "maxTerm",
       "termUnit",
+      "repaymentFrequency",
       "interestRate",
+      "ratePeriod",
+      "amortizationMethod",
+      "interestCollectionMethod",
+      "interestRecognitionCriteria",
     ],
     allOf: [
       // Ensure minAmount <= maxAmount
@@ -172,6 +209,20 @@ export namespace LoanProductsModel {
           },
         },
       },
+      // Ensure availabilityEndDate >= availabilityStartDate if both provided
+      {
+        if: {
+          properties: {
+            availabilityStartDate: { type: "string" },
+            availabilityEndDate: { type: "string" },
+          },
+        },
+        then: {
+          properties: {
+            availabilityEndDate: { type: "string" },
+          },
+        },
+      },
     ],
   } as const;
 
@@ -187,26 +238,27 @@ export namespace LoanProductsModel {
     id: string;
     name: string;
     slug?: string | null;
-    imageUrl?: string | null;
     summary?: string | null;
     description?: string | null;
+    organizationId: string;
+    userGroupIds?: string[]; // Array of user group IDs
     currency: string;
     minAmount: number;
     maxAmount: number;
     minTerm: number;
     maxTerm: number;
     termUnit: LoanTermUnit;
+    availabilityStartDate?: string | null; // ISO 8601 date string
+    availabilityEndDate?: string | null; // ISO 8601 date string
+    repaymentFrequency: RepaymentFrequency;
+    maxGracePeriod?: number | null;
+    maxGraceUnit?: GracePeriodUnit | null;
     interestRate: number;
-    interestType: InterestType;
     ratePeriod: InterestRatePeriod;
     amortizationMethod: AmortizationMethod;
-    repaymentFrequency: RepaymentFrequency;
-    processingFeeRate?: number | null;
-    processingFeeFlat?: number | null;
-    lateFeeRate?: number | null;
-    lateFeeFlat?: number | null;
-    prepaymentPenaltyRate?: number | null;
-    gracePeriodDays: number;
+    interestCollectionMethod: InterestCollectionMethod;
+    interestRecognitionCriteria: InterestRecognitionCriteria;
+    fees?: LoanFeeConfiguration[]; // Array of loan fees
     // Versioning fields
     version: number;
     status: ProductStatus;
@@ -224,26 +276,27 @@ export namespace LoanProductsModel {
       id: { type: "string" },
       name: { type: "string" },
       slug: { type: "string" },
-      imageUrl: { type: "string" },
       summary: { type: "string" },
       description: { type: "string" },
+      organizationId: { type: "string" },
+      userGroupIds: { type: "array", items: { type: "string" } },
       currency: { type: "string" },
       minAmount: { type: "number" },
       maxAmount: { type: "number" },
       minTerm: { type: "integer" },
       maxTerm: { type: "integer" },
       termUnit: { type: "string", enum: LoanTermUnitEnum },
+      availabilityStartDate: { type: "string" },
+      availabilityEndDate: { type: "string" },
+      repaymentFrequency: { type: "string", enum: RepaymentFrequencyEnum },
+      maxGracePeriod: { type: "integer" },
+      maxGraceUnit: { type: "string", enum: GracePeriodUnitEnum },
       interestRate: { type: "number" },
-      interestType: { type: "string", enum: InterestTypeEnum },
       ratePeriod: { type: "string", enum: InterestRatePeriodEnum },
       amortizationMethod: { type: "string", enum: AmortizationMethodEnum },
-      repaymentFrequency: { type: "string", enum: RepaymentFrequencyEnum },
-      processingFeeRate: { type: "number" },
-      processingFeeFlat: { type: "number" },
-      lateFeeRate: { type: "number" },
-      lateFeeFlat: { type: "number" },
-      prepaymentPenaltyRate: { type: "number" },
-      gracePeriodDays: { type: "integer" },
+      interestCollectionMethod: { type: "string", enum: InterestCollectionMethodEnum },
+      interestRecognitionCriteria: { type: "string", enum: InterestRecognitionCriteriaEnum },
+      fees: { type: "array" },
       // Versioning fields
       version: { type: "integer" },
       status: { type: "string", enum: ProductStatusEnum },
@@ -257,18 +310,19 @@ export namespace LoanProductsModel {
     required: [
       "id",
       "name",
+      "organizationId",
       "currency",
       "minAmount",
       "maxAmount",
       "minTerm",
       "maxTerm",
       "termUnit",
+      "repaymentFrequency",
       "interestRate",
-      "interestType",
       "ratePeriod",
       "amortizationMethod",
-      "repaymentFrequency",
-      "gracePeriodDays",
+      "interestCollectionMethod",
+      "interestRecognitionCriteria",
       "version",
       "status",
       "isActive",

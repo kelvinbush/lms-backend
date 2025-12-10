@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, boolean, integer, numeric, varchar, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import { pgEnum } from "drizzle-orm/pg-core";
+import { organizations } from "./organizations";
 
 // Enum for loan term unit granularity
 // Use plural names to be explicit in meaning when reading rows
@@ -10,12 +11,6 @@ export const loanTermUnitEnum = pgEnum("loan_term_unit", [
   "months",
   "quarters",
   "years",
-]);
-
-// Enum for interest type; extend later if needed (e.g., reducing-balance vs flat)
-export const interestTypeEnum = pgEnum("interest_type", [
-  "fixed",
-  "variable",
 ]);
 
 // Enum to indicate the period unit the interest rate refers to
@@ -38,6 +33,27 @@ export const repaymentFrequencyEnum = pgEnum("repayment_frequency", [
 export const amortizationMethodEnum = pgEnum("amortization_method", [
   "flat",
   "reducing_balance",
+]);
+
+// Enum for interest collection method
+export const interestCollectionMethodEnum = pgEnum("interest_collection_method", [
+  "installments",
+  "deducted",
+  "capitalized",
+]);
+
+// Enum for interest recognition criteria
+export const interestRecognitionCriteriaEnum = pgEnum("interest_recognition_criteria", [
+  "on_disbursement",
+  "when_accrued",
+]);
+
+// Enum for grace period unit
+export const gracePeriodUnitEnum = pgEnum("grace_period_unit", [
+  "days",
+  "weeks",
+  "months",
+  "years",
 ]);
 
 // Enum for product status
@@ -63,9 +79,17 @@ export const loanProducts = pgTable(
     // Identity & presentation
     name: varchar("name", { length: 150 }).notNull(),
     slug: varchar("slug", { length: 180 }),
-    imageUrl: text("image_url"),
     summary: text("summary"),
     description: text("description"),
+
+    // Organization and visibility
+    organizationId: varchar("organization_id", { length: 24 })
+      .references(() => organizations.id, { onDelete: "restrict" })
+      .notNull(),
+
+    // Loan availability window
+    availabilityStartDate: timestamp("availability_start_date", { withTimezone: true }),
+    availabilityEndDate: timestamp("availability_end_date", { withTimezone: true }),
 
     // Monetary constraints & currency
     currency: varchar("currency", { length: 10 }).notNull(), // ISO 4217 preferred (e.g., "USD", "KES")
@@ -79,17 +103,15 @@ export const loanProducts = pgTable(
 
     // Pricing
     interestRate: numeric("interest_rate", { precision: 7, scale: 4 }).notNull(), // percentage value
-    interestType: interestTypeEnum("interest_type").default("fixed").notNull(),
     ratePeriod: interestRatePeriodEnum("rate_period").default("per_year").notNull(),
     amortizationMethod: amortizationMethodEnum("amortization_method").default("reducing_balance").notNull(),
     repaymentFrequency: repaymentFrequencyEnum("repayment_frequency").default("monthly").notNull(),
-    // Fees (either flat amount or % of principal; all optional)
-    //processingFeeRate: numeric("processing_fee_rate", { precision: 7, scale: 4 }),
-    processingFeeFlat: numeric("processing_fee_flat", { precision: 15, scale: 2 }),
-    lateFeeRate: numeric("late_fee_rate", { precision: 7, scale: 4 }),
-    lateFeeFlat: numeric("late_fee_flat", { precision: 15, scale: 2 }),
-    prepaymentPenaltyRate: numeric("prepayment_penalty_rate", { precision: 7, scale: 4 }),
-    gracePeriodDays: integer("grace_period_days").default(0).notNull(),
+    interestCollectionMethod: interestCollectionMethodEnum("interest_collection_method").notNull(),
+    interestRecognitionCriteria: interestRecognitionCriteriaEnum("interest_recognition_criteria").notNull(),
+    
+    // Grace period
+    maxGracePeriod: integer("max_grace_period"),
+    maxGraceUnit: gracePeriodUnitEnum("max_grace_unit"),
 
     // Lifecycle and versioning (minimal compliance)
     version: integer("version").default(1).notNull(),
@@ -115,6 +137,11 @@ export const loanProducts = pgTable(
       idxLoanProductsVersion: index("idx_loan_products_version").on(table.version),
       idxLoanProductsDeletedAt: index("idx_loan_products_deleted_at").on(table.deletedAt),
       idxLoanProductsCreatedAt: index("idx_loan_products_created_at").on(table.createdAt),
+      idxLoanProductsOrganizationId: index("idx_loan_products_organization_id").on(table.organizationId),
+      idxLoanProductsAvailabilityDates: index("idx_loan_products_availability_dates").on(
+        table.availabilityStartDate,
+        table.availabilityEndDate
+      ),
     };
   },
 );

@@ -4,6 +4,7 @@ import { LoanProductsService } from "../modules/loan-products/loan-products.serv
 import { LoanProductsModel } from "../modules/loan-products/loan-products.model";
 import { UserModel } from "../modules/user/user.model";
 import { logger } from "../utils/logger";
+import { requireRole } from "../utils/authz";
 
 export async function loanProductsRoutes(fastify: FastifyInstance) {
   // CREATE loan product
@@ -24,6 +25,7 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
+        await requireRole(request, "member");
         const { userId } = getAuth(request);
         if (!userId) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
@@ -32,7 +34,7 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
           userId,
           request.body as LoanProductsModel.CreateLoanProductBody,
         );
-        return reply.send(result);
+        return reply.code(201).send(result);
       } catch (error: any) {
         logger.error("Error creating loan product:", error);
         if (error?.status) {
@@ -76,7 +78,6 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
             termUnit: { type: "string", enum: LoanProductsModel.LoanTermUnitEnum },
             
             // Interest and repayment filtering
-            interestType: { type: "string", enum: LoanProductsModel.InterestTypeEnum },
             ratePeriod: { type: "string", enum: LoanProductsModel.InterestRatePeriodEnum },
             amortizationMethod: { type: "string", enum: LoanProductsModel.AmortizationMethodEnum },
             repaymentFrequency: { type: "string", enum: LoanProductsModel.RepaymentFrequencyEnum },
@@ -100,6 +101,18 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
           500: UserModel.ErrorResponseSchema,
         },
         tags: ["loan-products"],
+      },
+      preValidation: async (request: FastifyRequest, reply: FastifyReply) => {
+        // Normalize duplicate query parameters (arrays) to their first value
+        // This handles cases where the same query param appears multiple times in the URL
+        if (request.query && typeof request.query === 'object') {
+          const query = request.query as Record<string, any>;
+          for (const key in query) {
+            if (Array.isArray(query[key])) {
+              query[key] = query[key][0];
+            }
+          }
+        }
       },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -186,6 +199,7 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
+        await requireRole(request, "member");
         const { userId } = getAuth(request);
         if (!userId) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
@@ -230,6 +244,7 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
+        await requireRole(request, "member");
         const { userId } = getAuth(request);
         if (!userId) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
@@ -280,6 +295,7 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
+        await requireRole(request, "member");
         const { userId } = getAuth(request);
         if (!userId) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });

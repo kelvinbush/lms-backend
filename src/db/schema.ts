@@ -20,3 +20,8 @@ export * from "./schema/businessCountries";
 export * from "./schema/businessPhotos";
 export * from "./schema/businessVideoLinks";
 export * from "./schema/adminSMEAuditTrail";
+export * from "./schema/loanFees";
+export * from "./schema/loanProductsLoanFees";
+export * from "./schema/organizations";
+export * from "./schema/loanProductsUserGroups";
+

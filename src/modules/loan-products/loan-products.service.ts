@@ -1,6 +1,6 @@
-import { and, eq, isNull, count, desc, or, asc, like, gte, lte, sql, ne } from "drizzle-orm";
+import { and, eq, isNull, count, desc, or, asc, like, gte, lte, sql, ne, inArray } from "drizzle-orm";
 import { db } from "../../db";
-import { loanProducts, loanApplications } from "../../db/schema";
+import { loanProducts, loanApplications, loanProductsUserGroups, loanProductsLoanFees, loanFees, organizations, userGroups } from "../../db/schema";
 import type { LoanProductsModel } from "./loan-products.model";
 import { logger } from "../../utils/logger";
 
@@ -19,40 +19,110 @@ function toNumber(val: unknown): number | null {
 
 type LoanProductRow = typeof loanProducts.$inferSelect;
 
-function mapRow(r: LoanProductRow): LoanProductsModel.LoanProductItem {
+// Helper function to map a single row with pre-fetched relationships
+function mapRow(
+  r: LoanProductRow,
+  userGroupIdsMap: Map<string, string[]>,
+  feesMap: Map<string, LoanProductsModel.LoanFeeConfiguration[]>
+): LoanProductsModel.LoanProductItem {
+  const userGroupIds = userGroupIdsMap.get(r.id) || [];
+  const fees = feesMap.get(r.id) || [];
+
   return {
     id: r.id,
     name: r.name,
-    slug: r.slug,
-    imageUrl: r.imageUrl,
-    summary: r.summary,
-    description: r.description,
+    slug: r.slug ?? null,
+    summary: r.summary ?? null,
+    description: r.description ?? null,
+    organizationId: r.organizationId,
+    userGroupIds: userGroupIds.length > 0 ? userGroupIds : undefined,
     currency: r.currency,
     minAmount: toNumber(r.minAmount) ?? 0,
     maxAmount: toNumber(r.maxAmount) ?? 0,
     minTerm: r.minTerm,
     maxTerm: r.maxTerm,
     termUnit: r.termUnit,
+    availabilityStartDate: r.availabilityStartDate?.toISOString()?.split('T')[0] ?? null,
+    availabilityEndDate: r.availabilityEndDate?.toISOString()?.split('T')[0] ?? null,
+    repaymentFrequency: r.repaymentFrequency,
+    maxGracePeriod: r.maxGracePeriod ?? null,
+    maxGraceUnit: r.maxGraceUnit ?? null,
     interestRate: toNumber(r.interestRate) ?? 0,
-    interestType: r.interestType,
     ratePeriod: r.ratePeriod,
     amortizationMethod: r.amortizationMethod,
-    repaymentFrequency: r.repaymentFrequency,
-    processingFeeFlat: toNumber(r.processingFeeFlat) ?? null,
-    lateFeeRate: toNumber(r.lateFeeRate) ?? null,
-    lateFeeFlat: toNumber(r.lateFeeFlat) ?? null,
-    prepaymentPenaltyRate: toNumber(r.prepaymentPenaltyRate) ?? null,
-    gracePeriodDays: r.gracePeriodDays,
-    // New versioning fields
+    interestCollectionMethod: r.interestCollectionMethod,
+    interestRecognitionCriteria: r.interestRecognitionCriteria,
+    fees: fees.length > 0 ? fees : undefined,
+    // Versioning fields
     version: r.version ?? 1,
     status: r.status ?? "draft",
-    changeReason: r.changeReason,
-    approvedBy: r.approvedBy,
-    approvedAt: r.approvedAt?.toISOString?.() ?? null,
+    changeReason: r.changeReason ?? null,
+    approvedBy: r.approvedBy ?? null,
+    approvedAt: r.approvedAt?.toISOString() ?? null,
     isActive: r.isActive,
-    createdAt: r.createdAt?.toISOString?.() ?? null,
-    updatedAt: r.updatedAt?.toISOString?.() ?? null,
+    createdAt: r.createdAt?.toISOString() ?? null,
+    updatedAt: r.updatedAt?.toISOString() ?? null,
   };
+}
+
+// Batch fetch relationships for multiple products (efficient)
+async function fetchRelationshipsForProducts(
+  productIds: string[]
+): Promise<{
+  userGroupIdsMap: Map<string, string[]>;
+  feesMap: Map<string, LoanProductsModel.LoanFeeConfiguration[]>;
+}> {
+  if (productIds.length === 0) {
+    return {
+      userGroupIdsMap: new Map(),
+      feesMap: new Map(),
+    };
+  }
+
+  // Batch fetch all user groups in one query
+  const userGroupRows = await db
+    .select({
+      loanProductId: loanProductsUserGroups.loanProductId,
+      userGroupId: loanProductsUserGroups.userGroupId,
+    })
+    .from(loanProductsUserGroups)
+    .where(inArray(loanProductsUserGroups.loanProductId, productIds));
+
+  // Batch fetch all fees in one query
+  const feeRows = await db
+    .select({
+      loanProductId: loanProductsLoanFees.loanProductId,
+      loanFeeId: loanProductsLoanFees.loanFeeId,
+      fee: loanFees,
+    })
+    .from(loanProductsLoanFees)
+    .innerJoin(loanFees, eq(loanProductsLoanFees.loanFeeId, loanFees.id))
+    .where(inArray(loanProductsLoanFees.loanProductId, productIds));
+
+  // Build maps for O(1) lookup
+  const userGroupIdsMap = new Map<string, string[]>();
+  for (const row of userGroupRows) {
+    const existing = userGroupIdsMap.get(row.loanProductId) || [];
+    existing.push(row.userGroupId);
+    userGroupIdsMap.set(row.loanProductId, existing);
+  }
+
+  const feesMap = new Map<string, LoanProductsModel.LoanFeeConfiguration[]>();
+  for (const row of feeRows) {
+    const existing = feesMap.get(row.loanProductId) || [];
+    existing.push({
+      loanFeeId: row.loanFeeId,
+      feeName: row.fee.name,
+      calculationMethod: row.fee.calculationMethod,
+      rate: toNumber(row.fee.rate) ?? 0,
+      collectionRule: row.fee.collectionRule,
+      allocationMethod: row.fee.allocationMethod,
+      calculationBasis: row.fee.calculationBasis,
+    });
+    feesMap.set(row.loanProductId, existing);
+  }
+
+  return { userGroupIdsMap, feesMap };
 }
 
 export abstract class LoanProductsService {
@@ -85,45 +155,127 @@ export abstract class LoanProductsService {
       if (body.minTerm > body.maxTerm) {
         throw httpError(400, "[INVALID_TERM_RANGE] minTerm cannot exceed maxTerm");
       }
+      if (body.availabilityStartDate && body.availabilityEndDate) {
+        const startDate = new Date(body.availabilityStartDate);
+        const endDate = new Date(body.availabilityEndDate);
+        if (endDate < startDate) {
+          throw httpError(400, "[INVALID_DATE_RANGE] availabilityEndDate cannot be before availabilityStartDate");
+        }
+      }
 
-      const values = {
-        name: body.name,
-        slug: body.slug ?? null,
-        imageUrl: body.imageUrl ?? null,
-        summary: body.summary ?? null,
-        description: body.description ?? null,
-        currency: body.currency,
-        minAmount: body.minAmount as any,
-        maxAmount: body.maxAmount as any,
-        minTerm: body.minTerm,
-        maxTerm: body.maxTerm,
-        termUnit: body.termUnit as any,
-        interestRate: body.interestRate as any,
-        interestType: (body.interestType ?? "fixed") as any,
-        ratePeriod: (body.ratePeriod ?? "per_year") as any,
-        amortizationMethod: (body.amortizationMethod ?? "reducing_balance") as any,
-        repaymentFrequency: (body.repaymentFrequency ?? "monthly") as any,
-        processingFeeRate: (body.processingFeeRate ?? null) as any,
-        processingFeeFlat: (body.processingFeeFlat ?? null) as any,
-        lateFeeRate: (body.lateFeeRate ?? null) as any,
-        lateFeeFlat: (body.lateFeeFlat ?? null) as any,
-        prepaymentPenaltyRate: (body.prepaymentPenaltyRate ?? null) as any,
-        gracePeriodDays: body.gracePeriodDays ?? 0,
-        // Versioning fields
-        version: 1, // Always start with version 1
-        status: (body.status ?? "draft") as any,
-        changeReason: body.changeReason ?? null,
-        approvedBy: null, // Will be set during approval
-        approvedAt: null, // Will be set during approval
-        isActive: body.isActive ?? true,
-      };
+      // Validate organization exists
+      const [org] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(and(eq(organizations.id, body.organizationId), isNull(organizations.deletedAt)))
+        .limit(1);
+      if (!org) {
+        throw httpError(400, "[INVALID_ORGANIZATION] Organization not found");
+      }
 
-      const [row] = await db
-        .insert(loanProducts)
-        .values(values)
-        .returning();
+      // Validate user groups exist
+      if (body.userGroupIds && body.userGroupIds.length > 0) {
+        const foundGroups = await db
+          .select({ id: userGroups.id })
+          .from(userGroups)
+          .where(and(inArray(userGroups.id, body.userGroupIds), isNull(userGroups.deletedAt)));
+        if (foundGroups.length !== body.userGroupIds.length) {
+          throw httpError(400, "[INVALID_USER_GROUPS] One or more user groups not found");
+        }
+      }
 
-      return mapRow(row);
+      // Parse availability dates
+      const availabilityStartDate = body.availabilityStartDate 
+        ? new Date(body.availabilityStartDate + 'T00:00:00Z')
+        : null;
+      const availabilityEndDate = body.availabilityEndDate
+        ? new Date(body.availabilityEndDate + 'T23:59:59Z')
+        : null;
+
+      // Create loan product and relationships in a transaction
+      const result = await db.transaction(async (tx) => {
+        const values = {
+          name: body.name,
+          slug: body.slug ?? null,
+          summary: body.summary ?? null,
+          description: body.description ?? null,
+          organizationId: body.organizationId,
+          availabilityStartDate: availabilityStartDate,
+          availabilityEndDate: availabilityEndDate,
+          currency: body.currency,
+          minAmount: body.minAmount as any,
+          maxAmount: body.maxAmount as any,
+          minTerm: body.minTerm,
+          maxTerm: body.maxTerm,
+          termUnit: body.termUnit as any,
+          interestRate: body.interestRate as any,
+          ratePeriod: body.ratePeriod as any,
+          amortizationMethod: body.amortizationMethod as any,
+          repaymentFrequency: body.repaymentFrequency,
+          interestCollectionMethod: body.interestCollectionMethod as any,
+          interestRecognitionCriteria: body.interestRecognitionCriteria as any,
+          maxGracePeriod: body.maxGracePeriod ?? null,
+          maxGraceUnit: body.maxGraceUnit as any ?? null,
+          version: 1,
+          status: (body.status ?? "draft") as any,
+          isActive: body.isActive ?? true,
+        };
+
+        const [row] = await tx
+          .insert(loanProducts)
+          .values(values)
+          .returning();
+
+        // Create user group associations
+        if (body.userGroupIds && body.userGroupIds.length > 0) {
+          await tx.insert(loanProductsUserGroups).values(
+            body.userGroupIds.map(userGroupId => ({
+              loanProductId: row.id,
+              userGroupId,
+            }))
+          );
+        }
+
+        // Handle fees - create new fees if needed, then link them
+        if (body.fees && body.fees.length > 0) {
+          const feeLinks: Array<{ loanProductId: string; loanFeeId: string }> = [];
+          
+          for (const feeConfig of body.fees) {
+            let feeId: string;
+            
+            if (feeConfig.loanFeeId) {
+              // Use existing fee
+              feeId = feeConfig.loanFeeId;
+            } else if (feeConfig.feeName) {
+              // Create new fee inline
+              const [newFee] = await tx.insert(loanFees).values({
+                name: feeConfig.feeName,
+                calculationMethod: feeConfig.calculationMethod as any,
+                rate: feeConfig.rate as any,
+                collectionRule: feeConfig.collectionRule as any,
+                allocationMethod: feeConfig.allocationMethod,
+                calculationBasis: feeConfig.calculationBasis as any,
+                isArchived: false,
+              }).returning();
+              feeId = newFee.id;
+            } else {
+              throw httpError(400, "[INVALID_FEE] Fee must have either loanFeeId or feeName");
+            }
+            
+            feeLinks.push({ loanProductId: row.id, loanFeeId: feeId });
+          }
+          
+          if (feeLinks.length > 0) {
+            await tx.insert(loanProductsLoanFees).values(feeLinks);
+          }
+        }
+
+        return row;
+      });
+
+      // Fetch relationships for the created product
+      const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([result.id]);
+      return mapRow(result, userGroupIdsMap, feesMap);
     } catch (error: any) {
       logger.error("Error creating loan product:", error);
       if (error?.status) throw error;
@@ -216,11 +368,6 @@ export abstract class LoanProductsService {
         whereConditions.push(eq(loanProducts.termUnit, query.termUnit));
       }
 
-      // Interest type filtering
-      if (query.interestType) {
-        whereConditions.push(eq(loanProducts.interestType, query.interestType));
-      }
-
       // Rate period filtering
       if (query.ratePeriod) {
         whereConditions.push(eq(loanProducts.ratePeriod, query.ratePeriod));
@@ -295,10 +442,17 @@ export abstract class LoanProductsService {
         .limit(limit)
         .offset(offset);
 
+      // Batch fetch relationships for all products (efficient - only 2 queries total)
+      const productIds = rows.map(row => row.id);
+      const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts(productIds);
+
+      // Map rows synchronously using pre-fetched data
+      const mappedRows = rows.map(row => mapRow(row, userGroupIdsMap, feesMap));
+
       return {
         success: true,
         message: "Loan products retrieved successfully",
-        data: rows.map(mapRow),
+        data: mappedRows,
         pagination: {
           page,
           limit,
@@ -340,7 +494,10 @@ export abstract class LoanProductsService {
         .where(and(eq(loanProducts.id, id), isNull(loanProducts.deletedAt)))
         .limit(1);
       if (!row) throw httpError(404, "[LOAN_PRODUCT_NOT_FOUND] Loan product not found");
-      return mapRow(row);
+      
+      // Fetch relationships for this single product
+      const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([row.id]);
+      return mapRow(row, userGroupIdsMap, feesMap);
     } catch (error: any) {
       logger.error("Error getting loan product:", error);
       if (error?.status) throw error;
@@ -413,7 +570,7 @@ export abstract class LoanProductsService {
       // Check for critical field changes on active products (for versioning)
       let shouldIncrementVersion = false;
       if (existing.status === "active") {
-        const criticalFields = ['minAmount', 'maxAmount', 'minTerm', 'maxTerm', 'interestRate', 'interestType', 'ratePeriod', 'amortizationMethod', 'repaymentFrequency'];
+        const criticalFields = ['minAmount', 'maxAmount', 'minTerm', 'maxTerm', 'interestRate', 'ratePeriod', 'amortizationMethod', 'repaymentFrequency', 'interestCollectionMethod', 'interestRecognitionCriteria'];
         shouldIncrementVersion = criticalFields.some(field => body[field as keyof typeof body] !== undefined);
         
         if (shouldIncrementVersion) {
@@ -421,46 +578,137 @@ export abstract class LoanProductsService {
         }
       }
 
+      // Validate organization if being updated
+      if (body.organizationId) {
+        const [org] = await db
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(and(eq(organizations.id, body.organizationId), isNull(organizations.deletedAt)))
+          .limit(1);
+        if (!org) {
+          throw httpError(400, "[INVALID_ORGANIZATION] Organization not found");
+        }
+      }
+
+      // Validate user groups if being updated
+      if (body.userGroupIds && body.userGroupIds.length > 0) {
+        const foundGroups = await db
+          .select({ id: userGroups.id })
+          .from(userGroups)
+          .where(and(inArray(userGroups.id, body.userGroupIds), isNull(userGroups.deletedAt)));
+        if (foundGroups.length !== body.userGroupIds.length) {
+          throw httpError(400, "[INVALID_USER_GROUPS] One or more user groups not found");
+        }
+      }
+
+      // Parse availability dates if provided
+      const availabilityStartDate = body.availabilityStartDate 
+        ? new Date(body.availabilityStartDate + 'T00:00:00Z')
+        : undefined;
+      const availabilityEndDate = body.availabilityEndDate
+        ? new Date(body.availabilityEndDate + 'T23:59:59Z')
+        : undefined;
+
       // Get current version for incrementing
       const [currentProduct] = await db
         .select({ version: loanProducts.version })
         .from(loanProducts)
         .where(eq(loanProducts.id, id));
 
-      const [row] = await db
-        .update(loanProducts)
-        .set({
-          name: body.name ?? undefined,
-          slug: body.slug ?? undefined,
-          imageUrl: body.imageUrl ?? undefined,
-          summary: body.summary ?? undefined,
-          description: body.description ?? undefined,
-          currency: body.currency ?? undefined,
-          minAmount: (body.minAmount as any) ?? undefined,
-          maxAmount: (body.maxAmount as any) ?? undefined,
-          minTerm: body.minTerm ?? undefined,
-          maxTerm: body.maxTerm ?? undefined,
-          termUnit: (body.termUnit as any) ?? undefined,
-          interestRate: (body.interestRate as any) ?? undefined,
-          interestType: (body.interestType as any) ?? undefined,
-          ratePeriod: (body.ratePeriod as any) ?? undefined,
-          amortizationMethod: (body.amortizationMethod as any) ?? undefined,
-          repaymentFrequency: (body.repaymentFrequency as any) ?? undefined,
-          processingFeeFlat: (body.processingFeeFlat as any) ?? undefined,
-          lateFeeRate: (body.lateFeeRate as any) ?? undefined,
-          lateFeeFlat: (body.lateFeeFlat as any) ?? undefined,
-          prepaymentPenaltyRate: (body.prepaymentPenaltyRate as any) ?? undefined,
-          gracePeriodDays: body.gracePeriodDays ?? undefined,
-          // Versioning fields
-          version: shouldIncrementVersion ? (currentProduct?.version ?? 1) + 1 : undefined,
-          changeReason: body.changeReason ?? undefined,
-          isActive: body.isActive ?? undefined,
+      // Update in transaction to handle relationships
+      const result = await db.transaction(async (tx) => {
+        const updateData: any = {
           updatedAt: new Date(),
-        })
-        .where(eq(loanProducts.id, id))
-        .returning();
+        };
 
-      return mapRow(row);
+        if (body.name !== undefined) updateData.name = body.name;
+        if (body.slug !== undefined) updateData.slug = body.slug ?? null;
+        if (body.summary !== undefined) updateData.summary = body.summary ?? null;
+        if (body.description !== undefined) updateData.description = body.description ?? null;
+        if (body.organizationId !== undefined) updateData.organizationId = body.organizationId;
+        if (body.availabilityStartDate !== undefined) updateData.availabilityStartDate = availabilityStartDate ?? null;
+        if (body.availabilityEndDate !== undefined) updateData.availabilityEndDate = availabilityEndDate ?? null;
+        if (body.currency !== undefined) updateData.currency = body.currency;
+        if (body.minAmount !== undefined) updateData.minAmount = body.minAmount as any;
+        if (body.maxAmount !== undefined) updateData.maxAmount = body.maxAmount as any;
+        if (body.minTerm !== undefined) updateData.minTerm = body.minTerm;
+        if (body.maxTerm !== undefined) updateData.maxTerm = body.maxTerm;
+        if (body.termUnit !== undefined) updateData.termUnit = body.termUnit as any;
+        if (body.repaymentFrequency !== undefined) updateData.repaymentFrequency = body.repaymentFrequency as any;
+        if (body.maxGracePeriod !== undefined) updateData.maxGracePeriod = body.maxGracePeriod ?? null;
+        if (body.maxGraceUnit !== undefined) updateData.maxGraceUnit = body.maxGraceUnit as any ?? null;
+        if (body.interestRate !== undefined) updateData.interestRate = body.interestRate as any;
+        if (body.ratePeriod !== undefined) updateData.ratePeriod = body.ratePeriod as any;
+        if (body.amortizationMethod !== undefined) updateData.amortizationMethod = body.amortizationMethod as any;
+        if (body.interestCollectionMethod !== undefined) updateData.interestCollectionMethod = body.interestCollectionMethod as any;
+        if (body.interestRecognitionCriteria !== undefined) updateData.interestRecognitionCriteria = body.interestRecognitionCriteria as any;
+        if (shouldIncrementVersion) updateData.version = (currentProduct?.version ?? 1) + 1;
+        if (body.isActive !== undefined) updateData.isActive = body.isActive;
+
+        const [row] = await tx
+          .update(loanProducts)
+          .set(updateData)
+          .where(eq(loanProducts.id, id))
+          .returning();
+
+        // Update user group associations if provided
+        if (body.userGroupIds !== undefined) {
+          // Delete existing associations
+          await tx.delete(loanProductsUserGroups).where(eq(loanProductsUserGroups.loanProductId, id));
+          // Insert new associations
+          if (body.userGroupIds.length > 0) {
+            await tx.insert(loanProductsUserGroups).values(
+              body.userGroupIds.map(userGroupId => ({
+                loanProductId: id,
+                userGroupId,
+              }))
+            );
+          }
+        }
+
+        // Update fee associations if provided
+        if (body.fees !== undefined) {
+          // Delete existing associations
+          await tx.delete(loanProductsLoanFees).where(eq(loanProductsLoanFees.loanProductId, id));
+          // Create new fees if needed and link them
+          if (body.fees.length > 0) {
+            const feeLinks: Array<{ loanProductId: string; loanFeeId: string }> = [];
+            
+            for (const feeConfig of body.fees) {
+              let feeId: string;
+              
+              if (feeConfig.loanFeeId) {
+                feeId = feeConfig.loanFeeId;
+              } else if (feeConfig.feeName) {
+                const [newFee] = await tx.insert(loanFees).values({
+                  name: feeConfig.feeName,
+                  calculationMethod: feeConfig.calculationMethod as any,
+                  rate: feeConfig.rate as any,
+                  collectionRule: feeConfig.collectionRule as any,
+                  allocationMethod: feeConfig.allocationMethod,
+                  calculationBasis: feeConfig.calculationBasis as any,
+                  isArchived: false,
+                }).returning();
+                feeId = newFee.id;
+              } else {
+                throw httpError(400, "[INVALID_FEE] Fee must have either loanFeeId or feeName");
+              }
+              
+              feeLinks.push({ loanProductId: id, loanFeeId: feeId });
+            }
+            
+            if (feeLinks.length > 0) {
+              await tx.insert(loanProductsLoanFees).values(feeLinks);
+            }
+          }
+        }
+
+        return row;
+      });
+
+      // Fetch relationships for the updated product
+      const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([result.id]);
+      return mapRow(result, userGroupIdsMap, feesMap);
     } catch (error: any) {
       logger.error("Error updating loan product:", error);
       if (error?.status) throw error;
@@ -668,7 +916,9 @@ export abstract class LoanProductsService {
         .where(eq(loanProducts.id, id))
         .returning();
 
-      return mapRow(row);
+      // Fetch relationships for the updated product
+      const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([row.id]);
+      return mapRow(row, userGroupIdsMap, feesMap);
     } catch (error: any) {
       logger.error("Error updating product status:", error);
       if (error?.status) throw error;
@@ -701,10 +951,17 @@ export abstract class LoanProductsService {
         ))
         .orderBy(desc(loanProducts.createdAt));
 
+      // Batch fetch relationships for all products (efficient - only 2 queries total)
+      const productIds = rows.map(row => row.id);
+      const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts(productIds);
+
+      // Map rows synchronously using pre-fetched data
+      const mappedRows = rows.map(row => mapRow(row, userGroupIdsMap, feesMap));
+
       return {
         success: true,
         message: "Available loan products retrieved successfully",
-        data: rows.map(mapRow),
+        data: mappedRows,
       };
     } catch (error: any) {
       logger.error("Error getting available products:", error);

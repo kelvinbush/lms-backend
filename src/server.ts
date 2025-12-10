@@ -32,6 +32,8 @@ import { userGroupsRoutes } from './routes/user-groups.routes';
 import { ResponseCachingService } from './modules/response-caching/response-caching.service';
 import { adminInternalUsersRoutes } from './routes/admin-internal-users.routes';
 import { adminSMERoutes } from './routes/admin-sme.routes';
+import { organizationsRoutes } from './routes/organizations.routes';
+import { loanFeesRoutes } from './routes/loan-fees.routes';
 
 config();
 
@@ -79,6 +81,8 @@ export async function registerPlugins(fastify: FastifyInstance): Promise<void> {
   await fastify.register(investorOpportunitiesRoutes, { prefix: '/investor-opportunities' });
   await fastify.register(documentRequestsRoutes, { prefix: '/document-requests' });
   await fastify.register(userGroupsRoutes, { prefix: '/user-groups' });
+  await fastify.register(organizationsRoutes, { prefix: '/organizations' });
+  await fastify.register(loanFeesRoutes, { prefix: '/loan-fees' });
   await fastify.register(webhookRoutes, { prefix: '/webhooks' });
 
   fastify.get('/', async () => {

@@ -20,3 +20,7 @@ export * from "./businessPhotos";
 export * from "./businessVideoLinks";
 export * from "./smeOnboardingProgress";
 export * from "./adminSMEAuditTrail";
+export * from "./organizations";
+export * from "./loanFees";
+export * from "./loanProductsUserGroups";
+export * from "./loanProductsLoanFees";
