@@ -1,6 +1,6 @@
 import { and, eq, isNull, count, desc, asc, like } from "drizzle-orm";
 import { db } from "../../db";
-import { organizations } from "../../db/schema";
+import { organizations, loanProducts } from "../../db/schema";
 import type { OrganizationsModel } from "./organizations.model";
 import { logger } from "../../utils/logger";
 
@@ -189,17 +189,45 @@ export abstract class OrganizationsService {
 
   /**
    * Delete organization (soft delete)
+   * 
+   * @description Soft deletes an organization. Cannot delete if there are loan products linked to it.
+   * 
+   * @param id - The organization ID
+   * @returns Success message
+   * 
+   * @throws {404} If organization is not found
+   * @throws {400} If organization has linked loan products
+   * @throws {500} If deletion fails
    */
   static async delete(id: string): Promise<{ success: boolean; message: string }> {
     try {
-      const [existing] = await db
-        .select({ id: organizations.id })
+      // Optimized: Check existence and count products in a single query using subquery
+      const [result] = await db
+        .select({
+          orgId: organizations.id,
+          productCount: count(loanProducts.id),
+        })
         .from(organizations)
+        .leftJoin(
+          loanProducts,
+          and(
+            eq(loanProducts.organizationId, organizations.id),
+            isNull(loanProducts.deletedAt)
+          )
+        )
         .where(and(eq(organizations.id, id), isNull(organizations.deletedAt)))
+        .groupBy(organizations.id)
         .limit(1);
 
-      if (!existing) {
+      if (!result) {
         throw httpError(404, "[ORGANIZATION_NOT_FOUND] Organization not found");
+      }
+
+      if (result.productCount > 0) {
+        throw httpError(
+          400,
+          `[ORGANIZATION_HAS_PRODUCTS] Cannot delete organization with ${result.productCount} linked loan product(s). Delete or archive the loan products first.`
+        );
       }
 
       await db
