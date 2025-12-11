@@ -119,3 +119,4 @@ All endpoints may return:
 - Organization names must be unique
 - Organizations are used as loan providers in loan product creation
 - Deleting an organization may fail if it's referenced by existing loan products (backend handles this)
+

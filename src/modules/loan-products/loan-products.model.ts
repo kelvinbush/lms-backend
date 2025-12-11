@@ -268,6 +268,7 @@ export namespace LoanProductsModel {
     isActive: boolean;
     createdAt?: string | null;
     updatedAt?: string | null;
+    loansCount?: number; // Number of loan applications linked to this product
   }
 
   export const LoanProductItemSchema = {
@@ -306,6 +307,7 @@ export namespace LoanProductsModel {
       isActive: { type: "boolean" },
       createdAt: { type: "string" },
       updatedAt: { type: "string" },
+      loansCount: { type: "integer" },
     },
     required: [
       "id",

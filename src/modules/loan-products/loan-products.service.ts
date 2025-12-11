@@ -23,7 +23,8 @@ type LoanProductRow = typeof loanProducts.$inferSelect;
 function mapRow(
   r: LoanProductRow,
   userGroupIdsMap: Map<string, string[]>,
-  feesMap: Map<string, LoanProductsModel.LoanFeeConfiguration[]>
+  feesMap: Map<string, LoanProductsModel.LoanFeeConfiguration[]>,
+  loansCount?: number
 ): LoanProductsModel.LoanProductItem {
   const userGroupIds = userGroupIdsMap.get(r.id) || [];
   const fees = feesMap.get(r.id) || [];
@@ -62,6 +63,7 @@ function mapRow(
     isActive: r.isActive,
     createdAt: r.createdAt?.toISOString() ?? null,
     updatedAt: r.updatedAt?.toISOString() ?? null,
+    loansCount: loansCount ?? 0,
   };
 }
 
@@ -275,7 +277,8 @@ export abstract class LoanProductsService {
 
       // Fetch relationships for the created product
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([result.id]);
-      return mapRow(result, userGroupIdsMap, feesMap);
+      // New products have 0 loan applications
+      return mapRow(result, userGroupIdsMap, feesMap, 0);
     } catch (error: any) {
       logger.error("Error creating loan product:", error);
       if (error?.status) throw error;
@@ -433,11 +436,52 @@ export abstract class LoanProductsService {
           orderByClause = sortOrder === "asc" ? asc(loanProducts.createdAt) : desc(loanProducts.createdAt);
       }
 
-      // Get paginated results
+      // Get paginated results with loan application counts (optimized single query)
       const rows = await db
-        .select()
+        .select({
+          id: loanProducts.id,
+          name: loanProducts.name,
+          slug: loanProducts.slug,
+          summary: loanProducts.summary,
+          description: loanProducts.description,
+          organizationId: loanProducts.organizationId,
+          currency: loanProducts.currency,
+          minAmount: loanProducts.minAmount,
+          maxAmount: loanProducts.maxAmount,
+          minTerm: loanProducts.minTerm,
+          maxTerm: loanProducts.maxTerm,
+          termUnit: loanProducts.termUnit,
+          availabilityStartDate: loanProducts.availabilityStartDate,
+          availabilityEndDate: loanProducts.availabilityEndDate,
+          repaymentFrequency: loanProducts.repaymentFrequency,
+          maxGracePeriod: loanProducts.maxGracePeriod,
+          maxGraceUnit: loanProducts.maxGraceUnit,
+          interestRate: loanProducts.interestRate,
+          ratePeriod: loanProducts.ratePeriod,
+          amortizationMethod: loanProducts.amortizationMethod,
+          interestCollectionMethod: loanProducts.interestCollectionMethod,
+          interestRecognitionCriteria: loanProducts.interestRecognitionCriteria,
+          version: loanProducts.version,
+          status: loanProducts.status,
+          changeReason: loanProducts.changeReason,
+          approvedBy: loanProducts.approvedBy,
+          approvedAt: loanProducts.approvedAt,
+          isActive: loanProducts.isActive,
+          createdAt: loanProducts.createdAt,
+          updatedAt: loanProducts.updatedAt,
+          deletedAt: loanProducts.deletedAt,
+          loansCount: count(loanApplications.id),
+        })
         .from(loanProducts)
+        .leftJoin(
+          loanApplications,
+          and(
+            eq(loanApplications.loanProductId, loanProducts.id),
+            isNull(loanApplications.deletedAt)
+          )
+        )
         .where(and(...whereConditions))
+        .groupBy(loanProducts.id)
         .orderBy(orderByClause)
         .limit(limit)
         .offset(offset);
@@ -447,7 +491,8 @@ export abstract class LoanProductsService {
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts(productIds);
 
       // Map rows synchronously using pre-fetched data
-      const mappedRows = rows.map(row => mapRow(row, userGroupIdsMap, feesMap));
+      // Type assertion needed because GROUP BY with COUNT changes type inference
+      const mappedRows = rows.map(row => mapRow(row as LoanProductRow, userGroupIdsMap, feesMap, Number(row.loansCount)));
 
       return {
         success: true,
@@ -488,16 +533,60 @@ export abstract class LoanProductsService {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
 
-      const [row] = await db
-        .select()
+      // Get product with loan application count
+      const [result] = await db
+        .select({
+          id: loanProducts.id,
+          name: loanProducts.name,
+          slug: loanProducts.slug,
+          summary: loanProducts.summary,
+          description: loanProducts.description,
+          organizationId: loanProducts.organizationId,
+          currency: loanProducts.currency,
+          minAmount: loanProducts.minAmount,
+          maxAmount: loanProducts.maxAmount,
+          minTerm: loanProducts.minTerm,
+          maxTerm: loanProducts.maxTerm,
+          termUnit: loanProducts.termUnit,
+          availabilityStartDate: loanProducts.availabilityStartDate,
+          availabilityEndDate: loanProducts.availabilityEndDate,
+          repaymentFrequency: loanProducts.repaymentFrequency,
+          maxGracePeriod: loanProducts.maxGracePeriod,
+          maxGraceUnit: loanProducts.maxGraceUnit,
+          interestRate: loanProducts.interestRate,
+          ratePeriod: loanProducts.ratePeriod,
+          amortizationMethod: loanProducts.amortizationMethod,
+          interestCollectionMethod: loanProducts.interestCollectionMethod,
+          interestRecognitionCriteria: loanProducts.interestRecognitionCriteria,
+          version: loanProducts.version,
+          status: loanProducts.status,
+          changeReason: loanProducts.changeReason,
+          approvedBy: loanProducts.approvedBy,
+          approvedAt: loanProducts.approvedAt,
+          isActive: loanProducts.isActive,
+          createdAt: loanProducts.createdAt,
+          updatedAt: loanProducts.updatedAt,
+          deletedAt: loanProducts.deletedAt,
+          loansCount: count(loanApplications.id),
+        })
         .from(loanProducts)
+        .leftJoin(
+          loanApplications,
+          and(
+            eq(loanApplications.loanProductId, loanProducts.id),
+            isNull(loanApplications.deletedAt)
+          )
+        )
         .where(and(eq(loanProducts.id, id), isNull(loanProducts.deletedAt)))
+        .groupBy(loanProducts.id)
         .limit(1);
-      if (!row) throw httpError(404, "[LOAN_PRODUCT_NOT_FOUND] Loan product not found");
+      
+      if (!result) throw httpError(404, "[LOAN_PRODUCT_NOT_FOUND] Loan product not found");
       
       // Fetch relationships for this single product
-      const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([row.id]);
-      return mapRow(row, userGroupIdsMap, feesMap);
+      const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([result.id]);
+      // Type assertion needed because GROUP BY with COUNT changes type inference
+      return mapRow(result as LoanProductRow, userGroupIdsMap, feesMap, Number(result.loansCount));
     } catch (error: any) {
       logger.error("Error getting loan product:", error);
       if (error?.status) throw error;
@@ -706,9 +795,20 @@ export abstract class LoanProductsService {
         return row;
       });
 
+      // Get loan application count for the updated product
+      const [{ loansCount }] = await db
+        .select({ loansCount: count(loanApplications.id) })
+        .from(loanApplications)
+        .where(
+          and(
+            eq(loanApplications.loanProductId, result.id),
+            isNull(loanApplications.deletedAt)
+          )
+        );
+
       // Fetch relationships for the updated product
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([result.id]);
-      return mapRow(result, userGroupIdsMap, feesMap);
+      return mapRow(result, userGroupIdsMap, feesMap, Number(loansCount));
     } catch (error: any) {
       logger.error("Error updating loan product:", error);
       if (error?.status) throw error;
@@ -916,9 +1016,20 @@ export abstract class LoanProductsService {
         .where(eq(loanProducts.id, id))
         .returning();
 
+      // Get loan application count for the updated product
+      const [{ loansCount }] = await db
+        .select({ loansCount: count(loanApplications.id) })
+        .from(loanApplications)
+        .where(
+          and(
+            eq(loanApplications.loanProductId, id),
+            isNull(loanApplications.deletedAt)
+          )
+        );
+
       // Fetch relationships for the updated product
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([row.id]);
-      return mapRow(row, userGroupIdsMap, feesMap);
+      return mapRow(row, userGroupIdsMap, feesMap, Number(loansCount));
     } catch (error: any) {
       logger.error("Error updating product status:", error);
       if (error?.status) throw error;
@@ -942,13 +1053,55 @@ export abstract class LoanProductsService {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
 
+      // Get products with loan application counts (optimized single query)
       const rows = await db
-        .select()
+        .select({
+          id: loanProducts.id,
+          name: loanProducts.name,
+          slug: loanProducts.slug,
+          summary: loanProducts.summary,
+          description: loanProducts.description,
+          organizationId: loanProducts.organizationId,
+          currency: loanProducts.currency,
+          minAmount: loanProducts.minAmount,
+          maxAmount: loanProducts.maxAmount,
+          minTerm: loanProducts.minTerm,
+          maxTerm: loanProducts.maxTerm,
+          termUnit: loanProducts.termUnit,
+          availabilityStartDate: loanProducts.availabilityStartDate,
+          availabilityEndDate: loanProducts.availabilityEndDate,
+          repaymentFrequency: loanProducts.repaymentFrequency,
+          maxGracePeriod: loanProducts.maxGracePeriod,
+          maxGraceUnit: loanProducts.maxGraceUnit,
+          interestRate: loanProducts.interestRate,
+          ratePeriod: loanProducts.ratePeriod,
+          amortizationMethod: loanProducts.amortizationMethod,
+          interestCollectionMethod: loanProducts.interestCollectionMethod,
+          interestRecognitionCriteria: loanProducts.interestRecognitionCriteria,
+          version: loanProducts.version,
+          status: loanProducts.status,
+          changeReason: loanProducts.changeReason,
+          approvedBy: loanProducts.approvedBy,
+          approvedAt: loanProducts.approvedAt,
+          isActive: loanProducts.isActive,
+          createdAt: loanProducts.createdAt,
+          updatedAt: loanProducts.updatedAt,
+          deletedAt: loanProducts.deletedAt,
+          loansCount: count(loanApplications.id),
+        })
         .from(loanProducts)
+        .leftJoin(
+          loanApplications,
+          and(
+            eq(loanApplications.loanProductId, loanProducts.id),
+            isNull(loanApplications.deletedAt)
+          )
+        )
         .where(and(
           isNull(loanProducts.deletedAt),
           eq(loanProducts.status, "active")
         ))
+        .groupBy(loanProducts.id)
         .orderBy(desc(loanProducts.createdAt));
 
       // Batch fetch relationships for all products (efficient - only 2 queries total)
@@ -956,7 +1109,8 @@ export abstract class LoanProductsService {
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts(productIds);
 
       // Map rows synchronously using pre-fetched data
-      const mappedRows = rows.map(row => mapRow(row, userGroupIdsMap, feesMap));
+      // Type assertion needed because GROUP BY with COUNT changes type inference
+      const mappedRows = rows.map(row => mapRow(row as LoanProductRow, userGroupIdsMap, feesMap, Number(row.loansCount)));
 
       return {
         success: true,

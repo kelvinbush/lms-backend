@@ -280,3 +280,4 @@ All endpoints may return:
 - **Archived Products**: Cannot be edited, only viewed
 - **Versioning**: Active products auto-increment version on critical field changes
 - **Validation**: `maxAmount >= minAmount`, `maxTerm >= minTerm`, `availabilityEndDate >= availabilityStartDate`
+

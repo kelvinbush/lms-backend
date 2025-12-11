@@ -22,7 +22,7 @@ function slugify(input: string): string {
 
 type GroupRow = typeof userGroups.$inferSelect;
 
-function mapRow(r: GroupRow): UserGroupsModel.GroupItem {
+function mapRow(r: GroupRow, businessCount?: number): UserGroupsModel.GroupItem {
   return {
     id: r.id,
     name: r.name,
@@ -30,6 +30,7 @@ function mapRow(r: GroupRow): UserGroupsModel.GroupItem {
     description: r.description ?? null,
     createdAt: r.createdAt?.toISOString?.() ?? null,
     updatedAt: r.updatedAt?.toISOString?.() ?? null,
+    businessCount: businessCount ?? 0,
   };
 }
 
@@ -89,7 +90,8 @@ export abstract class UserGroupsService {
         }
       }
 
-      return mapRow(group);
+      // New groups have 0 businesses
+      return mapRow(group, 0);
     } catch (error: any) {
       logger.error("Error creating user group:", error);
       if (error?.status) throw error;
@@ -99,11 +101,30 @@ export abstract class UserGroupsService {
 
   static async list(): Promise<{ success: boolean; message: string; data: UserGroupsModel.GroupItem[] }> {
     try {
+      // Optimized query: Get groups with business counts in a single query
       const rows = await db
-        .select()
+        .select({
+          id: userGroups.id,
+          name: userGroups.name,
+          slug: userGroups.slug,
+          description: userGroups.description,
+          createdAt: userGroups.createdAt,
+          updatedAt: userGroups.updatedAt,
+          businessCount: count(businessUserGroups.id),
+        })
         .from(userGroups)
-        .where(isNull(userGroups.deletedAt));
-      return { success: true, message: "Groups retrieved successfully", data: rows.map(mapRow) };
+        .leftJoin(
+          businessUserGroups,
+          eq(businessUserGroups.groupId, userGroups.id)
+        )
+        .where(isNull(userGroups.deletedAt))
+        .groupBy(userGroups.id);
+
+      return {
+        success: true,
+        message: "Groups retrieved successfully",
+        data: rows.map((r) => mapRow(r, Number(r.businessCount))),
+      };
     } catch (error: any) {
       logger.error("Error listing user groups:", error);
       if (error?.status) throw error;
@@ -113,13 +134,28 @@ export abstract class UserGroupsService {
 
   static async getById(id: string): Promise<UserGroupsModel.GroupItem> {
     try {
-      const [row] = await db
-        .select()
+      // Get group with business count
+      const [result] = await db
+        .select({
+          id: userGroups.id,
+          name: userGroups.name,
+          slug: userGroups.slug,
+          description: userGroups.description,
+          createdAt: userGroups.createdAt,
+          updatedAt: userGroups.updatedAt,
+          businessCount: count(businessUserGroups.id),
+        })
         .from(userGroups)
+        .leftJoin(
+          businessUserGroups,
+          eq(businessUserGroups.groupId, userGroups.id)
+        )
         .where(and(eq(userGroups.id, id), isNull(userGroups.deletedAt)))
+        .groupBy(userGroups.id)
         .limit(1);
-      if (!row) throw httpError(404, "[USER_GROUP_NOT_FOUND] Group not found");
-      return mapRow(row);
+      
+      if (!result) throw httpError(404, "[USER_GROUP_NOT_FOUND] Group not found");
+      return mapRow(result, Number(result.businessCount));
     } catch (error: any) {
       logger.error("Error getting user group:", error);
       if (error?.status) throw error;
@@ -166,6 +202,12 @@ export abstract class UserGroupsService {
 
       if (!updated) throw httpError(404, "[USER_GROUP_NOT_FOUND] Group not found");
 
+      // Get business count for the updated group
+      const [{ businessCount }] = await db
+        .select({ businessCount: count(businessUserGroups.id) })
+        .from(businessUserGroups)
+        .where(eq(businessUserGroups.groupId, id));
+
       // Membership operations
       if (body.userIds && body.userIds.length >= 0) {
         // Replace full membership set
@@ -208,7 +250,7 @@ export abstract class UserGroupsService {
         await ResponseCachingService.invalidateByPattern(`GET:/user-groups/${id}/members*`);
       }
 
-      return mapRow(updated);
+      return mapRow(updated, Number(businessCount));
     } catch (error: any) {
       logger.error("Error updating user group:", error);
       if (error?.status) throw error;

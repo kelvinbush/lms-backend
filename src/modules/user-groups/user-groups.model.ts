@@ -22,6 +22,7 @@ export namespace UserGroupsModel {
     description?: string | null;
     createdAt?: string | null;
     updatedAt?: string | null;
+    businessCount?: number; // Number of businesses assigned to this group
   }
 
   export type GroupIdParams = { id: string };
@@ -35,6 +36,7 @@ export namespace UserGroupsModel {
       description: { type: "string" },
       createdAt: { type: "string" },
       updatedAt: { type: "string" },
+      businessCount: { type: "integer" },
     },
     required: ["id", "name", "slug"],
     additionalProperties: true,
