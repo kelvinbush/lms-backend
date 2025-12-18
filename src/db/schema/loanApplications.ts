@@ -1,8 +1,18 @@
-import { pgTable, text, timestamp, boolean, integer, numeric, varchar, index, uniqueIndex, pgEnum } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
-import { users } from "./users";
+import {
+  index,
+  integer,
+  numeric,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { businessProfiles } from "./businessProfiles";
 import { loanProducts } from "./loanProducts";
+import { users } from "./users";
 
 // Enum for loan application status
 export const loanApplicationStatusEnum = pgEnum("loan_application_status", [
@@ -36,11 +46,13 @@ export const loanApplicationStatusEnum = pgEnum("loan_application_status", [
 export const loanApplications = pgTable(
   "loan_applications",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
-    
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
+
     // Application identification
     loanId: varchar("loan_id", { length: 50 }).notNull().unique(), // Display ID (e.g., "LN-48291")
-    
+
     // Core relationships
     businessId: varchar("business_id", { length: 24 })
       .notNull()
@@ -51,47 +63,48 @@ export const loanApplications = pgTable(
     loanProductId: varchar("loan_product_id", { length: 24 })
       .notNull()
       .references(() => loanProducts.id, { onDelete: "restrict" }),
-    
+
     // Funding details
     fundingAmount: numeric("funding_amount", { precision: 15, scale: 2 }).notNull(),
     fundingCurrency: varchar("funding_currency", { length: 10 }).notNull(), // ISO 4217 currency code
-    
+
     // Currency conversion (optional)
     convertedAmount: numeric("converted_amount", { precision: 15, scale: 2 }),
     convertedCurrency: varchar("converted_currency", { length: 10 }),
     exchangeRate: numeric("exchange_rate", { precision: 15, scale: 6 }),
-    
+
     // Repayment terms
     repaymentPeriod: integer("repayment_period").notNull(), // Repayment period in months
-    
+
     // Additional details
     intendedUseOfFunds: varchar("intended_use_of_funds", { length: 100 }).notNull(), // Max 100 characters
     interestRate: numeric("interest_rate", { precision: 7, scale: 4 }).notNull(), // Interest rate per annum (percentage)
-    
+
     // Metadata
     loanSource: varchar("loan_source", { length: 100 }), // Source of application (e.g., "Admin Platform", "SME Platform")
-    
+
     // Application status and workflow
     status: loanApplicationStatusEnum("status").default("kyc_kyb_verification").notNull(),
-    
+
     // Timeline tracking
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     rejectedAt: timestamp("rejected_at", { withTimezone: true }),
     disbursedAt: timestamp("disbursed_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
-    
+
     // Rejection reason (if applicable)
     rejectionReason: text("rejection_reason"),
-    
+
     // Audit tracking
     createdBy: varchar("created_by", { length: 24 })
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }), // User who created the application (admin/member or entrepreneur themselves)
-    lastUpdatedBy: varchar("last_updated_by", { length: 24 })
-      .references(() => users.id, { onDelete: "set null" }), // User who last updated
+    lastUpdatedBy: varchar("last_updated_by", { length: 24 }).references(() => users.id, {
+      onDelete: "set null",
+    }), // User who last updated
     lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true }).defaultNow(),
-    
+
     // Standard lifecycle fields
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -101,30 +114,48 @@ export const loanApplications = pgTable(
     return {
       // Unique constraints
       uqLoanApplicationsLoanId: uniqueIndex("uq_loan_applications_loan_id").on(table.loanId),
-      
+
       // Primary lookup indexes
       idxLoanApplicationsBusiness: index("idx_loan_applications_business").on(table.businessId),
-      idxLoanApplicationsEntrepreneur: index("idx_loan_applications_entrepreneur").on(table.entrepreneurId),
-      idxLoanApplicationsLoanProduct: index("idx_loan_applications_loan_product").on(table.loanProductId),
+      idxLoanApplicationsEntrepreneur: index("idx_loan_applications_entrepreneur").on(
+        table.entrepreneurId
+      ),
+      idxLoanApplicationsLoanProduct: index("idx_loan_applications_loan_product").on(
+        table.loanProductId
+      ),
       idxLoanApplicationsStatus: index("idx_loan_applications_status").on(table.status),
       idxLoanApplicationsLoanId: index("idx_loan_applications_loan_id").on(table.loanId),
-      idxLoanApplicationsLoanSource: index("idx_loan_applications_loan_source").on(table.loanSource),
-      
+      idxLoanApplicationsLoanSource: index("idx_loan_applications_loan_source").on(
+        table.loanSource
+      ),
+
       // Timeline indexes
-      idxLoanApplicationsSubmittedAt: index("idx_loan_applications_submitted_at").on(table.submittedAt),
-      idxLoanApplicationsApprovedAt: index("idx_loan_applications_approved_at").on(table.approvedAt),
-      idxLoanApplicationsRejectedAt: index("idx_loan_applications_rejected_at").on(table.rejectedAt),
-      idxLoanApplicationsDisbursedAt: index("idx_loan_applications_disbursed_at").on(table.disbursedAt),
-      
+      idxLoanApplicationsSubmittedAt: index("idx_loan_applications_submitted_at").on(
+        table.submittedAt
+      ),
+      idxLoanApplicationsApprovedAt: index("idx_loan_applications_approved_at").on(
+        table.approvedAt
+      ),
+      idxLoanApplicationsRejectedAt: index("idx_loan_applications_rejected_at").on(
+        table.rejectedAt
+      ),
+      idxLoanApplicationsDisbursedAt: index("idx_loan_applications_disbursed_at").on(
+        table.disbursedAt
+      ),
+
       // Audit indexes
       idxLoanApplicationsCreatedBy: index("idx_loan_applications_created_by").on(table.createdBy),
-      idxLoanApplicationsLastUpdatedBy: index("idx_loan_applications_last_updated_by").on(table.lastUpdatedBy),
-      idxLoanApplicationsLastUpdatedAt: index("idx_loan_applications_last_updated_at").on(table.lastUpdatedAt),
-      
+      idxLoanApplicationsLastUpdatedBy: index("idx_loan_applications_last_updated_by").on(
+        table.lastUpdatedBy
+      ),
+      idxLoanApplicationsLastUpdatedAt: index("idx_loan_applications_last_updated_at").on(
+        table.lastUpdatedAt
+      ),
+
       // Soft delete indexes
       idxLoanApplicationsDeletedAt: index("idx_loan_applications_deleted_at").on(table.deletedAt),
       idxLoanApplicationsCreatedAt: index("idx_loan_applications_created_at").on(table.createdAt),
-      
+
       // Composite indexes for common queries
       idxLoanApplicationsBusinessStatus: index("idx_loan_applications_business_status").on(
         table.businessId,
@@ -147,7 +178,7 @@ export const loanApplications = pgTable(
         table.status
       ),
     };
-  },
+  }
 );
 
 // Type exports for use in application code

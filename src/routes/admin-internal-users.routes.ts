@@ -26,7 +26,7 @@ export async function adminInternalUsersRoutes(fastify: FastifyInstance) {
       try {
         const current = await requireSuperAdmin(request);
         const result = await InternalUsersService.createInvitation({
-          invitedByClerkUserId: current.clerkId,
+          invitedByClerkUserId: current.clerkId || "", // TODO: Re-implement when clerkId is not nullable
           body: request.body,
         });
         return reply.send(result);
