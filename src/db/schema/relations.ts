@@ -7,6 +7,7 @@ import { businessUserGroups } from "./businessUserGroups";
 import { businessVideoLinks } from "./businessVideoLinks";
 import { investorOpportunities } from "./investorOpportunities";
 import { investorOpportunityBookmarks } from "./investorOpportunityBookmarks";
+import { loanApplications } from "./loanApplications";
 import { loanProducts } from "./loanProducts";
 import { personalDocuments } from "./personalDocuments";
 import { smeOnboardingProgress } from "./smeOnboardingProgress";
@@ -20,6 +21,12 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   investorOpportunityBookmarks: many(investorOpportunityBookmarks),
   groupMemberships: many(userGroupMembers),
   onboardingProgress: one(smeOnboardingProgress),
+  // Loan applications where user is the entrepreneur
+  entrepreneurLoanApplications: many(loanApplications, { relationName: "entrepreneur" }),
+  // Loan applications created by the user (as admin/member or entrepreneur)
+  createdLoanApplications: many(loanApplications, { relationName: "creator" }),
+  // Loan applications last updated by the user
+  updatedLoanApplications: many(loanApplications, { relationName: "updater" }),
 }));
 
 export const personalDocumentsRelations = relations(personalDocuments, ({ one }) => ({
@@ -39,6 +46,7 @@ export const businessProfilesRelations = relations(businessProfiles, ({ one, man
   countries: many(businessCountries),
   photos: many(businessPhotos),
   videoLinks: many(businessVideoLinks),
+  loanApplications: many(loanApplications),
 }));
 
 export const businessDocumentsRelations = relations(businessDocuments, ({ one }) => ({
@@ -82,7 +90,7 @@ export const investorOpportunityBookmarksRelations = relations(
 );
 
 export const loanProductsRelations = relations(loanProducts, ({ many }) => ({
-  // loanApplications: many(loanApplications), // TODO: Re-add when loan applications are re-implemented
+  loanApplications: many(loanApplications),
 }));
 
 // Business User Groups Relation
@@ -126,5 +134,32 @@ export const smeOnboardingProgressRelations = relations(smeOnboardingProgress, (
   user: one(users, {
     fields: [smeOnboardingProgress.userId],
     references: [users.id],
+  }),
+}));
+
+// Loan Applications Relations
+export const loanApplicationsRelations = relations(loanApplications, ({ one }) => ({
+  business: one(businessProfiles, {
+    fields: [loanApplications.businessId],
+    references: [businessProfiles.id],
+  }),
+  entrepreneur: one(users, {
+    fields: [loanApplications.entrepreneurId],
+    references: [users.id],
+    relationName: "entrepreneur",
+  }),
+  loanProduct: one(loanProducts, {
+    fields: [loanApplications.loanProductId],
+    references: [loanProducts.id],
+  }),
+  creator: one(users, {
+    fields: [loanApplications.createdBy],
+    references: [users.id],
+    relationName: "creator",
+  }),
+  lastUpdatedByUser: one(users, {
+    fields: [loanApplications.lastUpdatedBy],
+    references: [users.id],
+    relationName: "updater",
   }),
 }));

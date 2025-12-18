@@ -6,6 +6,7 @@ export * from "./schema/relations";
 export * from "./schema/investorOpportunities";
 export * from "./schema/investorOpportunityBookmarks";
 export * from "./schema/loanProducts";
+export * from "./schema/loanApplications";
 export * from "./schema/userGroups";
 export * from "./schema/userGroupMembers";
 export * from "./schema/internalInvitations";
