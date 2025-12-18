@@ -22,18 +22,10 @@ import { adminSMERoutes } from "./routes/admin-sme.routes";
 import { businessDocumentsRoutes } from "./routes/business-documents.routes";
 import { businessRoutes } from "./routes/business.routes";
 import { documentsRoutes } from "./routes/documents.routes";
-// TODO: Re-add loan applications routes when loan applications are re-implemented
-// import { loanApplicationsRoutes } from './routes/loan-applications.routes';
-// TODO: Re-add offer letters routes when offer letters are re-implemented
-// import { offerLettersRoutes } from './routes/offer-letters.routes';
 import { investorOpportunitiesRoutes } from "./routes/investor-opportunities.routes";
 import { loanFeesRoutes } from "./routes/loan-fees.routes";
 import { loanProductsRoutes } from "./routes/loan-products.routes";
 import { organizationsRoutes } from "./routes/organizations.routes";
-// TODO: Re-add webhook routes when docusign webhook is re-implemented
-// import { webhookRoutes } from './routes/webhooks.routes';
-// TODO: Re-add document requests routes when document requests are re-implemented
-// import { documentRequestsRoutes } from './routes/document-requests.routes';
 import { userGroupsRoutes } from "./routes/user-groups.routes";
 import { userRoutes } from "./routes/user.routes";
 import { errorHandler } from "./utils/error-handler";
@@ -70,7 +62,7 @@ export async function registerPlugins(fastify: FastifyInstance): Promise<void> {
 
   await fastify.register(clerkPlugin);
 
-  // Register response caching plugin
+  // Register response caching plugin.
   await fastify.register(ResponseCachingService.createPlugin());
 
   await fastify.register(userRoutes, { prefix: "/user" });
@@ -80,18 +72,10 @@ export async function registerPlugins(fastify: FastifyInstance): Promise<void> {
   await fastify.register(documentsRoutes, { prefix: "/documents" });
   await fastify.register(businessDocumentsRoutes, { prefix: "/business" });
   await fastify.register(loanProductsRoutes, { prefix: "/loan-products" });
-  // TODO: Re-add loan applications routes when loan applications are re-implemented
-  // await fastify.register(loanApplicationsRoutes, { prefix: '/loan-applications' });
-  // TODO: Re-add offer letters routes when offer letters are re-implemented
-  // await fastify.register(offerLettersRoutes, { prefix: '/offer-letters' });
   await fastify.register(investorOpportunitiesRoutes, { prefix: "/investor-opportunities" });
-  // TODO: Re-add document requests routes when document requests are re-implemented
-  // await fastify.register(documentRequestsRoutes, { prefix: '/document-requests' });
   await fastify.register(userGroupsRoutes, { prefix: "/user-groups" });
   await fastify.register(organizationsRoutes, { prefix: "/organizations" });
   await fastify.register(loanFeesRoutes, { prefix: "/loan-fees" });
-  // TODO: Re-add webhook routes when docusign webhook is re-implemented
-  // await fastify.register(webhookRoutes, { prefix: '/webhooks' });
 
   fastify.get("/", async () => {
     return { message: "Hello from Fastify!" };

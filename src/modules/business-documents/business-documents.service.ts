@@ -4,7 +4,6 @@ import { users } from "../../db/schema";
 import { businessProfiles } from "../../db/schema";
 import { businessDocumentTypeEnum, businessDocuments } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { DocumentRequestService } from "../document-requests/document-request.service";
 import type { BusinessDocumentsModel } from "./business-documents.model";
 
 // Lightweight HTTP error helper compatible with our route error handling
@@ -207,102 +206,4 @@ export abstract class BusinessDocuments {
     }
   }
 
-  /**
-   * Create a document request for business documents
-   */
-  static async createDocumentRequest(
-    clerkId: string,
-    businessId: string,
-    input: {
-      documentType: string;
-      reason: string;
-      dueDate?: Date;
-      metadata?: Record<string, any>;
-    }
-  ): Promise<BusinessDocumentsModel.BasicSuccessResponse> {
-    try {
-      if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
-
-      const user = await db.query.users.findFirst({ where: eq(users.clerkId, clerkId) });
-      if (!user) throw httpError(404, "[USER_NOT_FOUND] User not found");
-
-      // Ensure business exists and belongs to the user
-      const biz = await db.query.businessProfiles.findFirst({
-        where: and(eq(businessProfiles.id, businessId), eq(businessProfiles.userId, user.id)),
-        columns: { id: true },
-      });
-      if (!biz) throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found");
-
-      // Create document request
-      const _request = await DocumentRequestService.createRequest({
-        loanApplicationId: businessId, // Using businessId as loanApplicationId for business documents
-        requestedBy: user.id,
-        requestedFrom: user.id,
-        documentType: input.documentType as any,
-        description: input.reason,
-        isRequired: true,
-      });
-
-      // Note: Audit trail logging skipped for standalone document requests
-      // Document requests should be created in the context of a loan application
-
-      return {
-        success: true,
-        message: "Document request created successfully",
-      };
-    } catch (error: any) {
-      logger.error("Error creating document request:", error);
-      if (error?.status) throw error;
-      throw httpError(500, "[CREATE_DOCUMENT_REQUEST_ERROR] Failed to create document request");
-    }
-  }
-
-  /**
-   * Fulfill a document request by uploading the requested document
-   */
-  static async fulfillDocumentRequest(
-    clerkId: string,
-    businessId: string,
-    requestId: string,
-    documentData: BusinessDocumentsModel.AddDocumentsBody
-  ): Promise<BusinessDocumentsModel.BasicSuccessResponse> {
-    try {
-      if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
-
-      const user = await db.query.users.findFirst({ where: eq(users.clerkId, clerkId) });
-      if (!user) throw httpError(404, "[USER_NOT_FOUND] User not found");
-
-      // Ensure business exists and belongs to the user
-      const biz = await db.query.businessProfiles.findFirst({
-        where: and(eq(businessProfiles.id, businessId), eq(businessProfiles.userId, user.id)),
-        columns: { id: true },
-      });
-      if (!biz) throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found");
-
-      // Get the document request
-      const request = await DocumentRequestService.getRequest(requestId);
-      if (!request) throw httpError(404, "[DOCUMENT_REQUEST_NOT_FOUND] Document request not found");
-
-      // Upload the document
-      await BusinessDocuments.upsert(clerkId, businessId, documentData);
-
-      // Mark the request as fulfilled
-      await DocumentRequestService.fulfillRequest({
-        requestId,
-        fulfilledWith: "business_document_upload", // Placeholder for document ID
-      });
-
-      // Note: Audit trail logging skipped for standalone document request fulfillment
-      // Document request fulfillment should be tracked in the context of a loan application
-
-      return {
-        success: true,
-        message: "Document request fulfilled successfully",
-      };
-    } catch (error: any) {
-      logger.error("Error fulfilling document request:", error);
-      if (error?.status) throw error;
-      throw httpError(500, "[FULFILL_DOCUMENT_REQUEST_ERROR] Failed to fulfill document request");
-    }
-  }
 }

@@ -8,7 +8,6 @@ import {
   businessProfiles,
   businessUserGroups,
   businessVideoLinks,
-  loanApplications,
   personalDocuments,
   smeOnboardingProgress,
   userGroups,
@@ -727,19 +726,20 @@ export abstract class AdminSMEService {
     const pendingActivation = Number(row?.pendingActivation || 0);
     const incompleteProfiles = Math.max(total - completeProfiles, 0);
 
+    // TODO: Re-implement when loan applications are re-implemented
     // SMEs with loans: count distinct users that have at least one loan application
-    const [loanRow] = await db
-      .select({
-        count: sql<number>`count(distinct "users"."id")`,
-      })
-      .from(users)
-      .innerJoin(
-        loanApplications,
-        and(eq(loanApplications.userId, users.id), isNull(loanApplications.deletedAt))
-      )
-      .where(whereClause);
-
-    const smesWithLoans = Number(loanRow?.count || 0);
+    // const [loanRow] = await db
+    //   .select({
+    //     count: sql<number>`count(distinct "users"."id")`,
+    //   })
+    //   .from(users)
+    //   .innerJoin(
+    //     loanApplications,
+    //     and(eq(loanApplications.userId, users.id), isNull(loanApplications.deletedAt))
+    //   )
+    //   .where(whereClause);
+    // const smesWithLoans = Number(loanRow?.count || 0);
+    const smesWithLoans = 0; // TODO: Re-implement when loan applications are re-implemented
 
     return {
       total,

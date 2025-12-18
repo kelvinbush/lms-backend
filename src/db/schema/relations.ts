@@ -81,13 +81,11 @@ export const investorOpportunityBookmarksRelations = relations(
   })
 );
 
-// Loan Products Relations
-// TODO: Re-wire loan applications relation when loan applications are re-implemented
 export const loanProductsRelations = relations(loanProducts, ({ many }) => ({
   // loanApplications: many(loanApplications), // TODO: Re-add when loan applications are re-implemented
 }));
 
-// Business User Groups Relations
+// Business User Groups Relation
 export const businessUserGroupsRelations = relations(businessUserGroups, ({ one }) => ({
   business: one(businessProfiles, {
     fields: [businessUserGroups.businessId],

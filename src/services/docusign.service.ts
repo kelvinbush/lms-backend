@@ -1,6 +1,6 @@
 import { logger } from "../utils/logger";
 
-// DocuSign API configuration - Demo environment
+// DocuSign API configuration - Demo environmen
 const DOCUSIGN_API_BASE_URL = process.env.DOCUSIGN_BASE_URL || "https://demo.docusign.net/restapi";
 const DOCUSIGN_AUTH_BASE_URL =
   process.env.DOCUSIGN_AUTH_BASE_URL || "https://account-d.docusign.com/oauth/token";

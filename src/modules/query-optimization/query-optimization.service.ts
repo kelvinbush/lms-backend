@@ -1,8 +1,4 @@
-// TODO: Re-add loan application related imports when loan applications are re-implemented
-// import { applicationAuditTrail } from "../../db/schema/applicationAuditTrail";
-// import { loanApplicationSnapshots } from "../../db/schema/loanApplicationSnapshots";
-// import { documentRequests } from "../../db/schema/documentRequests";
-// import { loanApplications } from "../../db/schema/loanApplications";
+
 
 // Lightweight HTTP error helper
 function httpError(status: number, message: string) {

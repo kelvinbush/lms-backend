@@ -1,6 +1,5 @@
 import { and, asc, count, desc, eq, gte, inArray, isNull, like, lte, ne, or } from "drizzle-orm";
 import { db } from "../../db";
-// TODO: Re-add loanApplications import when loan applications are re-implemented
 import {
   loanFees,
   loanProducts,

@@ -28,10 +28,6 @@ export class UserDeletionService {
 
       // Wrap all deletions in a transaction
       await db.transaction(async (tx) => {
-        // TODO: Re-add loan application related deletions when loan applications are re-implemented
-        // This includes: documentRequests, loanApplicationSnapshots, applicationAuditTrail,
-        // loanApplications, offerLetters
-
         await tx
           .delete(investorOpportunityBookmarks)
           .where(eq(investorOpportunityBookmarks.userId, userId));
