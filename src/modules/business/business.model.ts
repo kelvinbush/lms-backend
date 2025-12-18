@@ -243,4 +243,85 @@ export namespace BusinessModel {
     required: ["success", "message", "data"],
     additionalProperties: true,
   } as const;
+
+  // ------------------------------------------------------------
+  // Search Active Businesses (admin endpoint)
+  // ------------------------------------------------------------
+  export interface SearchActiveBusinessesQuery {
+    search?: string; // Search by business name or owner email
+    page?: string; // number as string
+    limit?: string; // number as string
+  }
+
+  export interface BusinessSearchItem {
+    id: string;
+    name: string;
+    description?: string | null;
+    sector?: string | null;
+    country?: string | null;
+    city?: string | null;
+    owner: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email: string;
+    };
+  }
+
+  export interface SearchActiveBusinessesResponse {
+    success: boolean;
+    message: string;
+    data: BusinessSearchItem[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }
+
+  export const BusinessSearchItemSchema = {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      name: { type: "string" },
+      description: { type: "string" },
+      sector: { type: "string" },
+      country: { type: "string" },
+      city: { type: "string" },
+      owner: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          firstName: { type: "string" },
+          lastName: { type: "string" },
+          email: { type: "string" },
+        },
+        required: ["id", "email"],
+      },
+    },
+    required: ["id", "name", "owner"],
+    additionalProperties: true,
+  } as const;
+
+  export const SearchActiveBusinessesResponseSchema = {
+    type: "object",
+    properties: {
+      success: { type: "boolean" },
+      message: { type: "string" },
+      data: { type: "array", items: BusinessSearchItemSchema },
+      pagination: {
+        type: "object",
+        properties: {
+          page: { type: "integer" },
+          limit: { type: "integer" },
+          total: { type: "integer" },
+          totalPages: { type: "integer" },
+        },
+        required: ["page", "limit", "total", "totalPages"],
+      },
+    },
+    required: ["success", "message", "data", "pagination"],
+    additionalProperties: true,
+  } as const;
 }

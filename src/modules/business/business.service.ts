@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, count, eq, isNull, like, or } from "drizzle-orm";
 import { db } from "../../db";
 import { businessProfiles } from "../../db/schema";
 import { users } from "../../db/schema";
@@ -254,6 +254,107 @@ export abstract class Business {
       logger.error("Error listing businesses:", error);
       if (error?.status) throw error;
       throw httpError(500, "[LIST_BUSINESSES_ERROR] Failed to list businesses");
+    }
+  }
+
+  /**
+   * Search all active businesses (admin endpoint)
+   *
+   * @description Searches all active businesses for use in loan application creation and other admin workflows.
+   * Returns businesses with owner information, searchable by business name or owner email.
+   *
+   * @param query - Search and pagination parameters
+   * @returns Paginated list of active businesses with owner information
+   *
+   * @throws {500} If search fails
+   */
+  static async searchActiveBusinesses(
+    query: BusinessModel.SearchActiveBusinessesQuery = {}
+  ): Promise<BusinessModel.SearchActiveBusinessesResponse> {
+    try {
+      // Pagination
+      const page = query.page ? Math.max(1, Number.parseInt(query.page)) : 1;
+      const limit = Math.min(query.limit ? Math.max(1, Number.parseInt(query.limit)) : 20, 100);
+      const offset = (page - 1) * limit;
+
+      // Build search conditions - only active businesses (not deleted)
+      const whereConditions = [isNull(businessProfiles.deletedAt)];
+
+      if (query.search && query.search.trim().length > 0) {
+        const searchTerm = `%${query.search.trim()}%`;
+        // Search by business name (indexed) or owner email (indexed)
+        whereConditions.push(
+          or(like(businessProfiles.name, searchTerm), like(users.email, searchTerm))!
+        );
+      }
+
+      // Optimized single query: Get businesses with owner info
+      const results = await db
+        .select({
+          businessId: businessProfiles.id,
+          businessName: businessProfiles.name,
+          businessDescription: businessProfiles.description,
+          businessSector: businessProfiles.sector,
+          businessCountry: businessProfiles.country,
+          businessCity: businessProfiles.city,
+          ownerId: users.id,
+          ownerFirstName: users.firstName,
+          ownerLastName: users.lastName,
+          ownerEmail: users.email,
+        })
+        .from(businessProfiles)
+        .innerJoin(users, eq(businessProfiles.userId, users.id))
+        .where(and(...whereConditions))
+        .orderBy(asc(businessProfiles.name))
+        .limit(limit)
+        .offset(offset);
+
+      // Get total count for pagination (separate optimized count query)
+      const countConditions = [isNull(businessProfiles.deletedAt)];
+      if (query.search && query.search.trim().length > 0) {
+        const searchTerm = `%${query.search.trim()}%`;
+        countConditions.push(
+          or(like(businessProfiles.name, searchTerm), like(users.email, searchTerm))!
+        );
+      }
+
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(businessProfiles)
+        .innerJoin(users, eq(businessProfiles.userId, users.id))
+        .where(and(...countConditions));
+
+      // Map results
+      const data: BusinessModel.BusinessSearchItem[] = results.map((r) => ({
+        id: r.businessId,
+        name: r.businessName,
+        description: r.businessDescription ?? null,
+        sector: r.businessSector ?? null,
+        country: r.businessCountry ?? null,
+        city: r.businessCity ?? null,
+        owner: {
+          id: r.ownerId,
+          firstName: r.ownerFirstName ?? null,
+          lastName: r.ownerLastName ?? null,
+          email: r.ownerEmail,
+        },
+      }));
+
+      return {
+        success: true,
+        message: "Businesses retrieved successfully",
+        data,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error: any) {
+      logger.error("Error searching active businesses:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[SEARCH_ACTIVE_BUSINESSES_ERROR] Failed to search businesses");
     }
   }
 }
