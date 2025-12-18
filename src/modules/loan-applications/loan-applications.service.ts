@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { db } from "../../db";
 import {
   businessProfiles,
@@ -14,6 +14,7 @@ import {
   mapCreateLoanApplicationResponse,
   mapLoanApplicationDetail,
   mapLoanApplicationRow,
+  toNumber,
 } from "./loan-applications.mapper";
 import type { LoanApplicationsModel } from "./loan-applications.model";
 import { buildBaseWhereConditions, buildSearchConditions } from "./loan-applications.query-builder";
@@ -688,6 +689,326 @@ export abstract class LoanApplicationsService {
       logger.error("Error updating loan application status:", error);
       if (error?.status) throw error;
       throw httpError(500, "[UPDATE_STATUS_ERROR] Failed to update loan application status");
+    }
+  }
+
+  /**
+   * List loan applications for external users (entrepreneurs)
+   * Returns only applications where the authenticated user is the entrepreneur
+   *
+   * @description Retrieves a paginated, searchable, and filterable list of loan applications
+   * for the authenticated entrepreneur. Simplified format matching frontend requirements.
+   *
+   * @param clerkId - The Clerk ID of the authenticated entrepreneur
+   * @param query - Query parameters for filtering, pagination, and sorting
+   * @returns Paginated list of loan applications in simplified format
+   *
+   * @throws {401} If user is not authorized
+   * @throws {404} If user not found
+   * @throws {500} If listing fails
+   */
+  static async listForEntrepreneur(
+    clerkId: string,
+    query: LoanApplicationsModel.ExternalLoanApplicationListQuery = {}
+  ): Promise<LoanApplicationsModel.ExternalLoanApplicationListResponse> {
+    try {
+      // Get the authenticated user
+      const user = await db.query.users.findFirst({
+        where: eq(users.clerkId, clerkId),
+        columns: { id: true },
+      });
+
+      if (!user) {
+        throw httpError(401, "[UNAUTHORIZED] User not found");
+      }
+
+      const page = query.page ? Number.parseInt(query.page) : 1;
+      const limit = Math.min(query.limit ? Number.parseInt(query.limit) : 8, 50);
+      const offset = (page - 1) * limit;
+
+      // Build where conditions - only applications where user is the entrepreneur
+      const whereConditions: any[] = [
+        eq(loanApplications.entrepreneurId, user.id),
+        isNull(loanApplications.deletedAt),
+      ];
+
+      // Status filter - map frontend status values to backend statuses
+      if (query.status && query.status !== "all") {
+        const statusMap: Record<string, string[]> = {
+          pending: [
+            "kyc_kyb_verification",
+            "eligibility_check",
+            "credit_analysis",
+            "head_of_credit_review",
+            "internal_approval_ceo",
+            "committee_decision",
+            "sme_offer_approval",
+            "document_generation",
+            "signing_execution",
+            "awaiting_disbursement",
+          ],
+          approved: ["approved"],
+          rejected: ["rejected"],
+          disbursed: ["disbursed"],
+          cancelled: ["cancelled"],
+        };
+
+        const backendStatuses = statusMap[query.status];
+        if (backendStatuses) {
+          whereConditions.push(
+            or(...backendStatuses.map((s) => eq(loanApplications.status, s as any)))!
+          );
+        }
+      }
+
+      // Search filter
+      if (query.search) {
+        const searchTerm = `%${query.search}%`;
+        whereConditions.push(
+          or(
+            like(loanApplications.loanId, searchTerm),
+            like(loanProducts.name, searchTerm),
+            like(loanApplications.fundingAmount, searchTerm)
+          )!
+        );
+      }
+
+      // Get total count
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(loanApplications)
+        .leftJoin(loanProducts, eq(loanApplications.loanProductId, loanProducts.id))
+        .where(and(...whereConditions));
+
+      // Build sort order
+      let orderByClause;
+      switch (query.sortBy || "newest") {
+        case "oldest":
+          orderByClause = asc(loanApplications.createdAt);
+          break;
+        case "ascending":
+          orderByClause = asc(loanApplications.loanId);
+          break;
+        case "descending":
+          orderByClause = desc(loanApplications.loanId);
+          break;
+        default: // newest
+          orderByClause = desc(loanApplications.createdAt);
+      }
+
+      // Get applications with loan product data
+      const applicationRows = await db
+        .select({
+          loanApplication: loanApplications,
+          loanProductName: loanProducts.name,
+          loanProductTermUnit: loanProducts.termUnit,
+        })
+        .from(loanApplications)
+        .leftJoin(loanProducts, eq(loanApplications.loanProductId, loanProducts.id))
+        .where(and(...whereConditions))
+        .orderBy(orderByClause)
+        .limit(limit)
+        .offset(offset);
+
+      // Map backend status to frontend status
+      const mapStatusToFrontend = (
+        backendStatus: string
+      ): "pending" | "approved" | "rejected" | "disbursed" | "cancelled" => {
+        const pendingStatuses = [
+          "kyc_kyb_verification",
+          "eligibility_check",
+          "credit_analysis",
+          "head_of_credit_review",
+          "internal_approval_ceo",
+          "committee_decision",
+          "sme_offer_approval",
+          "document_generation",
+          "signing_execution",
+          "awaiting_disbursement",
+        ];
+        if (pendingStatuses.includes(backendStatus)) return "pending";
+        if (backendStatus === "approved") return "approved";
+        if (backendStatus === "rejected") return "rejected";
+        if (backendStatus === "disbursed") return "disbursed";
+        if (backendStatus === "cancelled") return "cancelled";
+        return "pending"; // Default fallback
+      };
+
+      // Format applications for external users
+      const applications: LoanApplicationsModel.ExternalLoanApplicationListItem[] =
+        applicationRows.map((row) => {
+          const app = row.loanApplication;
+          const termUnit = row.loanProductTermUnit || "months";
+          const tenure = `${app.repaymentPeriod} ${termUnit}`;
+
+          // Format amount with commas
+          const amount = toNumber(app.fundingAmount) ?? 0;
+          const formattedAmount = amount.toLocaleString("en-US", {
+            maximumFractionDigits: 2,
+            minimumFractionDigits: 0,
+          });
+
+          return {
+            id: app.id,
+            loanId: app.loanId,
+            product: row.loanProductName || "Unknown Product",
+            requestedAmount: formattedAmount,
+            currency: app.fundingCurrency,
+            tenure,
+            status: mapStatusToFrontend(app.status),
+            appliedOn: app.submittedAt?.toISOString() || app.createdAt.toISOString(),
+          };
+        });
+
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        success: true,
+        message: "Loan applications retrieved successfully",
+        data: {
+          applications,
+          pagination: {
+            currentPage: page,
+            totalPages,
+            totalItems: total,
+            itemsPerPage: limit,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1,
+          },
+        },
+      };
+    } catch (error: any) {
+      logger.error("Error listing loan applications for entrepreneur:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[LIST_LOAN_APPLICATIONS_ERROR] Failed to list loan applications");
+    }
+  }
+
+  /**
+   * Get loan application detail for external users (entrepreneurs)
+   * Returns application only if the authenticated user is the entrepreneur
+   *
+   * @description Retrieves detailed information about a specific loan application
+   * for the authenticated entrepreneur. Simplified format matching frontend requirements.
+   *
+   * @param clerkId - The Clerk ID of the authenticated entrepreneur
+   * @param applicationId - The loan application ID
+   * @returns Detailed loan application information in simplified format
+   *
+   * @throws {403} If user is not the entrepreneur for this application
+   * @throws {404} If loan application is not found
+   * @throws {500} If retrieval fails
+   */
+  static async getByIdForEntrepreneur(
+    clerkId: string,
+    applicationId: string
+  ): Promise<LoanApplicationsModel.ExternalLoanApplicationDetailResponse> {
+    try {
+      // Get the authenticated user
+      const user = await db.query.users.findFirst({
+        where: eq(users.clerkId, clerkId),
+        columns: { id: true },
+      });
+
+      if (!user) {
+        throw httpError(401, "[UNAUTHORIZED] User not found");
+      }
+
+      // Get loan application
+      const [application] = await db
+        .select()
+        .from(loanApplications)
+        .where(and(eq(loanApplications.id, applicationId), isNull(loanApplications.deletedAt)))
+        .limit(1);
+
+      if (!application) {
+        throw httpError(404, "[LOAN_APPLICATION_NOT_FOUND] Loan application not found");
+      }
+
+      // Verify user is the entrepreneur
+      if (application.entrepreneurId !== user.id) {
+        throw httpError(
+          403,
+          "[FORBIDDEN] You do not have permission to view this loan application"
+        );
+      }
+
+      // Get loan product for termUnit
+      const loanProduct = await db.query.loanProducts.findFirst({
+        where: and(
+          eq(loanProducts.id, application.loanProductId),
+          isNull(loanProducts.deletedAt)
+        ),
+        columns: {
+          name: true,
+          termUnit: true,
+        },
+      });
+
+      const termUnit = loanProduct?.termUnit || "months";
+      const tenure = `${application.repaymentPeriod} ${termUnit}`;
+
+      // Format amount with commas
+      const amount = toNumber(application.fundingAmount) ?? 0;
+      const formattedAmount = amount.toLocaleString("en-US", {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 0,
+      });
+
+      // Map backend status to frontend status
+      const mapStatusToFrontend = (
+        backendStatus: string
+      ): "pending" | "approved" | "rejected" | "disbursed" | "cancelled" => {
+        const pendingStatuses = [
+          "kyc_kyb_verification",
+          "eligibility_check",
+          "credit_analysis",
+          "head_of_credit_review",
+          "internal_approval_ceo",
+          "committee_decision",
+          "sme_offer_approval",
+          "document_generation",
+          "signing_execution",
+          "awaiting_disbursement",
+        ];
+        if (pendingStatuses.includes(backendStatus)) return "pending";
+        if (backendStatus === "approved") return "approved";
+        if (backendStatus === "rejected") return "rejected";
+        if (backendStatus === "disbursed") return "disbursed";
+        if (backendStatus === "cancelled") return "cancelled";
+        return "pending"; // Default fallback
+      };
+
+      return {
+        success: true,
+        message: "Loan application retrieved successfully",
+        data: {
+          id: application.id,
+          loanId: application.loanId,
+          product: loanProduct?.name || "Unknown Product",
+          requestedAmount: formattedAmount,
+          currency: application.fundingCurrency,
+          tenure,
+          status: mapStatusToFrontend(application.status),
+          appliedOn: application.submittedAt?.toISOString() || application.createdAt.toISOString(),
+          // Additional detail fields
+          fundingAmount: amount,
+          repaymentPeriod: application.repaymentPeriod,
+          termUnit,
+          intendedUseOfFunds: application.intendedUseOfFunds,
+          interestRate: toNumber(application.interestRate) ?? 0,
+          submittedAt: application.submittedAt?.toISOString(),
+          approvedAt: application.approvedAt?.toISOString(),
+          rejectedAt: application.rejectedAt?.toISOString(),
+          disbursedAt: application.disbursedAt?.toISOString(),
+          cancelledAt: application.cancelledAt?.toISOString(),
+          rejectionReason: application.rejectionReason ?? undefined,
+        },
+      };
+    } catch (error: any) {
+      logger.error("Error getting loan application for entrepreneur:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[GET_LOAN_APPLICATION_ERROR] Failed to get loan application");
     }
   }
 }

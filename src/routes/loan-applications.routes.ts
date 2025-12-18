@@ -1,10 +1,13 @@
 import { getAuth } from "@clerk/fastify";
+import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { db } from "../db";
+import { loanApplications } from "../db/schema";
 import { LoanApplicationsModel } from "../modules/loan-applications/loan-applications.model";
 import { LoanApplicationsService } from "../modules/loan-applications/loan-applications.service";
 import { LoanApplicationTimelineService } from "../modules/loan-applications/loan-applications-timeline.service";
 import { UserModel } from "../modules/user/user.model";
-import { requireAuth, requireRole } from "../utils/authz";
+import { isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
 
 export async function loanApplicationsRoutes(fastify: FastifyInstance) {
@@ -296,6 +299,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
   );
 
   // GET loan application by ID
+  // Accessible to: admins/members (can view any) OR entrepreneurs (can only view their own)
   fastify.get(
     "/:id",
     {
@@ -310,6 +314,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
           200: LoanApplicationsModel.LoanApplicationDetailSchema,
           400: UserModel.ErrorResponseSchema,
           401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
           404: UserModel.ErrorResponseSchema,
           500: UserModel.ErrorResponseSchema,
         },
@@ -318,8 +323,42 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        await requireRole(request, "member");
+        // Require authentication (but not specific role - entrepreneurs can access their own)
+        const user = await requireAuth(request);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
         const { id } = (request.params as any) || {};
+        
+        // Get the application first to check authorization
+        const [application] = await db
+          .select()
+          .from(loanApplications)
+          .where(and(eq(loanApplications.id, id), isNull(loanApplications.deletedAt)))
+          .limit(1);
+
+        if (!application) {
+          return reply.code(404).send({
+            error: "Loan application not found",
+            code: "LOAN_APPLICATION_NOT_FOUND",
+          });
+        }
+
+        // Check if user is entrepreneur and if so, verify they own this application
+        if (isEntrepreneur(user)) {
+          if (application.entrepreneurId !== user.id) {
+            return reply.code(403).send({
+              error: "You do not have permission to view this loan application",
+              code: "FORBIDDEN",
+            });
+          }
+        } else {
+          // Admin/member - require role
+          await requireRole(request, "member");
+        }
+
         const result = await LoanApplicationsService.getById(id);
         return reply.send(result);
       } catch (error: any) {
@@ -442,6 +481,184 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to update loan application status",
           code: "UPDATE_STATUS_FAILED",
+        });
+      }
+    }
+  );
+
+  // GET loan applications list for external users (entrepreneurs)
+  // Accessible to: entrepreneurs (can only see their own applications)
+  fastify.get(
+    "/my-applications",
+    {
+      schema: {
+        querystring: LoanApplicationsModel.ExternalLoanApplicationListQuerySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              message: { type: "string" },
+              data: {
+                type: "object",
+                properties: {
+                  applications: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        loanId: { type: "string" },
+                        product: { type: "string" },
+                        requestedAmount: { type: "string" },
+                        currency: { type: "string" },
+                        tenure: { type: "string" },
+                        status: { type: "string" },
+                        appliedOn: { type: "string" },
+                      },
+                      required: ["id", "loanId", "product", "requestedAmount", "currency", "tenure", "status", "appliedOn"],
+                    },
+                  },
+                  pagination: {
+                    type: "object",
+                    properties: {
+                      currentPage: { type: "number" },
+                      totalPages: { type: "number" },
+                      totalItems: { type: "number" },
+                      itemsPerPage: { type: "number" },
+                      hasNextPage: { type: "boolean" },
+                      hasPreviousPage: { type: "boolean" },
+                    },
+                    required: ["currentPage", "totalPages", "totalItems", "itemsPerPage", "hasNextPage", "hasPreviousPage"],
+                  },
+                },
+                required: ["applications", "pagination"],
+              },
+            },
+            required: ["success", "message", "data"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+      preValidation: async (request: FastifyRequest, _reply: FastifyReply) => {
+        // Normalize duplicate query parameters (arrays) to their first value
+        if (request.query && typeof request.query === "object") {
+          const query = request.query as Record<string, any>;
+          for (const key in query) {
+            if (Array.isArray(query[key])) {
+              query[key] = query[key][0];
+            }
+          }
+        }
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await requireAuth(request);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const query = request.query as LoanApplicationsModel.ExternalLoanApplicationListQuery;
+        const result = await LoanApplicationsService.listForEntrepreneur(userId, query);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error listing loan applications for entrepreneur:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to list loan applications",
+          code: "LIST_LOAN_APPLICATIONS_FAILED",
+        });
+      }
+    }
+  );
+
+  // GET loan application detail for external users (entrepreneurs)
+  // Accessible to: entrepreneurs (can only see their own applications)
+  fastify.get(
+    "/my-applications/:id",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              message: { type: "string" },
+              data: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  loanId: { type: "string" },
+                  product: { type: "string" },
+                  requestedAmount: { type: "string" },
+                  currency: { type: "string" },
+                  tenure: { type: "string" },
+                  status: { type: "string" },
+                  appliedOn: { type: "string" },
+                  fundingAmount: { type: "number" },
+                  repaymentPeriod: { type: "number" },
+                  termUnit: { type: "string" },
+                  intendedUseOfFunds: { type: "string" },
+                  interestRate: { type: "number" },
+                  submittedAt: { type: "string" },
+                  approvedAt: { type: "string" },
+                  rejectedAt: { type: "string" },
+                  disbursedAt: { type: "string" },
+                  cancelledAt: { type: "string" },
+                  rejectionReason: { type: "string" },
+                },
+                required: ["id", "loanId", "product", "requestedAmount", "currency", "tenure", "status", "appliedOn"],
+              },
+            },
+            required: ["success", "message", "data"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await requireAuth(request);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const result = await LoanApplicationsService.getByIdForEntrepreneur(userId, id);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting loan application for entrepreneur:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get loan application",
+          code: "GET_LOAN_APPLICATION_FAILED",
         });
       }
     }

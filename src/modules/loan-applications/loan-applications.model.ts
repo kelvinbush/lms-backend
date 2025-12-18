@@ -477,4 +477,100 @@ export namespace LoanApplicationsModel {
     },
     required: ["status"],
   } as const;
+
+  // External user (entrepreneur) simplified models
+  export interface ExternalLoanApplicationListItem {
+    id: string;
+    loanId: string; // Display ID (e.g., "LN-48291")
+    product: string; // Loan product name
+    requestedAmount: string; // Formatted amount as string (e.g., "5,000")
+    currency: string; // ISO currency code
+    tenure: string; // Formatted tenure (e.g., "3 months", "50 days")
+    status: "pending" | "approved" | "rejected" | "disbursed" | "cancelled"; // Simplified status
+    appliedOn: string; // ISO 8601 date string
+  }
+
+  export interface ExternalLoanApplicationListResponse {
+    success: boolean;
+    message: string;
+    data: {
+      applications: ExternalLoanApplicationListItem[];
+      pagination: {
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        itemsPerPage: number;
+        hasNextPage: boolean;
+        hasPreviousPage: boolean;
+      };
+    };
+  }
+
+  export interface ExternalLoanApplicationStatsResponse {
+    success: boolean;
+    message: string;
+    data: {
+      totalApplications: number;
+      approvedLoans: number;
+      pendingApproval: number;
+      rejectedApplications: number;
+      disbursedLoans: number;
+      cancelledApplications: number;
+    };
+  }
+
+  export interface ExternalLoanApplicationListQuery {
+    page?: string;
+    limit?: string;
+    status?: "all" | "pending" | "approved" | "rejected" | "disbursed" | "cancelled";
+    search?: string;
+    sortBy?: "newest" | "oldest" | "ascending" | "descending";
+  }
+
+  export interface ExternalLoanApplicationDetail {
+    id: string;
+    loanId: string; // Display ID (e.g., "LN-48291")
+    product: string; // Loan product name
+    requestedAmount: string; // Formatted amount as string
+    currency: string; // ISO currency code
+    tenure: string; // Formatted tenure
+    status: "pending" | "approved" | "rejected" | "disbursed" | "cancelled"; // Simplified status
+    appliedOn: string; // ISO 8601 date string
+    // Additional detail fields
+    fundingAmount: number; // Raw amount
+    repaymentPeriod: number; // Raw repayment period
+    termUnit: string; // Unit from loan product (days, weeks, months, etc.)
+    intendedUseOfFunds: string;
+    interestRate: number;
+    submittedAt?: string;
+    approvedAt?: string;
+    rejectedAt?: string;
+    disbursedAt?: string;
+    cancelledAt?: string;
+    rejectionReason?: string;
+  }
+
+  export interface ExternalLoanApplicationDetailResponse {
+    success: boolean;
+    message: string;
+    data: ExternalLoanApplicationDetail;
+  }
+
+  export const ExternalLoanApplicationListQuerySchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      page: { type: "string", pattern: "^[0-9]+$" },
+      limit: { type: "string", pattern: "^[0-9]+$" },
+      status: {
+        type: "string",
+        enum: ["all", "pending", "approved", "rejected", "disbursed", "cancelled"],
+      },
+      search: { type: "string", minLength: 1, maxLength: 200 },
+      sortBy: {
+        type: "string",
+        enum: ["newest", "oldest", "ascending", "descending"],
+      },
+    },
+  } as const;
 }
