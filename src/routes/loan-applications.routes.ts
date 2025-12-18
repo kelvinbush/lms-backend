@@ -43,12 +43,10 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to create loan application",
-            code: "CREATE_LOAN_APPLICATION_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to create loan application",
+          code: "CREATE_LOAN_APPLICATION_FAILED",
+        });
       }
     }
   );
@@ -193,12 +191,10 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to list loan applications",
-            code: "LIST_LOAN_APPLICATIONS_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to list loan applications",
+          code: "LIST_LOAN_APPLICATIONS_FAILED",
+        });
       }
     }
   );
@@ -287,12 +283,53 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to get loan application statistics",
-            code: "GET_LOAN_APPLICATION_STATS_FAILED",
+        return reply.code(500).send({
+          error: "Failed to get loan application statistics",
+          code: "GET_LOAN_APPLICATION_STATS_FAILED",
+        });
+      }
+    }
+  );
+
+  // GET loan application by ID
+  fastify.get(
+    "/:id",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: LoanApplicationsModel.LoanApplicationDetailSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await requireRole(request, "member");
+        const { id } = (request.params as any) || {};
+        const result = await LoanApplicationsService.getById(id);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting loan application:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
           });
+        }
+        return reply.code(500).send({
+          error: "Failed to get loan application",
+          code: "GET_LOAN_APPLICATION_FAILED",
+        });
       }
     }
   );

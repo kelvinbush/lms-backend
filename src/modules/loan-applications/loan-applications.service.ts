@@ -1,10 +1,17 @@
 import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../db";
-import { businessProfiles, loanApplications, loanProducts, users } from "../../db/schema";
+import {
+  businessProfiles,
+  loanApplications,
+  loanProducts,
+  organizations,
+  users,
+} from "../../db/schema";
 import { logger } from "../../utils/logger";
 import {
   generateLoanId,
   mapCreateLoanApplicationResponse,
+  mapLoanApplicationDetail,
   mapLoanApplicationRow,
 } from "./loan-applications.mapper";
 import type { LoanApplicationsModel } from "./loan-applications.model";
@@ -311,6 +318,150 @@ export abstract class LoanApplicationsService {
       logger.error("Error getting loan application statistics:", error);
       if (error?.status) throw error;
       throw httpError(500, "[GET_LOAN_APPLICATION_STATS_ERROR] Failed to get statistics");
+    }
+  }
+
+  /**
+   * Get loan application by ID
+   *
+   * @description Retrieves a specific loan application by its ID with all related data.
+   * This is an admin-only endpoint - authorization is handled at the route level.
+   *
+   * @param id - The loan application ID
+   * @returns Detailed loan application information
+   *
+   * @throws {404} If loan application is not found
+   * @throws {500} If retrieval fails
+   */
+  static async getById(id: string): Promise<LoanApplicationsModel.LoanApplicationDetail> {
+    try {
+      // Get loan application with related data in optimized queries
+      const [application] = await db
+        .select()
+        .from(loanApplications)
+        .where(and(eq(loanApplications.id, id), isNull(loanApplications.deletedAt)))
+        .limit(1);
+
+      if (!application) {
+        throw httpError(404, "[LOAN_APPLICATION_NOT_FOUND] Loan application not found");
+      }
+
+      // Fetch related data in parallel for efficiency
+      const [business, entrepreneur, loanProduct, creator, lastUpdatedByUser] = await Promise.all([
+        // Business
+        db.query.businessProfiles.findFirst({
+          where: and(
+            eq(businessProfiles.id, application.businessId),
+            isNull(businessProfiles.deletedAt)
+          ),
+          columns: {
+            id: true,
+            name: true,
+            description: true,
+            sector: true,
+            country: true,
+            city: true,
+          },
+        }),
+        // Entrepreneur
+        db.query.users.findFirst({
+          where: and(eq(users.id, application.entrepreneurId), isNull(users.deletedAt)),
+          columns: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            imageUrl: true,
+          },
+        }),
+        // Loan Product (with organizationId to fetch organization name)
+        db.query.loanProducts.findFirst({
+          where: and(
+            eq(loanProducts.id, application.loanProductId),
+            isNull(loanProducts.deletedAt)
+          ),
+          columns: {
+            id: true,
+            name: true,
+            currency: true,
+            minAmount: true,
+            maxAmount: true,
+            organizationId: true,
+          },
+        }),
+        // Creator
+        db.query.users.findFirst({
+          where: and(eq(users.id, application.createdBy), isNull(users.deletedAt)),
+          columns: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        }),
+        // Last Updated By (if exists)
+        application.lastUpdatedBy
+          ? db.query.users.findFirst({
+              where: and(eq(users.id, application.lastUpdatedBy), isNull(users.deletedAt)),
+              columns: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            })
+          : Promise.resolve(null),
+      ]);
+
+      // Validate required related data exists
+      if (!business) {
+        throw httpError(
+          404,
+          "[BUSINESS_NOT_FOUND] Business associated with loan application not found"
+        );
+      }
+      if (!entrepreneur) {
+        throw httpError(
+          404,
+          "[ENTREPRENEUR_NOT_FOUND] Entrepreneur associated with loan application not found"
+        );
+      }
+      if (!loanProduct) {
+        throw httpError(
+          404,
+          "[LOAN_PRODUCT_NOT_FOUND] Loan product associated with loan application not found"
+        );
+      }
+      if (!creator) {
+        throw httpError(404, "[CREATOR_NOT_FOUND] Creator of loan application not found");
+      }
+
+      // Fetch organization name
+      const organizationData = loanProduct.organizationId
+        ? await db.query.organizations.findFirst({
+            where: and(
+              eq(organizations.id, loanProduct.organizationId),
+              isNull(organizations.deletedAt)
+            ),
+            columns: {
+              name: true,
+            },
+          })
+        : null;
+
+      return mapLoanApplicationDetail(application, {
+        business,
+        entrepreneur,
+        loanProduct,
+        creator,
+        lastUpdatedByUser: lastUpdatedByUser || null,
+        organizationName: organizationData?.name || "Unknown Organization",
+      });
+    } catch (error: any) {
+      logger.error("Error getting loan application by ID:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[GET_LOAN_APPLICATION_ERROR] Failed to get loan application");
     }
   }
 }

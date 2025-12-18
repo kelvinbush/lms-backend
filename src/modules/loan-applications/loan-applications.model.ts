@@ -134,6 +134,78 @@ export namespace LoanApplicationsModel {
     cancelledChange?: number; // Percentage change
   }
 
+  // Loan application detail (for getById response)
+  export interface LoanApplicationDetail {
+    id: string;
+    loanId: string; // Display ID (e.g., "LN-48291")
+    businessId: string;
+    entrepreneurId: string;
+    loanProductId: string;
+    fundingAmount: number;
+    fundingCurrency: string;
+    convertedAmount?: number;
+    convertedCurrency?: string;
+    exchangeRate?: number;
+    repaymentPeriod: number; // in months
+    intendedUseOfFunds: string;
+    interestRate: number;
+    loanSource: string;
+    status: LoanApplicationStatus;
+    submittedAt?: string; // ISO 8601 timestamp
+    approvedAt?: string; // ISO 8601 timestamp
+    rejectedAt?: string; // ISO 8601 timestamp
+    disbursedAt?: string; // ISO 8601 timestamp
+    cancelledAt?: string; // ISO 8601 timestamp
+    rejectionReason?: string;
+    createdAt: string; // ISO 8601 timestamp
+    updatedAt: string; // ISO 8601 timestamp
+    lastUpdatedAt?: string; // ISO 8601 timestamp
+    createdBy: string; // User ID
+    lastUpdatedBy?: string; // User ID
+    // Convenience fields (for easy frontend access)
+    businessName: string;
+    sector?: string | null;
+    applicantName: string; // Full name of entrepreneur/applicant
+    organizationName: string; // Name of organization providing the loan
+    creatorName: string; // Full name of creator
+    // Related data
+    business: {
+      id: string;
+      name: string;
+      description?: string | null;
+      sector?: string | null;
+      country?: string | null;
+      city?: string | null;
+    };
+    entrepreneur: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email: string;
+      phoneNumber?: string | null;
+      imageUrl?: string | null;
+    };
+    loanProduct: {
+      id: string;
+      name: string;
+      currency: string;
+      minAmount: number;
+      maxAmount: number;
+    };
+    creator: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email: string;
+    };
+    lastUpdatedByUser?: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email: string;
+    };
+  }
+
   // JSON Schemas for validation
   export const CreateLoanApplicationBodySchema = {
     type: "object",
@@ -202,6 +274,123 @@ export namespace LoanApplicationsModel {
       "createdAt",
       "createdBy",
       "updatedAt",
+    ],
+  } as const;
+
+  export const LoanApplicationDetailSchema = {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      loanId: { type: "string" },
+      businessId: { type: "string" },
+      entrepreneurId: { type: "string" },
+      loanProductId: { type: "string" },
+      fundingAmount: { type: "number" },
+      fundingCurrency: { type: "string" },
+      convertedAmount: { type: "number" },
+      convertedCurrency: { type: "string" },
+      exchangeRate: { type: "number" },
+      repaymentPeriod: { type: "integer" },
+      intendedUseOfFunds: { type: "string" },
+      interestRate: { type: "number" },
+      loanSource: { type: "string" },
+      status: { type: "string", enum: LoanApplicationStatusEnum },
+      submittedAt: { type: "string" },
+      approvedAt: { type: "string" },
+      rejectedAt: { type: "string" },
+      disbursedAt: { type: "string" },
+      cancelledAt: { type: "string" },
+      rejectionReason: { type: "string" },
+      createdAt: { type: "string" },
+      updatedAt: { type: "string" },
+      lastUpdatedAt: { type: "string" },
+      createdBy: { type: "string" },
+      lastUpdatedBy: { type: "string" },
+      businessName: { type: "string" },
+      sector: { type: "string" },
+      applicantName: { type: "string" },
+      organizationName: { type: "string" },
+      creatorName: { type: "string" },
+      business: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          description: { type: "string" },
+          sector: { type: "string" },
+          country: { type: "string" },
+          city: { type: "string" },
+        },
+        required: ["id", "name"],
+      },
+      entrepreneur: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          firstName: { type: "string" },
+          lastName: { type: "string" },
+          email: { type: "string" },
+          phoneNumber: { type: "string" },
+          imageUrl: { type: "string" },
+        },
+        required: ["id", "email"],
+      },
+      loanProduct: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          currency: { type: "string" },
+          minAmount: { type: "number" },
+          maxAmount: { type: "number" },
+        },
+        required: ["id", "name", "currency", "minAmount", "maxAmount"],
+      },
+      creator: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          firstName: { type: "string" },
+          lastName: { type: "string" },
+          email: { type: "string" },
+        },
+        required: ["id", "email"],
+      },
+      lastUpdatedByUser: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          firstName: { type: "string" },
+          lastName: { type: "string" },
+          email: { type: "string" },
+        },
+        required: ["id", "email"],
+      },
+    },
+    required: [
+      "id",
+      "loanId",
+      "businessId",
+      "entrepreneurId",
+      "loanProductId",
+      "fundingAmount",
+      "fundingCurrency",
+      "repaymentPeriod",
+      "intendedUseOfFunds",
+      "interestRate",
+      "loanSource",
+      "status",
+      "createdAt",
+      "updatedAt",
+      "createdBy",
+      "businessName",
+      "applicantName",
+      "organizationName",
+      "creatorName",
+      "business",
+      "entrepreneur",
+      "loanProduct",
+      "creator",
     ],
   } as const;
 }

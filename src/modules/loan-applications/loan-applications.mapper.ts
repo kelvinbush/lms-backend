@@ -115,3 +115,130 @@ export function mapCreateLoanApplicationResponse(
     updatedAt: row.updatedAt.toISOString(),
   };
 }
+
+/**
+ * Map a loan application row with related data to detailed response format
+ */
+export function mapLoanApplicationDetail(
+  row: LoanApplicationRow,
+  related: {
+    business: {
+      id: string;
+      name: string;
+      description?: string | null;
+      sector?: string | null;
+      country?: string | null;
+      city?: string | null;
+    };
+    entrepreneur: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email: string;
+      phoneNumber?: string | null;
+      imageUrl?: string | null;
+    };
+    loanProduct: {
+      id: string;
+      name: string;
+      currency: string;
+      minAmount: unknown;
+      maxAmount: unknown;
+    };
+    creator: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email: string;
+    };
+    lastUpdatedByUser?: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email: string;
+    } | null;
+    organizationName: string;
+  }
+): LoanApplicationsModel.LoanApplicationDetail {
+  // Build applicant name
+  const applicantName = related.entrepreneur
+    ? [related.entrepreneur.firstName, related.entrepreneur.lastName].filter(Boolean).join(" ") ||
+      "N/A"
+    : "N/A";
+
+  // Build creator name
+  const creatorName = related.creator
+    ? [related.creator.firstName, related.creator.lastName].filter(Boolean).join(" ") || "N/A"
+    : "N/A";
+  return {
+    id: row.id,
+    loanId: row.loanId,
+    businessId: row.businessId,
+    entrepreneurId: row.entrepreneurId,
+    loanProductId: row.loanProductId,
+    fundingAmount: toNumber(row.fundingAmount) ?? 0,
+    fundingCurrency: row.fundingCurrency,
+    convertedAmount: row.convertedAmount ? (toNumber(row.convertedAmount) ?? undefined) : undefined,
+    convertedCurrency: row.convertedCurrency ?? undefined,
+    exchangeRate: row.exchangeRate ? (toNumber(row.exchangeRate) ?? undefined) : undefined,
+    repaymentPeriod: row.repaymentPeriod,
+    intendedUseOfFunds: row.intendedUseOfFunds,
+    interestRate: toNumber(row.interestRate) ?? 0,
+    loanSource: row.loanSource || "Unknown",
+    status: row.status,
+    submittedAt: row.submittedAt?.toISOString(),
+    approvedAt: row.approvedAt?.toISOString(),
+    rejectedAt: row.rejectedAt?.toISOString(),
+    disbursedAt: row.disbursedAt?.toISOString(),
+    cancelledAt: row.cancelledAt?.toISOString(),
+    rejectionReason: row.rejectionReason ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    lastUpdatedAt: row.lastUpdatedAt?.toISOString(),
+    createdBy: row.createdBy,
+    lastUpdatedBy: row.lastUpdatedBy ?? undefined,
+    // Convenience fields
+    businessName: related.business.name,
+    sector: related.business.sector ?? undefined,
+    applicantName,
+    organizationName: related.organizationName,
+    creatorName,
+    business: {
+      id: related.business.id,
+      name: related.business.name,
+      description: related.business.description ?? undefined,
+      sector: related.business.sector ?? undefined,
+      country: related.business.country ?? undefined,
+      city: related.business.city ?? undefined,
+    },
+    entrepreneur: {
+      id: related.entrepreneur.id,
+      firstName: related.entrepreneur.firstName ?? undefined,
+      lastName: related.entrepreneur.lastName ?? undefined,
+      email: related.entrepreneur.email,
+      phoneNumber: related.entrepreneur.phoneNumber ?? undefined,
+      imageUrl: related.entrepreneur.imageUrl ?? undefined,
+    },
+    loanProduct: {
+      id: related.loanProduct.id,
+      name: related.loanProduct.name,
+      currency: related.loanProduct.currency,
+      minAmount: toNumber(related.loanProduct.minAmount) ?? 0,
+      maxAmount: toNumber(related.loanProduct.maxAmount) ?? 0,
+    },
+    creator: {
+      id: related.creator.id,
+      firstName: related.creator.firstName ?? undefined,
+      lastName: related.creator.lastName ?? undefined,
+      email: related.creator.email,
+    },
+    lastUpdatedByUser: related.lastUpdatedByUser
+      ? {
+          id: related.lastUpdatedByUser.id,
+          firstName: related.lastUpdatedByUser.firstName ?? undefined,
+          lastName: related.lastUpdatedByUser.lastName ?? undefined,
+          email: related.lastUpdatedByUser.email,
+        }
+      : undefined,
+  };
+}

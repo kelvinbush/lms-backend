@@ -293,6 +293,134 @@ interface LoanProductSearchItem {
 
 ---
 
+### 5. Get Loan Application by ID
+
+**GET** `/loan-applications/:id`
+
+Retrieves a specific loan application by its ID with all related data.
+
+#### Path Parameters
+
+```typescript
+{
+  id: string; // Loan application ID
+}
+```
+
+#### Response (200 OK)
+
+```typescript
+{
+  // Core application data
+  id: string;
+  loanId: string;                  // Display ID (e.g., "LN-48291")
+  businessId: string;
+  entrepreneurId: string;
+  loanProductId: string;
+  
+  // Funding details
+  fundingAmount: number;
+  fundingCurrency: string;
+  convertedAmount?: number;         // Optional - if currency conversion was done
+  convertedCurrency?: string;      // Optional
+  exchangeRate?: number;           // Optional
+  
+  // Terms
+  repaymentPeriod: number;         // in months
+  interestRate: number;            // percentage (e.g., 10 for 10%)
+  intendedUseOfFunds: string;
+  
+  // Metadata
+  loanSource: string;
+  status: LoanApplicationStatus;
+  
+  // Timeline (optional - only set when status changes)
+  submittedAt?: string;            // ISO 8601 timestamp
+  approvedAt?: string;             // ISO 8601 timestamp
+  rejectedAt?: string;             // ISO 8601 timestamp
+  disbursedAt?: string;            // ISO 8601 timestamp
+  cancelledAt?: string;            // ISO 8601 timestamp
+  rejectionReason?: string;       // Only present if rejected
+  
+  // Audit fields
+  createdAt: string;               // ISO 8601 timestamp
+  updatedAt: string;               // ISO 8601 timestamp
+  lastUpdatedAt?: string;         // ISO 8601 timestamp
+  createdBy: string;               // User ID
+  lastUpdatedBy?: string;          // User ID
+  
+  // Convenience fields (for easy frontend access)
+  businessName: string;            // Business name
+  sector?: string | null;          // Business sector
+  applicantName: string;            // Full name of entrepreneur/applicant
+  organizationName: string;        // Name of organization providing the loan
+  creatorName: string;             // Full name of creator
+  
+  // Related data - Business
+  business: {
+    id: string;
+    name: string;
+    description?: string | null;
+    sector?: string | null;
+    country?: string | null;
+    city?: string | null;
+  };
+  
+  // Related data - Entrepreneur
+  entrepreneur: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    email: string;
+    phoneNumber?: string | null;
+    imageUrl?: string | null;
+  };
+  
+  // Related data - Loan Product
+  loanProduct: {
+    id: string;
+    name: string;
+    currency: string;
+    minAmount: number;
+    maxAmount: number;
+  };
+  
+  // Related data - Creator
+  creator: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    email: string;
+  };
+  
+  // Related data - Last Updated By (optional)
+  lastUpdatedByUser?: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    email: string;
+  };
+}
+```
+
+#### Notes
+
+- All timestamps are in ISO 8601 format
+- Timeline fields (`submittedAt`, `approvedAt`, etc.) are only present when the corresponding status change occurred
+- `rejectionReason` is only present if the application was rejected
+- `lastUpdatedByUser` is only present if the application was updated by a different user than the creator
+- Related data (business, entrepreneur, loanProduct, creator) is always included
+- Optional fields in nested objects may be `null` or `undefined`
+
+#### Error Responses
+
+- `400 Bad Request`: Invalid ID format
+- `401 Unauthorized`: Missing or invalid authentication token
+- `404 Not Found`: Loan application or related entity not found
+- `500 Internal Server Error`: Server error
+
+---
+
 ## Loan Application Status Values
 
 ```typescript
