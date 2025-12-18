@@ -393,4 +393,69 @@ export namespace LoanApplicationsModel {
       "creator",
     ],
   } as const;
+
+  // Timeline event
+  export interface TimelineEvent {
+    id: string;
+    type:
+      | "submitted"
+      | "cancelled"
+      | "review_in_progress"
+      | "rejected"
+      | "approved"
+      | "awaiting_disbursement"
+      | "disbursed";
+    title: string;
+    description?: string;
+    date: string; // ISO date string or formatted date (e.g., "2025-01-25" or "Jan 25, 2025")
+    time?: string; // Optional: Time string (e.g., "6:04PM" or "18:04")
+    updatedDate?: string; // Optional: For in-progress events, when it was last updated
+    updatedTime?: string; // Optional: Time of last update
+    performedBy?: string; // Optional: Name of person who performed the action (e.g., "Shalyne Waweru")
+    performedById?: string; // Optional: ID of the user who performed the action
+    lineColor?: "green" | "orange" | "grey"; // Optional: Visual indicator color
+  }
+
+  // Timeline response
+  export interface TimelineResponse {
+    data: TimelineEvent[];
+  }
+
+  export const TimelineResponseSchema = {
+    type: "object",
+    properties: {
+      data: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            type: {
+              type: "string",
+              enum: [
+                "submitted",
+                "cancelled",
+                "review_in_progress",
+                "rejected",
+                "approved",
+                "awaiting_disbursement",
+                "disbursed",
+              ],
+            },
+            title: { type: "string" },
+            description: { type: "string" },
+            date: { type: "string" },
+            time: { type: "string" },
+            updatedDate: { type: "string" },
+            updatedTime: { type: "string" },
+            performedBy: { type: "string" },
+            performedById: { type: "string" },
+            lineColor: { type: "string", enum: ["green", "orange", "grey"] },
+          },
+          required: ["id", "type", "title", "date"],
+        },
+      },
+    },
+    required: ["data"],
+  } as const;
 }

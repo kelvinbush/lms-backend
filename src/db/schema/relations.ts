@@ -7,6 +7,7 @@ import { businessUserGroups } from "./businessUserGroups";
 import { businessVideoLinks } from "./businessVideoLinks";
 import { investorOpportunities } from "./investorOpportunities";
 import { investorOpportunityBookmarks } from "./investorOpportunityBookmarks";
+import { loanApplicationAuditTrail } from "./loanApplicationAuditTrail";
 import { loanApplications } from "./loanApplications";
 import { loanProducts } from "./loanProducts";
 import { personalDocuments } from "./personalDocuments";
@@ -27,6 +28,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   createdLoanApplications: many(loanApplications, { relationName: "creator" }),
   // Loan applications last updated by the user
   updatedLoanApplications: many(loanApplications, { relationName: "updater" }),
+  // Loan application audit trail entries performed by the user
+  loanApplicationAuditEntries: many(loanApplicationAuditTrail),
 }));
 
 export const personalDocumentsRelations = relations(personalDocuments, ({ one }) => ({
@@ -138,7 +141,7 @@ export const smeOnboardingProgressRelations = relations(smeOnboardingProgress, (
 }));
 
 // Loan Applications Relations
-export const loanApplicationsRelations = relations(loanApplications, ({ one }) => ({
+export const loanApplicationsRelations = relations(loanApplications, ({ one, many }) => ({
   business: one(businessProfiles, {
     fields: [loanApplications.businessId],
     references: [businessProfiles.id],
@@ -162,4 +165,21 @@ export const loanApplicationsRelations = relations(loanApplications, ({ one }) =
     references: [users.id],
     relationName: "updater",
   }),
+  // Audit trail entries for this loan application
+  auditTrail: many(loanApplicationAuditTrail),
 }));
+
+// Loan Application Audit Trail Relations
+export const loanApplicationAuditTrailRelations = relations(
+  loanApplicationAuditTrail,
+  ({ one }) => ({
+    loanApplication: one(loanApplications, {
+      fields: [loanApplicationAuditTrail.loanApplicationId],
+      references: [loanApplications.id],
+    }),
+    performedBy: one(users, {
+      fields: [loanApplicationAuditTrail.performedById],
+      references: [users.id],
+    }),
+  })
+);

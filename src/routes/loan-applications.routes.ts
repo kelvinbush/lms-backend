@@ -2,6 +2,7 @@ import { getAuth } from "@clerk/fastify";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { LoanApplicationsModel } from "../modules/loan-applications/loan-applications.model";
 import { LoanApplicationsService } from "../modules/loan-applications/loan-applications.service";
+import { LoanApplicationTimelineService } from "../modules/loan-applications/loan-applications-timeline.service";
 import { UserModel } from "../modules/user/user.model";
 import { requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
@@ -329,6 +330,57 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to get loan application",
           code: "GET_LOAN_APPLICATION_FAILED",
+        });
+      }
+    }
+  );
+
+  // GET loan application timeline
+  // Accessible to: admins/members OR entrepreneurs (for their own applications)
+  fastify.get(
+    "/:id/timeline",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: LoanApplicationsModel.TimelineResponseSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require authentication (but not specific role - entrepreneurs can access their own)
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        // Pass clerkId for authorization check - service will verify user has access
+        const result = await LoanApplicationTimelineService.getTimeline(id, userId);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting loan application timeline:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get loan application timeline",
+          code: "GET_TIMELINE_FAILED",
         });
       }
     }

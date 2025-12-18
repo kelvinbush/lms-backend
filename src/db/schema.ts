@@ -20,3 +20,4 @@ export * from "./schema/loanFees";
 export * from "./schema/loanProductsLoanFees";
 export * from "./schema/organizations";
 export * from "./schema/loanProductsUserGroups";
+export * from "./schema/loanApplicationAuditTrail";

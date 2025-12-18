@@ -18,6 +18,7 @@ import type { LoanApplicationsModel } from "./loan-applications.model";
 import { buildBaseWhereConditions, buildSearchConditions } from "./loan-applications.query-builder";
 import { calculateStatsWithChanges } from "./loan-applications.stats";
 import { validateLoanApplicationCreation } from "./loan-applications.validators";
+import { LoanApplicationAuditService } from "./loan-applications-audit.service";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -90,6 +91,22 @@ export abstract class LoanApplicationsService {
           submittedAt: new Date(),
         })
         .returning();
+
+      // Log audit event for loan application creation/submission
+      await LoanApplicationAuditService.logEvent({
+        loanApplicationId: row.id,
+        clerkId,
+        eventType: "submitted",
+        title: LoanApplicationAuditService.getEventTitle("submitted"),
+        description: `Loan application ${loanId} submitted successfully`,
+        status: row.status,
+        details: {
+          loanId,
+          fundingAmount: body.fundingAmount,
+          fundingCurrency: body.fundingCurrency,
+          repaymentPeriod: body.repaymentPeriod,
+        },
+      });
 
       return mapCreateLoanApplicationResponse(row);
     } catch (error: any) {
