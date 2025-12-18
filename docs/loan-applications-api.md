@@ -12,7 +12,15 @@ All endpoints require authentication via Clerk Bearer token in the Authorization
 Authorization: Bearer <clerk_session_token>
 ```
 
-All endpoints require `member` role (admin/super-admin/member).
+### Authorization by Endpoint
+
+- **Create Loan Application** (`POST /loan-applications`): 
+  - ✅ **Admins/Members**: Can create applications for any business/entrepreneur
+  - ✅ **Entrepreneurs**: Can create applications only for themselves (automatically uses their business profile)
+  
+- **List, Get, Stats, Timeline, Update Status**: 
+  - ✅ **Admins/Members**: Full access to all applications
+  - ✅ **Entrepreneurs**: Can only access their own applications (where they are the entrepreneur)
 
 ---
 
@@ -24,24 +32,43 @@ All endpoints require `member` role (admin/super-admin/member).
 
 Creates a new loan application with all required details. Initial status is set to `kyc_kyb_verification`.
 
+**Accessible to**: Admins/Members (can create for any business) OR Entrepreneurs (can only create for themselves)
+
 #### Request Body
 
 ```typescript
 {
-  businessId: string;              // Required - ID of the selected business/SME
-  entrepreneurId: string;          // Required - ID of the entrepreneur/business owner
+  businessId?: string;             // Optional - Required for admins, auto-set for entrepreneurs
+                                   // If provided by entrepreneur, must match their business
+  entrepreneurId?: string;         // Optional - Required for admins, auto-set for entrepreneurs
+                                   // If provided by entrepreneur, must match their user ID
   loanProductId: string;           // Required - ID of the selected loan product
   fundingAmount: number;           // Required - Amount requested (primary currency)
   fundingCurrency: string;         // Required - ISO currency code (e.g., "EUR", "USD", "KES")
   convertedAmount?: number;        // Optional - Converted amount in secondary currency
   convertedCurrency?: string;      // Optional - Secondary currency code
   exchangeRate?: number;           // Optional - Exchange rate used for conversion
-  repaymentPeriod: number;         // Required - Preferred repayment period (in months)
+  repaymentPeriod: number;         // Required - Preferred repayment period (unit must match loan product's termUnit: days, weeks, months, quarters, or years)
   intendedUseOfFunds: string;      // Required - Description of intended use (max 100 characters)
   interestRate: number;            // Required - Interest rate per annum (percentage, e.g., 10 for 10%)
-  loanSource?: string;             // Optional - Source of loan application (e.g., "Admin Platform", "SME Platform")
+  loanSource?: string;             // Optional - Auto-set to "SME Platform" for entrepreneurs, "Admin Platform" for admins
 }
 ```
+
+#### Behavior by User Type
+
+**For Entrepreneurs:**
+- `entrepreneurId` is automatically set to the authenticated user's ID
+- `businessId` is automatically set to the entrepreneur's business profile ID
+- `loanSource` is automatically set to "SME Platform" (cannot be overridden)
+- Must have a valid business profile to create applications
+- Cannot create applications for other entrepreneurs
+- If `entrepreneurId` or `businessId` are provided, they must match the entrepreneur's own ID/business
+
+**For Admins/Members:**
+- Full control over `businessId` and `entrepreneurId`
+- `loanSource` defaults to "Admin Platform" if not specified
+- Can create applications for any business/entrepreneur
 
 #### Response (201 Created)
 
@@ -72,18 +99,53 @@ Creates a new loan application with all required details. Initial status is set 
 
 - Business ID must reference an existing business/SME
 - Entrepreneur ID must reference an existing entrepreneur and be associated with the business
+- **For Entrepreneurs**: Must have a valid business profile associated with their account
+- **For Entrepreneurs**: Cannot create applications for other users (entrepreneurId must match authenticated user)
 - Loan Product ID must reference an existing, active loan product
 - Funding amount must be within the loan product's min/max amount range
-- Repayment period must be within the loan product's min/max term range
+- Repayment period must be within the loan product's min/max term range (unit must match the loan product's termUnit: days, weeks, months, quarters, or years)
 - Currency must match the loan product currency
 - Intended use of funds: max 100 characters
 
 #### Error Responses
 
 - `400 Bad Request`: Invalid request data or validation errors
+  - Missing business profile (for entrepreneurs)
+  - Invalid entrepreneur/business combination
 - `401 Unauthorized`: Missing or invalid authentication token
+- `403 Forbidden`: Entrepreneur attempting to create application for another user
 - `404 Not Found`: Business, entrepreneur, or loan product not found
 - `500 Internal Server Error`: Server error
+
+#### Example Requests
+
+**Entrepreneur creating their own application:**
+```json
+{
+  "loanProductId": "prod_123",
+  "fundingAmount": 50000,
+  "fundingCurrency": "KES",
+  "repaymentPeriod": 12,
+  "intendedUseOfFunds": "Expanding production capacity",
+  "interestRate": 10
+}
+```
+Note: `businessId` and `entrepreneurId` are automatically set, `loanSource` is set to "SME Platform"
+
+**Admin creating application for an entrepreneur:**
+```json
+{
+  "businessId": "biz_456",
+  "entrepreneurId": "user_789",
+  "loanProductId": "prod_123",
+  "fundingAmount": 100000,
+  "fundingCurrency": "KES",
+  "repaymentPeriod": 24,
+  "intendedUseOfFunds": "Working capital for inventory",
+  "interestRate": 12,
+  "loanSource": "Admin Platform"
+}
+```
 
 ---
 
@@ -150,7 +212,7 @@ interface LoanApplication {
   loanProductId: string;           // Loan product ID
   loanRequested: number;           // Funding amount
   loanCurrency: string;            // Currency of loanRequested
-  loanTenure: number;              // Repayment period in months
+  loanTenure: number;              // Repayment period (unit matches loan product's termUnit)
   status: LoanApplicationStatus;
   createdAt: string;               // ISO 8601 timestamp
   createdBy: string;               // Creator name or ID
@@ -326,7 +388,7 @@ Retrieves a specific loan application by its ID with all related data.
   exchangeRate?: number;           // Optional
   
   // Terms
-  repaymentPeriod: number;         // in months
+    repaymentPeriod: number;         // Unit matches loan product's termUnit (days, weeks, months, quarters, or years)
   interestRate: number;            // percentage (e.g., 10 for 10%)
   intendedUseOfFunds: string;
   
@@ -551,9 +613,14 @@ All error responses follow this format:
 
 ## Notes
 
-- All endpoints require `member` role authorization
+- **Authorization**: 
+  - Create endpoint is accessible to both admins/members and entrepreneurs
+  - Other endpoints (list, get, stats, timeline, update status) require `member` role (admin/super-admin/member)
+  - Entrepreneurs can access timeline for their own applications
 - All timestamps are in ISO 8601 format
 - Pagination defaults: page=1, limit=20, max limit=100
 - Search is case-insensitive
 - Date filters support both predefined periods and custom date ranges
 - Statistics percentage changes can be `undefined` if previous period had no data
+- For entrepreneurs: `businessId` and `entrepreneurId` are automatically set based on their profile
+- `loanSource` is automatically set: "SME Platform" for entrepreneurs, "Admin Platform" for admins

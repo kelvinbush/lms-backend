@@ -108,31 +108,19 @@ export function validateFundingAmount(
 
 /**
  * Validate repayment period against loan product constraints
+ * 
+ * Note: repaymentPeriod should be provided in the same unit as the loan product's termUnit
+ * (e.g., if product termUnit is "days", repaymentPeriod should be in days)
  */
 export function validateRepaymentPeriod(
   repaymentPeriod: number,
   loanProduct: typeof loanProducts.$inferSelect
 ) {
-  // Convert repayment period to match product's term unit if needed
-  // API specifies repaymentPeriod in months, but product might use different unit
-  let repaymentPeriodInProductUnit = repaymentPeriod;
-  if (loanProduct.termUnit === "days") {
-    repaymentPeriodInProductUnit = repaymentPeriod * 30; // Approximate
-  } else if (loanProduct.termUnit === "weeks") {
-    repaymentPeriodInProductUnit = repaymentPeriod * 4; // Approximate
-  } else if (loanProduct.termUnit === "quarters") {
-    repaymentPeriodInProductUnit = repaymentPeriod / 3;
-  } else if (loanProduct.termUnit === "years") {
-    repaymentPeriodInProductUnit = repaymentPeriod / 12;
-  }
-
-  if (
-    repaymentPeriodInProductUnit < loanProduct.minTerm ||
-    repaymentPeriodInProductUnit > loanProduct.maxTerm
-  ) {
+  // No conversion needed - repaymentPeriod is already in the product's termUnit
+  if (repaymentPeriod < loanProduct.minTerm || repaymentPeriod > loanProduct.maxTerm) {
     throw httpError(
       400,
-      `[INVALID_TERM] Repayment period must be between ${loanProduct.minTerm} and ${loanProduct.maxTerm} ${loanProduct.termUnit}`
+      `[INVALID_TERM] Repayment period must be between ${loanProduct.minTerm} and ${loanProduct.maxTerm} ${loanProduct.termUnit}. You provided ${repaymentPeriod} ${loanProduct.termUnit}.`
     );
   }
 }

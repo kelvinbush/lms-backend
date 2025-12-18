@@ -4,11 +4,12 @@ import { LoanApplicationsModel } from "../modules/loan-applications/loan-applica
 import { LoanApplicationsService } from "../modules/loan-applications/loan-applications.service";
 import { LoanApplicationTimelineService } from "../modules/loan-applications/loan-applications-timeline.service";
 import { UserModel } from "../modules/user/user.model";
-import { requireRole } from "../utils/authz";
+import { requireAuth, requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
 
 export async function loanApplicationsRoutes(fastify: FastifyInstance) {
   // CREATE loan application
+  // Accessible to: admins/members (can create for any business) OR entrepreneurs (can only create for themselves)
   fastify.post(
     "/",
     {
@@ -18,6 +19,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
           201: LoanApplicationsModel.CreateLoanApplicationResponseSchema,
           400: UserModel.ErrorResponseSchema,
           401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
           404: UserModel.ErrorResponseSchema,
           500: UserModel.ErrorResponseSchema,
         },
@@ -26,7 +28,8 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        await requireRole(request, "member");
+        // Require authentication (but not specific role - entrepreneurs can create their own)
+        await requireAuth(request);
         const { userId } = getAuth(request);
         if (!userId) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });

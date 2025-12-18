@@ -74,7 +74,7 @@ export const loanApplications = pgTable(
     exchangeRate: numeric("exchange_rate", { precision: 15, scale: 6 }),
 
     // Repayment terms
-    repaymentPeriod: integer("repayment_period").notNull(), // Repayment period in months
+    repaymentPeriod: integer("repayment_period").notNull(), // Repayment period (unit matches loan product's termUnit: days, weeks, months, quarters, or years)
 
     // Additional details
     intendedUseOfFunds: varchar("intended_use_of_funds", { length: 100 }).notNull(), // Max 100 characters

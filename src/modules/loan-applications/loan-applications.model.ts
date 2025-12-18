@@ -7,18 +7,18 @@ export namespace LoanApplicationsModel {
 
   // Create loan application input
   export interface CreateLoanApplicationBody {
-    businessId: string; // Required - ID of the selected business/SME
-    entrepreneurId: string; // Required - ID of the entrepreneur/business owner
+    businessId?: string; // Optional - Auto-set for entrepreneurs, required for admins
+    entrepreneurId?: string; // Optional - Auto-set for entrepreneurs, required for admins
     loanProductId: string; // Required - ID of the selected loan product
     fundingAmount: number; // Required - Amount requested (primary currency)
     fundingCurrency: string; // Required - ISO currency code (e.g., "EUR", "USD", "KES")
     convertedAmount?: number; // Optional - Converted amount in secondary currency
     convertedCurrency?: string; // Optional - Secondary currency code
     exchangeRate?: number; // Optional - Exchange rate used for conversion (e.g., 150.90)
-    repaymentPeriod: number; // Required - Preferred repayment period (in months)
+    repaymentPeriod: number; // Required - Preferred repayment period (unit matches loan product's termUnit: days, weeks, months, quarters, or years)
     intendedUseOfFunds: string; // Required - Description of intended use (max 100 characters)
     interestRate: number; // Required - Interest rate per annum (percentage, e.g., 10 for 10%)
-    loanSource?: string; // Optional - Source of loan application (e.g., "Admin Platform", "SME Platform")
+    loanSource?: string; // Optional - Auto-set to "SME Platform" for entrepreneurs, "Admin Platform" for admins
   }
 
   // Create loan application response
@@ -220,14 +220,13 @@ export namespace LoanApplicationsModel {
       convertedAmount: { type: "number", minimum: 0 },
       convertedCurrency: { type: "string", minLength: 3, maxLength: 10 },
       exchangeRate: { type: "number", minimum: 0 },
-      repaymentPeriod: { type: "integer", minimum: 1, maximum: 60 },
+      repaymentPeriod: { type: "integer", minimum: 1 }, // Max depends on loan product's maxTerm
       intendedUseOfFunds: { type: "string", minLength: 1, maxLength: 100 },
       interestRate: { type: "number", minimum: 0, maximum: 100 },
       loanSource: { type: "string", maxLength: 100 },
     },
     required: [
-      "businessId",
-      "entrepreneurId",
+      // businessId and entrepreneurId are optional (auto-set for entrepreneurs, required for admins - validated in service)
       "loanProductId",
       "fundingAmount",
       "fundingCurrency",

@@ -8,6 +8,7 @@ import {
   users,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
+import { isEntrepreneur } from "../../utils/authz";
 import {
   generateLoanId,
   mapCreateLoanApplicationResponse,
@@ -32,6 +33,7 @@ export abstract class LoanApplicationsService {
    *
    * @description Creates a new loan application with all required details.
    * Initial status is set to "kyc_kyb_verification".
+   * Supports both admin users (can create for any business) and entrepreneurs (can only create for themselves).
    *
    * @param clerkId - The ID of the user creating the application
    * @param body - Loan application creation data
@@ -39,6 +41,7 @@ export abstract class LoanApplicationsService {
    *
    * @throws {400} If application data is invalid
    * @throws {401} If user is not authorized
+   * @throws {403} If entrepreneur tries to create for someone else
    * @throws {404} If business, entrepreneur, or loan product not found
    * @throws {500} If creation fails
    */
@@ -47,8 +50,66 @@ export abstract class LoanApplicationsService {
     body: LoanApplicationsModel.CreateLoanApplicationBody
   ): Promise<LoanApplicationsModel.CreateLoanApplicationResponse> {
     try {
-      // Validate all input data
-      const { user, loanProduct } = await validateLoanApplicationCreation(clerkId, body);
+      // Get the user first to check if they're an entrepreneur
+      const user = await db.query.users.findFirst({
+        where: eq(users.clerkId, clerkId),
+      });
+
+      if (!user) {
+        throw httpError(401, "[UNAUTHORIZED] User not found");
+      }
+
+      // If user is an entrepreneur, validate they can only create for themselves
+      if (isEntrepreneur(user)) {
+        // If entrepreneurId is provided, it must match the authenticated user
+        if (body.entrepreneurId && body.entrepreneurId !== user.id) {
+          throw httpError(
+            403,
+            "[FORBIDDEN] Entrepreneurs can only create loan applications for themselves"
+          );
+        }
+
+        // Get entrepreneur's business profile
+        const business = await db.query.businessProfiles.findFirst({
+          where: and(eq(businessProfiles.userId, user.id), isNull(businessProfiles.deletedAt)),
+        });
+
+        if (!business) {
+          throw httpError(
+            400,
+            "[BUSINESS_NOT_FOUND] You must have a business profile to create a loan application"
+          );
+        }
+
+        // Auto-set businessId and entrepreneurId for entrepreneurs
+        body.businessId = business.id;
+        body.entrepreneurId = user.id;
+        body.loanSource = body.loanSource || "SME Platform";
+      } else {
+        // Admin/member users - businessId and entrepreneurId are required
+        if (!body.businessId) {
+          throw httpError(400, "[MISSING_BUSINESS_ID] businessId is required for admin users");
+        }
+        if (!body.entrepreneurId) {
+          throw httpError(
+            400,
+            "[MISSING_ENTREPRENEUR_ID] entrepreneurId is required for admin users"
+          );
+        }
+        body.loanSource = body.loanSource || "Admin Platform";
+      }
+
+      // At this point, businessId and entrepreneurId are guaranteed to be set
+      // (either auto-set for entrepreneurs or validated for admins)
+      // Type assertion is safe here because we've ensured they're set above
+      const validatedBody = {
+        ...body,
+        businessId: body.businessId!,
+        entrepreneurId: body.entrepreneurId!,
+      };
+
+      // Validate all input data (this will validate business, entrepreneur, loan product, etc.)
+      const { loanProduct } = await validateLoanApplicationCreation(clerkId, validatedBody);
 
       // Generate unique loan ID
       let loanId = generateLoanId();
