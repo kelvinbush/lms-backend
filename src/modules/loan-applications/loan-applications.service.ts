@@ -378,6 +378,7 @@ export abstract class LoanApplicationsService {
             sector: true,
             country: true,
             city: true,
+            entityType: true,
           },
         }),
         // Entrepreneur
@@ -479,6 +480,153 @@ export abstract class LoanApplicationsService {
       logger.error("Error getting loan application by ID:", error);
       if (error?.status) throw error;
       throw httpError(500, "[GET_LOAN_APPLICATION_ERROR] Failed to get loan application");
+    }
+  }
+
+  /**
+   * Update loan application status
+   *
+   * @description Updates the status of a loan application with validation, timestamp updates, and audit logging.
+   * This is an admin-only endpoint - authorization is handled at the route level.
+   *
+   * @param clerkId - The ID of the user updating the status
+   * @param applicationId - The loan application ID
+   * @param newStatus - The new status to set
+   * @param reason - Optional reason for the status change
+   * @param rejectionReason - Required if status is "rejected"
+   * @param request - Optional Fastify request for extracting metadata
+   * @returns Updated loan application detail
+   *
+   * @throws {400} If status transition is invalid or rejectionReason is missing for rejected status
+   * @throws {404} If loan application is not found
+   * @throws {500} If update fails
+   */
+  static async updateStatus(
+    clerkId: string,
+    applicationId: string,
+    newStatus: LoanApplicationsModel.LoanApplicationStatus,
+    reason?: string,
+    rejectionReason?: string,
+    request?: any
+  ): Promise<LoanApplicationsModel.LoanApplicationDetail> {
+    try {
+      if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
+
+      // Get current application
+      const [current] = await db
+        .select()
+        .from(loanApplications)
+        .where(and(eq(loanApplications.id, applicationId), isNull(loanApplications.deletedAt)))
+        .limit(1);
+
+      if (!current) {
+        throw httpError(404, "[LOAN_APPLICATION_NOT_FOUND] Loan application not found");
+      }
+
+      // Validate status transition
+      const currentStatus = current.status;
+      if (currentStatus === newStatus) {
+        throw httpError(400, "[INVALID_TRANSITION] Status is already set to this value");
+      }
+
+      // Define valid status transitions
+      // Terminal states cannot be changed from
+      const terminalStates = ["approved", "rejected", "disbursed", "cancelled"];
+      if (terminalStates.includes(currentStatus)) {
+        throw httpError(
+          400,
+          `[INVALID_TRANSITION] Cannot change status from terminal state: ${currentStatus}`
+        );
+      }
+
+      // Validate rejection reason if status is rejected
+      if (newStatus === "rejected" && !rejectionReason) {
+        throw httpError(
+          400,
+          "[MISSING_REJECTION_REASON] Rejection reason is required when rejecting an application"
+        );
+      }
+
+      // Get user who is making the change
+      const user = await db.query.users.findFirst({
+        where: eq(users.clerkId, clerkId),
+        columns: { id: true },
+      });
+
+      if (!user) {
+        throw httpError(401, "[UNAUTHORIZED] User not found");
+      }
+
+      // Prepare update data
+      const now = new Date();
+      const updateData: any = {
+        status: newStatus as any,
+        lastUpdatedBy: user.id,
+        lastUpdatedAt: now,
+        updatedAt: now,
+      };
+
+      // Update appropriate timestamp fields based on status
+      if (newStatus === "approved" && !current.approvedAt) {
+        updateData.approvedAt = now;
+      } else if (newStatus === "rejected" && !current.rejectedAt) {
+        updateData.rejectedAt = now;
+        updateData.rejectionReason = rejectionReason || null;
+      } else if (newStatus === "disbursed" && !current.disbursedAt) {
+        updateData.disbursedAt = now;
+      } else if (newStatus === "cancelled" && !current.cancelledAt) {
+        updateData.cancelledAt = now;
+      }
+
+      // Clear rejection reason if status is not rejected
+      if (newStatus !== "rejected" && current.rejectionReason) {
+        updateData.rejectionReason = null;
+      }
+
+      // Update the application
+      const [_updated] = await db
+        .update(loanApplications)
+        .set(updateData)
+        .where(eq(loanApplications.id, applicationId))
+        .returning();
+
+      // Log audit event
+      const eventType = LoanApplicationAuditService.mapStatusToEventType(newStatus);
+      if (eventType) {
+        const eventTitle = LoanApplicationAuditService.getEventTitle(eventType, newStatus);
+        const eventDescription = reason
+          ? `${eventTitle}. Reason: ${reason}`
+          : rejectionReason
+            ? `${eventTitle}. Reason: ${rejectionReason}`
+            : eventTitle;
+
+        const requestMetadata = request
+          ? LoanApplicationAuditService.extractRequestMetadata(request)
+          : {};
+
+        await LoanApplicationAuditService.logEvent({
+          loanApplicationId: applicationId,
+          clerkId,
+          eventType,
+          title: eventTitle,
+          description: eventDescription,
+          status: newStatus,
+          previousStatus: currentStatus,
+          newStatus: newStatus,
+          details: {
+            reason: reason || null,
+            rejectionReason: rejectionReason || null,
+          },
+          ...requestMetadata,
+        });
+      }
+
+      // Return updated application detail
+      return await LoanApplicationsService.getById(applicationId);
+    } catch (error: any) {
+      logger.error("Error updating loan application status:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[UPDATE_STATUS_ERROR] Failed to update loan application status");
     }
   }
 }

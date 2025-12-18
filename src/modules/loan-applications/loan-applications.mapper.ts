@@ -129,6 +129,7 @@ export function mapLoanApplicationDetail(
       sector?: string | null;
       country?: string | null;
       city?: string | null;
+      entityType?: string | null;
     };
     entrepreneur: {
       id: string;
@@ -210,6 +211,7 @@ export function mapLoanApplicationDetail(
       sector: related.business.sector ?? undefined,
       country: related.business.country ?? undefined,
       city: related.business.city ?? undefined,
+      entityType: related.business.entityType ?? undefined,
     },
     entrepreneur: {
       id: related.entrepreneur.id,

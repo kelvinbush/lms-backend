@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import {
   loanApplicationAuditTrail,
-  loanApplications,
   users,
   type LoanApplicationAuditEventType,
 } from "../../db/schema";
@@ -150,12 +149,12 @@ export abstract class LoanApplicationAuditService {
     const titles: Record<LoanApplicationAuditEventType, string> = {
       submitted: "Loan submitted successfully",
       cancelled: "Loan application cancelled",
-      review_in_progress: this.getReviewInProgressTitle(status),
+      review_in_progress: LoanApplicationAuditService.getReviewInProgressTitle(status),
       rejected: "Loan application rejected",
       approved: "Loan application approved",
       awaiting_disbursement: "Awaiting disbursement",
       disbursed: "Loan disbursed",
-      status_changed: this.getStatusChangedTitle(status),
+      status_changed: LoanApplicationAuditService.getStatusChangedTitle(status),
     };
 
     return titles[eventType];

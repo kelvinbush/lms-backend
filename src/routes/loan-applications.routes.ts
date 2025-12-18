@@ -385,4 +385,62 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  // PUT update loan application status
+  fastify.put(
+    "/:id/status",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: LoanApplicationsModel.UpdateStatusBodySchema,
+        response: {
+          200: LoanApplicationsModel.LoanApplicationDetailSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const { status, reason, rejectionReason } = request.body as LoanApplicationsModel.UpdateStatusBody;
+
+        const result = await LoanApplicationsService.updateStatus(
+          userId,
+          id,
+          status,
+          reason,
+          rejectionReason,
+          request
+        );
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error updating loan application status:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to update loan application status",
+          code: "UPDATE_STATUS_FAILED",
+        });
+      }
+    }
+  );
 }

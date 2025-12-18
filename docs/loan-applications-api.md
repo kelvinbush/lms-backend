@@ -421,6 +421,99 @@ Retrieves a specific loan application by its ID with all related data.
 
 ---
 
+### 6. Update Loan Application Status
+
+**PUT** `/loan-applications/:id/status`
+
+Updates the status of a loan application with validation, timestamp updates, and automatic audit trail logging.
+
+#### Path Parameters
+
+```typescript
+{
+  id: string; // Loan application ID
+}
+```
+
+#### Request Body
+
+```typescript
+{
+  status: LoanApplicationStatus;  // Required - New status to set
+  reason?: string;                 // Optional - Reason for the status change (max 500 characters)
+  rejectionReason?: string;         // Required if status = "rejected" - Reason for rejection (max 1000 characters)
+}
+```
+
+#### Response (200 OK)
+
+Returns the updated loan application detail (same format as `GET /loan-applications/:id`).
+
+#### Business Logic
+
+- **Status Validation**: 
+  - Cannot change status if it's already set to the same value
+  - Cannot change status from terminal states (`approved`, `rejected`, `disbursed`, `cancelled`)
+  - Rejection reason is required when status is set to `rejected`
+
+- **Automatic Timestamp Updates**:
+  - Sets `approvedAt` when status changes to `approved`
+  - Sets `rejectedAt` when status changes to `rejected`
+  - Sets `disbursedAt` when status changes to `disbursed`
+  - Sets `cancelledAt` when status changes to `cancelled`
+
+- **Audit Trail**: Automatically logs the status change to the audit trail with:
+  - Event type mapped from status
+  - Title and description
+  - Previous and new status
+  - User who performed the change
+  - Timestamp
+  - Request metadata (IP address, user agent)
+
+#### Example Request
+
+```json
+{
+  "status": "approved",
+  "reason": "Application meets all requirements and has been approved by the committee"
+}
+```
+
+```json
+{
+  "status": "rejected",
+  "rejectionReason": "Credit score below minimum threshold",
+  "reason": "Application rejected after credit analysis"
+}
+```
+
+```json
+{
+  "status": "credit_analysis",
+  "reason": "Moving to credit analysis phase"
+}
+```
+
+#### Error Responses
+
+- `400 Bad Request`: 
+  - Invalid status transition
+  - Status already set to requested value
+  - Missing rejection reason when status is "rejected"
+  - Attempting to change from terminal state
+- `401 Unauthorized`: Missing or invalid authentication token
+- `404 Not Found`: Loan application not found
+- `500 Internal Server Error`: Server error
+
+#### Notes
+
+- Only users with `member` role (admin/super-admin/member) can update loan application status
+- Status changes are automatically logged to the audit trail
+- The timeline endpoint (`GET /loan-applications/:id/timeline`) will show all status changes
+- Terminal states (`approved`, `rejected`, `disbursed`, `cancelled`) cannot be changed once set
+
+---
+
 ## Loan Application Status Values
 
 ```typescript

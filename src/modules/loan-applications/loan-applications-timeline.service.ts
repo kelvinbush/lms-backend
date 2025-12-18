@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import {
   loanApplicationAuditTrail,
@@ -6,7 +6,6 @@ import {
   users,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import type { LoanApplicationsModel } from "./loan-applications.model";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -134,8 +133,8 @@ export abstract class LoanApplicationTimelineService {
           type: "submitted",
           title: "Loan submitted successfully",
           description: `Loan application ${application.loanId} submitted successfully`,
-          date: this.formatDate(application.submittedAt),
-          time: this.formatTime(application.submittedAt),
+          date: LoanApplicationTimelineService.formatDate(application.submittedAt),
+          time: LoanApplicationTimelineService.formatTime(application.submittedAt),
           performedBy: creator
             ? `${creator.firstName || ""} ${creator.lastName || ""}`.trim() || undefined
             : undefined,
@@ -146,7 +145,7 @@ export abstract class LoanApplicationTimelineService {
 
       // Map audit trail entries to timeline events
       for (const entry of auditEntries) {
-        const event = this.mapAuditEntryToTimelineEvent(entry.audit, entry.user);
+        const event = LoanApplicationTimelineService.mapAuditEntryToTimelineEvent(entry.audit, entry.user);
         if (event) {
           events.push(event);
         }
@@ -196,8 +195,8 @@ export abstract class LoanApplicationTimelineService {
       type: eventType,
       title: audit.title,
       description: audit.description || undefined,
-      date: this.formatDate(audit.createdAt),
-      time: this.formatTime(audit.createdAt),
+      date: LoanApplicationTimelineService.formatDate(audit.createdAt),
+      time: LoanApplicationTimelineService.formatTime(audit.createdAt),
       performedBy,
       performedById: audit.performedById || undefined,
       lineColor,

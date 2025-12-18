@@ -176,6 +176,7 @@ export namespace LoanApplicationsModel {
       sector?: string | null;
       country?: string | null;
       city?: string | null;
+      entityType?: string | null;
     };
     entrepreneur: {
       id: string;
@@ -320,6 +321,7 @@ export namespace LoanApplicationsModel {
           sector: { type: "string" },
           country: { type: "string" },
           city: { type: "string" },
+          entityType: { type: "string" },
         },
         required: ["id", "name"],
       },
@@ -457,5 +459,23 @@ export namespace LoanApplicationsModel {
       },
     },
     required: ["data"],
+  } as const;
+
+  // Update status request body
+  export interface UpdateStatusBody {
+    status: LoanApplicationStatus;
+    reason?: string; // Optional reason for the status change
+    rejectionReason?: string; // Required if status = "rejected"
+  }
+
+  export const UpdateStatusBodySchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      status: { type: "string", enum: LoanApplicationStatusEnum },
+      reason: { type: "string", maxLength: 500 },
+      rejectionReason: { type: "string", maxLength: 1000 },
+    },
+    required: ["status"],
   } as const;
 }
