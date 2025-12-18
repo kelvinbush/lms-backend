@@ -143,6 +143,163 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // SEARCH loan products (simplified endpoint for loan application creation)
+  fastify.get(
+    "/search",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            // Search
+            search: { type: "string", minLength: 1, maxLength: 100 },
+            // Pagination
+            page: { type: "string", pattern: "^[0-9]+$" },
+            limit: { type: "string", pattern: "^[0-9]+$" },
+            // Active status filter (defaults to true)
+            isActive: { type: "string", enum: ["true", "false"] },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              data: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    name: { type: "string" },
+                    description: { type: "string" },
+                    organizationId: { type: "string" },
+                    organizationName: { type: "string" },
+                    currency: { type: "string" },
+                    minAmount: { type: "number" },
+                    maxAmount: { type: "number" },
+                    minTerm: { type: "number" },
+                    maxTerm: { type: "number" },
+                    termUnit: {
+                      type: "string",
+                      enum: ["days", "weeks", "months", "quarters", "years"],
+                    },
+                    isActive: { type: "boolean" },
+                  },
+                  required: [
+                    "id",
+                    "name",
+                    "organizationId",
+                    "currency",
+                    "minAmount",
+                    "maxAmount",
+                    "minTerm",
+                    "maxTerm",
+                    "termUnit",
+                    "isActive",
+                  ],
+                },
+              },
+              pagination: {
+                type: "object",
+                properties: {
+                  page: { type: "number" },
+                  limit: { type: "number" },
+                  total: { type: "number" },
+                  totalPages: { type: "number" },
+                },
+                required: ["page", "limit", "total", "totalPages"],
+              },
+            },
+            required: ["data", "pagination"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-products"],
+      },
+      preValidation: async (request: FastifyRequest, _reply: FastifyReply) => {
+        // Normalize duplicate query parameters
+        if (request.query && typeof request.query === "object") {
+          const query = request.query as Record<string, any>;
+          for (const key in query) {
+            if (Array.isArray(query[key])) {
+              query[key] = query[key][0];
+            }
+          }
+        }
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        // Build query with defaults for search endpoint
+        const queryParams = request.query as {
+          search?: string;
+          page?: string;
+          limit?: string;
+          isActive?: string;
+        };
+
+        // Default to active products only and active status
+        const searchQuery: LoanProductsModel.ListLoanProductsQuery = {
+          page: queryParams.page || "1",
+          limit: queryParams.limit || "20",
+          search: queryParams.search,
+          isActive: queryParams.isActive !== undefined ? queryParams.isActive : "true",
+          status: "active", // Only show active status products
+          sortBy: "name", // Sort by name alphabetically
+          sortOrder: "asc",
+        };
+
+        const result = await LoanProductsService.list(userId, searchQuery);
+
+        // Transform response to match API requirements format
+        // Note: organizationName is not currently returned by the service, but it's optional in the API
+        const transformedData = result.data.map((item: LoanProductsModel.LoanProductItem) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description ?? undefined,
+          organizationId: item.organizationId,
+          // organizationName would need to be fetched separately if needed
+          currency: item.currency,
+          minAmount: item.minAmount,
+          maxAmount: item.maxAmount,
+          minTerm: item.minTerm,
+          maxTerm: item.maxTerm,
+          termUnit: item.termUnit,
+          isActive: item.isActive,
+        }));
+
+        return reply.send({
+          data: transformedData,
+          pagination: result.pagination || {
+            page: 1,
+            limit: 20,
+            total: 0,
+            totalPages: 0,
+          },
+        });
+      } catch (error: any) {
+        logger.error("Error searching loan products:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply
+          .code(500)
+          .send({ error: "Failed to search loan products", code: "SEARCH_LOAN_PRODUCTS_FAILED" });
+      }
+    }
+  );
+
   // GET by ID
   fastify.get(
     "/:id",

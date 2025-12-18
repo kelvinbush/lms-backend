@@ -23,6 +23,7 @@ import { businessDocumentsRoutes } from "./routes/business-documents.routes";
 import { businessRoutes } from "./routes/business.routes";
 import { documentsRoutes } from "./routes/documents.routes";
 import { investorOpportunitiesRoutes } from "./routes/investor-opportunities.routes";
+import { loanApplicationsRoutes } from "./routes/loan-applications.routes";
 import { loanFeesRoutes } from "./routes/loan-fees.routes";
 import { loanProductsRoutes } from "./routes/loan-products.routes";
 import { organizationsRoutes } from "./routes/organizations.routes";
@@ -72,6 +73,7 @@ export async function registerPlugins(fastify: FastifyInstance): Promise<void> {
   await fastify.register(documentsRoutes, { prefix: "/documents" });
   await fastify.register(businessDocumentsRoutes, { prefix: "/business" });
   await fastify.register(loanProductsRoutes, { prefix: "/loan-products" });
+  await fastify.register(loanApplicationsRoutes, { prefix: "/loan-applications" });
   await fastify.register(investorOpportunitiesRoutes, { prefix: "/investor-opportunities" });
   await fastify.register(userGroupsRoutes, { prefix: "/user-groups" });
   await fastify.register(organizationsRoutes, { prefix: "/organizations" });
