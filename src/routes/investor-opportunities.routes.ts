@@ -41,12 +41,10 @@ export async function investorOpportunitiesRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to create investor opportunity",
-            code: "CREATE_INVESTOR_OPPORTUNITY_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to create investor opportunity",
+          code: "CREATE_INVESTOR_OPPORTUNITY_FAILED",
+        });
       }
     }
   );
@@ -82,12 +80,10 @@ export async function investorOpportunitiesRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to list investor opportunities",
-            code: "LIST_INVESTOR_OPPORTUNITIES_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to list investor opportunities",
+          code: "LIST_INVESTOR_OPPORTUNITIES_FAILED",
+        });
       }
     }
   );
@@ -123,12 +119,10 @@ export async function investorOpportunitiesRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to list investor opportunity bookmarks",
-            code: "LIST_INVESTOR_OPPORTUNITY_BOOKMARKS_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to list investor opportunity bookmarks",
+          code: "LIST_INVESTOR_OPPORTUNITY_BOOKMARKS_FAILED",
+        });
       }
     }
   );
@@ -171,12 +165,10 @@ export async function investorOpportunitiesRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to get investor opportunity",
-            code: "GET_INVESTOR_OPPORTUNITY_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to get investor opportunity",
+          code: "GET_INVESTOR_OPPORTUNITY_FAILED",
+        });
       }
     }
   );
@@ -224,12 +216,10 @@ export async function investorOpportunitiesRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to update investor opportunity",
-            code: "UPDATE_INVESTOR_OPPORTUNITY_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to update investor opportunity",
+          code: "UPDATE_INVESTOR_OPPORTUNITY_FAILED",
+        });
       }
     }
   );
@@ -272,12 +262,10 @@ export async function investorOpportunitiesRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to delete investor opportunity",
-            code: "DELETE_INVESTOR_OPPORTUNITY_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to delete investor opportunity",
+          code: "DELETE_INVESTOR_OPPORTUNITY_FAILED",
+        });
       }
     }
   );
@@ -320,12 +308,10 @@ export async function investorOpportunitiesRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to bookmark investor opportunity",
-            code: "BOOKMARK_INVESTOR_OPPORTUNITY_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to bookmark investor opportunity",
+          code: "BOOKMARK_INVESTOR_OPPORTUNITY_FAILED",
+        });
       }
     }
   );
@@ -368,12 +354,10 @@ export async function investorOpportunitiesRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to unbookmark investor opportunity",
-            code: "UNBOOKMARK_INVESTOR_OPPORTUNITY_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to unbookmark investor opportunity",
+          code: "UNBOOKMARK_INVESTOR_OPPORTUNITY_FAILED",
+        });
       }
     }
   );

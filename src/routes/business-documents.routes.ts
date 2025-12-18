@@ -80,12 +80,10 @@ export async function businessDocumentsRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to upsert business documents",
-            code: "UPSERT_BUSINESS_DOCUMENTS_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to upsert business documents",
+          code: "UPSERT_BUSINESS_DOCUMENTS_FAILED",
+        });
       }
     }
   );
@@ -123,12 +121,10 @@ export async function businessDocumentsRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to list business documents",
-            code: "LIST_BUSINESS_DOCUMENTS_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to list business documents",
+          code: "LIST_BUSINESS_DOCUMENTS_FAILED",
+        });
       }
     }
   );

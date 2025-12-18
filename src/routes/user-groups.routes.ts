@@ -165,12 +165,10 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to search businesses",
-            code: "SEARCH_BUSINESSES_FOR_GROUP_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to search businesses",
+          code: "SEARCH_BUSINESSES_FOR_GROUP_FAILED",
+        });
       }
     }
   );
@@ -213,12 +211,10 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to assign businesses",
-            code: "ASSIGN_BUSINESSES_TO_GROUP_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to assign businesses",
+          code: "ASSIGN_BUSINESSES_TO_GROUP_FAILED",
+        });
       }
     }
   );

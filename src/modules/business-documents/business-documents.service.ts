@@ -205,5 +205,4 @@ export abstract class BusinessDocuments {
       throw httpError(500, "[LIST_BUSINESS_DOCS_ERROR] Failed to list business documents");
     }
   }
-
 }

@@ -385,12 +385,10 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({
-            error: "Failed to get available products",
-            code: "GET_AVAILABLE_PRODUCTS_FAILED",
-          });
+        return reply.code(500).send({
+          error: "Failed to get available products",
+          code: "GET_AVAILABLE_PRODUCTS_FAILED",
+        });
       }
     }
   );

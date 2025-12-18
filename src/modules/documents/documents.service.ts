@@ -132,5 +132,4 @@ export abstract class Documents {
       throw httpError(500, "[LIST_DOCUMENTS_ERROR] Failed to list documents");
     }
   }
-
 }

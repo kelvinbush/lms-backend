@@ -1,5 +1,3 @@
-
-
 // Lightweight HTTP error helper
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
