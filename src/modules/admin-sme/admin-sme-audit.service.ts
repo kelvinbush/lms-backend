@@ -1,8 +1,8 @@
+import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { adminSMEAuditTrail, users } from "../../db/schema";
-import { logger } from "../../utils/logger";
-import { eq } from "drizzle-orm";
 import type { AdminSMEAuditAction } from "../../db/schema/adminSMEAuditTrail";
+import { logger } from "../../utils/logger";
 
 export interface AuditLogParams {
   adminClerkId: string; // Clerk ID of the admin performing the action
@@ -45,7 +45,7 @@ export abstract class AdminSMEAuditService {
         if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
           return null;
         }
-        
+
         // Filter out undefined values, keep null (null is meaningful)
         const cleaned: Record<string, any> = {};
         for (const [key, value] of Object.entries(obj)) {
@@ -53,7 +53,7 @@ export abstract class AdminSMEAuditService {
             cleaned[key] = value;
           }
         }
-        
+
         // Only stringify if there are actual properties
         return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
       };
@@ -94,10 +94,9 @@ export abstract class AdminSMEAuditService {
     userAgent?: string;
   } {
     return {
-      ipAddress: request.ip || request.headers?.["x-forwarded-for"] || request.headers?.["x-real-ip"],
+      ipAddress:
+        request.ip || request.headers?.["x-forwarded-for"] || request.headers?.["x-real-ip"],
       userAgent: request.headers?.["user-agent"],
     };
   }
 }
-
-

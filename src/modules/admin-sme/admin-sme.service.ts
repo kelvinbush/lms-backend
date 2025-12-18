@@ -1,22 +1,22 @@
-import type { AdminSMEModel } from "./admin-sme.model";
+import { and, desc, eq, inArray, isNull, like, notInArray, or, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
-  users,
-  businessProfiles,
-  smeOnboardingProgress,
-  personalDocuments,
-  businessDocuments,
-  businessUserGroups,
-  businessCountries,
-  businessPhotos,
-  businessVideoLinks,
-  userGroups,
-  loanApplications,
   adminSMEAuditTrail,
+  businessCountries,
+  businessDocuments,
+  businessPhotos,
+  businessProfiles,
+  businessUserGroups,
+  businessVideoLinks,
+  loanApplications,
+  personalDocuments,
+  smeOnboardingProgress,
+  userGroups,
+  users,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { eq, and, isNull, or, like, sql, inArray, desc, notInArray } from "drizzle-orm";
-import { httpError } from "./admin-sme.utils";
+import { AdminSMEInvitationService } from "./admin-sme.invitation.service";
+import type { AdminSMEModel } from "./admin-sme.model";
 import { AdminSMEStep1Service } from "./admin-sme.step1.service";
 import { AdminSMEStep2Service } from "./admin-sme.step2.service";
 import { AdminSMEStep3Service } from "./admin-sme.step3.service";
@@ -24,7 +24,7 @@ import { AdminSMEStep4Service } from "./admin-sme.step4.service";
 import { AdminSMEStep5Service } from "./admin-sme.step5.service";
 import { AdminSMEStep6Service } from "./admin-sme.step6.service";
 import { AdminSMEStep7Service } from "./admin-sme.step7.service";
-import { AdminSMEInvitationService } from "./admin-sme.invitation.service";
+import { httpError } from "./admin-sme.utils";
 
 // Re-export step services for convenience
 export { AdminSMEStep1Service } from "./admin-sme.step1.service";
@@ -44,9 +44,7 @@ export abstract class AdminSMEService {
   /**
    * Get current onboarding state for a user
    */
-  static async getOnboardingState(
-    userId: string,
-  ): Promise<AdminSMEModel.OnboardingStateResponse> {
+  static async getOnboardingState(userId: string): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
       // Execute all queries in parallel for better performance
       const [user, progress, business] = await Promise.all([
@@ -112,63 +110,63 @@ export abstract class AdminSMEService {
 
   // Convenience methods that delegate to step services
   static async createSMEUser(
-    payload: AdminSMEModel.Step1UserInfoBody,
+    payload: AdminSMEModel.Step1UserInfoBody
   ): Promise<AdminSMEModel.CreateUserResponse> {
     return AdminSMEStep1Service.createSMEUser(payload);
   }
 
   static async updateSMEUser(
     userId: string,
-    payload: AdminSMEModel.Step1UserInfoBody,
+    payload: AdminSMEModel.Step1UserInfoBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     return AdminSMEStep1Service.updateSMEUser(userId, payload);
   }
 
   static async saveBusinessBasicInfo(
     userId: string,
-    payload: AdminSMEModel.Step2BusinessBasicInfoBody,
+    payload: AdminSMEModel.Step2BusinessBasicInfoBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     return AdminSMEStep2Service.saveBusinessBasicInfo(userId, payload);
   }
 
   static async saveLocationInfo(
     userId: string,
-    payload: AdminSMEModel.Step3LocationInfoBody,
+    payload: AdminSMEModel.Step3LocationInfoBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     return AdminSMEStep3Service.saveLocationInfo(userId, payload);
   }
 
   static async savePersonalDocuments(
     userId: string,
-    payload: AdminSMEModel.Step4PersonalDocumentsBody,
+    payload: AdminSMEModel.Step4PersonalDocumentsBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     return AdminSMEStep4Service.savePersonalDocuments(userId, payload);
   }
 
   static async saveCompanyInfoDocuments(
     userId: string,
-    payload: AdminSMEModel.Step5CompanyInfoDocumentsBody,
+    payload: AdminSMEModel.Step5CompanyInfoDocumentsBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     return AdminSMEStep5Service.saveCompanyInfoDocuments(userId, payload);
   }
 
   static async saveFinancialDocuments(
     userId: string,
-    payload: AdminSMEModel.Step6FinancialDocumentsBody,
+    payload: AdminSMEModel.Step6FinancialDocumentsBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     return AdminSMEStep6Service.saveFinancialDocuments(userId, payload);
   }
 
   static async savePermitAndPitchDocuments(
     userId: string,
-    payload: AdminSMEModel.Step7PermitAndPitchDocumentsBody,
+    payload: AdminSMEModel.Step7PermitAndPitchDocumentsBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     return AdminSMEStep7Service.savePermitAndPitchDocuments(userId, payload);
   }
 
   static async sendSMEInvitation(
     userId: string,
-    adminClerkId: string,
+    adminClerkId: string
   ): Promise<AdminSMEModel.InvitationResponse> {
     return AdminSMEInvitationService.sendSMEInvitation(userId, adminClerkId);
   }
@@ -177,11 +175,11 @@ export abstract class AdminSMEService {
    * List all SME users with optional filtering and pagination
    */
   static async listSMEUsers(
-    query: AdminSMEModel.ListSMEUsersQuery,
+    query: AdminSMEModel.ListSMEUsersQuery
   ): Promise<AdminSMEModel.ListSMEUsersResponse> {
     try {
-      const page = query.page ? parseInt(query.page, 10) : 1;
-      const limit = query.limit ? parseInt(query.limit, 10) : 50;
+      const page = query.page ? Number.parseInt(query.page, 10) : 1;
+      const limit = query.limit ? Number.parseInt(query.limit, 10) : 50;
       const offset = (page - 1) * limit;
 
       // Build where conditions
@@ -198,7 +196,7 @@ export abstract class AdminSMEService {
         const searchCondition = or(
           like(users.email, searchTerm),
           like(users.firstName, searchTerm),
-          like(users.lastName, searchTerm),
+          like(users.lastName, searchTerm)
         );
         if (searchCondition) {
           conditions.push(searchCondition);
@@ -292,11 +290,11 @@ export abstract class AdminSMEService {
    * List entrepreneurs for admin table view
    */
   static async listEntrepreneurs(
-    query: AdminSMEModel.ListSMEUsersQuery,
+    query: AdminSMEModel.ListSMEUsersQuery
   ): Promise<AdminSMEModel.EntrepreneurListResponse> {
     try {
-      const page = query.page ? parseInt(query.page, 10) : 1;
-      const limit = query.limit ? parseInt(query.limit, 10) : 50;
+      const page = query.page ? Number.parseInt(query.page, 10) : 1;
+      const limit = query.limit ? Number.parseInt(query.limit, 10) : 50;
       const offset = (page - 1) * limit;
 
       // Build where conditions (reuse logic from listSMEUsers)
@@ -304,10 +302,7 @@ export abstract class AdminSMEService {
 
       // Exclude internal/admin users (super-admin, admin, member)
       conditions.push(
-        or(
-          isNull(users.role),
-          notInArray(users.role, ["super-admin", "admin", "member"]),
-        ),
+        or(isNull(users.role), notInArray(users.role, ["super-admin", "admin", "member"]))
       );
 
       if (query.onboardingStatus) {
@@ -319,7 +314,7 @@ export abstract class AdminSMEService {
         const searchCondition = or(
           like(users.email, searchTerm),
           like(users.firstName, searchTerm),
-          like(users.lastName, searchTerm),
+          like(users.lastName, searchTerm)
         );
         if (searchCondition) {
           conditions.push(searchCondition);
@@ -420,8 +415,7 @@ export abstract class AdminSMEService {
                 id: business.id,
                 name: business.name,
                 sectors:
-                  (business.sectors as string[]) ??
-                  (business.sector ? [business.sector] : []),
+                  (business.sectors as string[]) ?? (business.sector ? [business.sector] : []),
                 country: business.country,
               }
             : null,
@@ -453,7 +447,7 @@ export abstract class AdminSMEService {
    */
   static async updateEntrepreneurDetails(
     userId: string,
-    payload: AdminSMEModel.UpdateEntrepreneurDetailsBody,
+    payload: AdminSMEModel.UpdateEntrepreneurDetailsBody
   ): Promise<AdminSMEModel.UpdateEntrepreneurDetailsResponse> {
     try {
       // Verify user exists
@@ -539,7 +533,10 @@ export abstract class AdminSMEService {
         userId,
       });
       if (error?.status) throw error;
-      throw httpError(500, "[UPDATE_ENTREPRENEUR_DETAILS_ERROR] Failed to update entrepreneur details");
+      throw httpError(
+        500,
+        "[UPDATE_ENTREPRENEUR_DETAILS_ERROR] Failed to update entrepreneur details"
+      );
     }
   }
 
@@ -548,7 +545,7 @@ export abstract class AdminSMEService {
    */
   static async saveFinancialDetails(
     userId: string,
-    payload: AdminSMEModel.SaveFinancialDetailsBody,
+    payload: AdminSMEModel.SaveFinancialDetailsBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
       const user = await db.query.users.findFirst({
@@ -629,7 +626,7 @@ export abstract class AdminSMEService {
         0,
         0,
         0,
-        0,
+        0
       );
       const previousEnd = new Date(currentStart.getTime() - 1);
 
@@ -643,18 +640,22 @@ export abstract class AdminSMEService {
 
       const isEntrepreneurCondition = and(
         isNull(users.deletedAt),
-        or(isNull(users.role), notInArray(users.role, ["super-admin", "admin", "member"])),
+        or(isNull(users.role), notInArray(users.role, ["super-admin", "admin", "member"]))
       );
 
       const buildWhereForPeriod = (start: Date, end: Date) =>
         and(
           isEntrepreneurCondition,
-          sql`users.created_at BETWEEN ${start.toISOString()} AND ${end.toISOString()}`,
+          sql`users.created_at BETWEEN ${start.toISOString()} AND ${end.toISOString()}`
         );
 
       const [currentAgg, previousAgg] = await Promise.all([
-        this.computeEntrepreneurAggregates(buildWhereForPeriod(currentStart, currentEnd)),
-        this.computeEntrepreneurAggregates(buildWhereForPeriod(previousStart, previousEnd)),
+        AdminSMEService.computeEntrepreneurAggregates(
+          buildWhereForPeriod(currentStart, currentEnd)
+        ),
+        AdminSMEService.computeEntrepreneurAggregates(
+          buildWhereForPeriod(previousStart, previousEnd)
+        ),
       ]);
 
       function delta(current: number, previous: number): number {
@@ -718,10 +719,7 @@ export abstract class AdminSMEService {
         )`,
       })
       .from(users)
-      .leftJoin(
-        smeOnboardingProgress,
-        eq(smeOnboardingProgress.userId, users.id),
-      )
+      .leftJoin(smeOnboardingProgress, eq(smeOnboardingProgress.userId, users.id))
       .where(whereClause);
 
     const total = Number(row?.total || 0);
@@ -737,10 +735,7 @@ export abstract class AdminSMEService {
       .from(users)
       .innerJoin(
         loanApplications,
-        and(
-          eq(loanApplications.userId, users.id),
-          isNull(loanApplications.deletedAt),
-        ),
+        and(eq(loanApplications.userId, users.id), isNull(loanApplications.deletedAt))
       )
       .where(whereClause);
 
@@ -758,9 +753,7 @@ export abstract class AdminSMEService {
   /**
    * Get detailed information about a single SME user
    */
-  static async getSMEUserDetail(
-    userId: string,
-  ): Promise<AdminSMEModel.GetSMEUserDetailResponse> {
+  static async getSMEUserDetail(userId: string): Promise<AdminSMEModel.GetSMEUserDetailResponse> {
     try {
       const user = await db.query.users.findFirst({
         where: eq(users.id, userId),
@@ -801,7 +794,7 @@ export abstract class AdminSMEService {
           db.query.businessVideoLinks.findMany({
             where: and(
               eq(businessVideoLinks.businessId, business.id),
-              isNull(businessVideoLinks.deletedAt),
+              isNull(businessVideoLinks.deletedAt)
             ),
             columns: {
               videoUrl: true,
@@ -813,7 +806,7 @@ export abstract class AdminSMEService {
           db.query.businessPhotos.findMany({
             where: and(
               eq(businessPhotos.businessId, business.id),
-              isNull(businessPhotos.deletedAt),
+              isNull(businessPhotos.deletedAt)
             ),
             columns: {
               photoUrl: true,
@@ -858,7 +851,7 @@ export abstract class AdminSMEService {
               sectors: (business.sectors as string[]) ?? null,
               description: business.description,
               yearOfIncorporation: business.yearOfIncorporation
-                ? parseInt(business.yearOfIncorporation, 10)
+                ? Number.parseInt(business.yearOfIncorporation, 10)
                 : null,
               city: business.city,
               country: business.country,
@@ -904,7 +897,7 @@ export abstract class AdminSMEService {
    * Get personal documents for an SME user
    */
   static async getPersonalDocuments(
-    userId: string,
+    userId: string
   ): Promise<AdminSMEModel.ListPersonalDocumentsResponse> {
     try {
       const user = await db.query.users.findFirst({
@@ -916,10 +909,7 @@ export abstract class AdminSMEService {
       }
 
       const docs = await db.query.personalDocuments.findMany({
-        where: and(
-          eq(personalDocuments.userId, userId),
-          isNull(personalDocuments.deletedAt),
-        ),
+        where: and(eq(personalDocuments.userId, userId), isNull(personalDocuments.deletedAt)),
         columns: {
           id: true,
           docType: true,
@@ -955,7 +945,7 @@ export abstract class AdminSMEService {
    * Get business documents for an SME user
    */
   static async getBusinessDocuments(
-    userId: string,
+    userId: string
   ): Promise<AdminSMEModel.ListBusinessDocumentsResponse> {
     try {
       const user = await db.query.users.findFirst({
@@ -981,7 +971,7 @@ export abstract class AdminSMEService {
       const docs = await db.query.businessDocuments.findMany({
         where: and(
           eq(businessDocuments.businessId, business.id),
-          isNull(businessDocuments.deletedAt),
+          isNull(businessDocuments.deletedAt)
         ),
         columns: {
           id: true,
@@ -1027,7 +1017,7 @@ export abstract class AdminSMEService {
    */
   static async getAuditTrail(
     smeUserId: string,
-    query: AdminSMEModel.ListAuditTrailQuery,
+    query: AdminSMEModel.ListAuditTrailQuery
   ): Promise<AdminSMEModel.ListAuditTrailResponse> {
     try {
       // Verify SME user exists
@@ -1040,8 +1030,8 @@ export abstract class AdminSMEService {
         throw httpError(404, "[USER_NOT_FOUND] SME user not found");
       }
 
-      const page = query.page ? parseInt(query.page, 10) : 1;
-      const limit = query.limit ? parseInt(query.limit, 10) : 50;
+      const page = query.page ? Number.parseInt(query.page, 10) : 1;
+      const limit = query.limit ? Number.parseInt(query.limit, 10) : 50;
       const offset = (page - 1) * limit;
 
       // Build where conditions

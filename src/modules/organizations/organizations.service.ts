@@ -1,8 +1,8 @@
-import { and, eq, isNull, count, desc, asc, like } from "drizzle-orm";
+import { and, count, desc, eq, isNull, like } from "drizzle-orm";
 import { db } from "../../db";
-import { organizations, loanProducts } from "../../db/schema";
-import type { OrganizationsModel } from "./organizations.model";
+import { loanProducts, organizations } from "../../db/schema";
 import { logger } from "../../utils/logger";
+import type { OrganizationsModel } from "./organizations.model";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -189,12 +189,12 @@ export abstract class OrganizationsService {
 
   /**
    * Delete organization (soft delete)
-   * 
+   *
    * @description Soft deletes an organization. Cannot delete if there are loan products linked to it.
-   * 
+   *
    * @param id - The organization ID
    * @returns Success message
-   * 
+   *
    * @throws {404} If organization is not found
    * @throws {400} If organization has linked loan products
    * @throws {500} If deletion fails
@@ -210,10 +210,7 @@ export abstract class OrganizationsService {
         .from(organizations)
         .leftJoin(
           loanProducts,
-          and(
-            eq(loanProducts.organizationId, organizations.id),
-            isNull(loanProducts.deletedAt)
-          )
+          and(eq(loanProducts.organizationId, organizations.id), isNull(loanProducts.deletedAt))
         )
         .where(and(eq(organizations.id, id), isNull(organizations.deletedAt)))
         .groupBy(organizations.id)

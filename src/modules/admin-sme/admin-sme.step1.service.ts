@@ -1,10 +1,9 @@
-import type { AdminSMEModel } from "./admin-sme.model";
-import { db } from "../../db";
-import { users, smeOnboardingProgress } from "../../db/schema";
-import { logger } from "../../utils/logger";
 import { eq } from "drizzle-orm";
+import { db } from "../../db";
+import { smeOnboardingProgress, users } from "../../db/schema";
+import { logger } from "../../utils/logger";
+import type { AdminSMEModel } from "./admin-sme.model";
 import { httpError } from "./admin-sme.utils";
-import { AdminSMEService } from "./admin-sme.service";
 
 /**
  * Step 1: User Creation Service
@@ -15,7 +14,7 @@ export abstract class AdminSMEStep1Service {
    * Creates user and initializes onboarding progress
    */
   static async createSMEUser(
-    payload: AdminSMEModel.Step1UserInfoBody,
+    payload: AdminSMEModel.Step1UserInfoBody
   ): Promise<AdminSMEModel.CreateUserResponse> {
     try {
       // Check if user with email already exists
@@ -109,7 +108,7 @@ export abstract class AdminSMEStep1Service {
    */
   static async updateSMEUser(
     userId: string,
-    payload: AdminSMEModel.Step1UserInfoBody,
+    payload: AdminSMEModel.Step1UserInfoBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
       // Verify user exists
@@ -226,4 +225,3 @@ export abstract class AdminSMEStep1Service {
     }
   }
 }
-

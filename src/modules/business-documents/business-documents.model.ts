@@ -16,7 +16,7 @@ export namespace BusinessDocumentsModel {
     "annual_bank_statement",
     "audited_financial_statements",
     "income_statements",
-    "personal_bank_statement"
+    "personal_bank_statement",
   ];
 
   export interface BusinessDocumentItem {
@@ -32,7 +32,9 @@ export namespace BusinessDocumentsModel {
   export type AddDocumentsBody = BusinessDocumentItem | BusinessDocumentItem[];
 
   // Params for routes that include :businessId
-  export interface BusinessIdParams { id: string; }
+  export interface BusinessIdParams {
+    id: string;
+  }
   export const BusinessIdParamsSchema = {
     type: "object",
     additionalProperties: false,
@@ -56,12 +58,18 @@ export namespace BusinessDocumentsModel {
     allOf: [
       // If isPasswordProtected true -> require docPassword
       {
-        if: { properties: { isPasswordProtected: { const: true } }, required: ["isPasswordProtected"] },
+        if: {
+          properties: { isPasswordProtected: { const: true } },
+          required: ["isPasswordProtected"],
+        },
         then: { required: ["docPassword"] },
       },
       // If docType is audited_financial_statements -> require docYear
       {
-        if: { properties: { docType: { const: "audited_financial_statements" } }, required: ["docType"] },
+        if: {
+          properties: { docType: { const: "audited_financial_statements" } },
+          required: ["docType"],
+        },
         then: { required: ["docYear"] },
       },
       // If docType is annual_bank_statement -> require docYear and docBankName
@@ -82,7 +90,10 @@ export namespace BusinessDocumentsModel {
   } as const;
 
   // Basic success response for add/upsert
-  export interface BasicSuccessResponse { success: boolean; message: string; }
+  export interface BasicSuccessResponse {
+    success: boolean;
+    message: string;
+  }
   export type AddDocumentsResponse = BasicSuccessResponse;
   export const AddDocumentsResponseSchema = {
     type: "object",

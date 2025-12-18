@@ -1,4 +1,3 @@
-
 export namespace UserModel {
   export interface SignUpBody {
     email: string;
@@ -19,7 +18,7 @@ export namespace UserModel {
     code: string;
   }
 
-  export type OtpRequestBody = {}
+  export type OtpRequestBody = {};
 
   export interface OtpVerificationBody {
     otp: string;
@@ -104,7 +103,7 @@ export namespace UserModel {
     | "national_id_back"
     | "passport_bio_page"
     | "personal_tax_document"
-    | "user_photo"
+    | "user_photo";
 
   export type UserIdType = "national_id" | "passport";
 
@@ -130,7 +129,7 @@ export namespace UserModel {
           "national_id_back",
           "passport_bio_page",
           "personal_tax_document",
-          "user_photo"
+          "user_photo",
         ],
       },
       docUrl: { type: "string", minLength: 1, format: "uri" },

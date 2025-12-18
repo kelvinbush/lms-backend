@@ -1,11 +1,11 @@
-import type { UserModel } from "./user.model";
+import { clerkClient } from "@clerk/fastify";
+import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { personalDocuments, users } from "../../db/schema";
-import { logger } from "../../utils/logger";
-import { eq } from "drizzle-orm";
-import { OtpUtils } from "../../utils/otp.utils";
 import { smsService } from "../../services/sms.service";
-import { clerkClient } from "@clerk/fastify";
+import { logger } from "../../utils/logger";
+import { OtpUtils } from "../../utils/otp.utils";
+import type { UserModel } from "./user.model";
 
 // Lightweight HTTP error helper compatible with our route error handling
 function httpError(status: number, message: string) {
@@ -15,17 +15,12 @@ function httpError(status: number, message: string) {
 }
 
 export abstract class User {
-  static async signUp(
-    userPayload: UserModel.SignUpBody,
-  ): Promise<UserModel.SignUpResponse> {
+  static async signUp(userPayload: UserModel.SignUpBody): Promise<UserModel.SignUpResponse> {
     try {
       // Ensure dob is a Date object for the DB layer
       const values = {
         ...userPayload,
-        dob:
-          typeof userPayload.dob === "string"
-            ? new Date(userPayload.dob)
-            : userPayload.dob,
+        dob: typeof userPayload.dob === "string" ? new Date(userPayload.dob) : userPayload.dob,
       } as any;
       const user = await db.insert(users).values(values).returning();
       return {
@@ -59,9 +54,7 @@ export abstract class User {
    * @param clerkId User's Clerk ID
    * @returns Success status
    */
-  static async sendPhoneVerificationOtp(
-    clerkId: string,
-  ): Promise<UserModel.OtpResponse> {
+  static async sendPhoneVerificationOtp(clerkId: string): Promise<UserModel.OtpResponse> {
     try {
       // Get user details
       const user = await db.query.users.findFirst({
@@ -121,7 +114,7 @@ export abstract class User {
    */
   static async verifyPhoneOtp(
     clerkId: string,
-    otp: string,
+    otp: string
   ): Promise<UserModel.OtpVerificationResponse> {
     try {
       // Get user details
@@ -144,7 +137,7 @@ export abstract class User {
       const isValid = OtpUtils.validateOtp(
         otp,
         user.phoneVerificationCode || null,
-        user.phoneVerificationExpiry || null,
+        user.phoneVerificationExpiry || null
       );
 
       if (!isValid) {
@@ -181,9 +174,7 @@ export abstract class User {
    * @param clerkId User's Clerk ID
    * @returns Success status
    */
-  static async resendPhoneVerificationOtp(
-    clerkId: string,
-  ): Promise<UserModel.OtpResponse> {
+  static async resendPhoneVerificationOtp(clerkId: string): Promise<UserModel.OtpResponse> {
     return User.sendPhoneVerificationOtp(clerkId);
   }
 
@@ -194,7 +185,7 @@ export abstract class User {
    * */
   static async updatePhoneNumber(
     clerkId: string,
-    phoneNumber: string,
+    phoneNumber: string
   ): Promise<UserModel.EditPhoneResponse> {
     try {
       const user = await db.query.users.findFirst({
@@ -234,10 +225,7 @@ export abstract class User {
     } catch (error: any) {
       logger.error("Error updating phone number:", error);
       if (error.status) throw error;
-      throw httpError(
-        500,
-        "[UPDATE_PHONE_ERROR] Failed to update phone number",
-      );
+      throw httpError(500, "[UPDATE_PHONE_ERROR] Failed to update phone number");
     }
   }
 
@@ -248,7 +236,7 @@ export abstract class User {
    */
   static async updateUserAndDocuments(
     clerkId: string,
-    payload: UserModel.UpdateUserAndDocumentsBody,
+    payload: UserModel.UpdateUserAndDocumentsBody
   ): Promise<UserModel.BasicSuccessResponse> {
     try {
       // Resolve internal user
@@ -279,7 +267,7 @@ export abstract class User {
               userId: user.id,
               docType: doc.docType,
               docUrl: doc.docUrl,
-            })),
+            }))
           );
         }
       });
@@ -291,10 +279,7 @@ export abstract class User {
     } catch (error: any) {
       logger.error("Error updating user and documents:", error);
       if (error?.status) throw error;
-      throw httpError(
-        500,
-        "[UPDATE_USER_DOCS_ERROR] Failed to update user and documents",
-      );
+      throw httpError(500, "[UPDATE_USER_DOCS_ERROR] Failed to update user and documents");
     }
   }
 
@@ -305,7 +290,7 @@ export abstract class User {
    */
   static async editProfile(
     clerkId: string,
-    payload: UserModel.EditUserProfileBody,
+    payload: UserModel.EditUserProfileBody
   ): Promise<UserModel.BasicSuccessResponse> {
     try {
       // Resolve internal user
@@ -365,10 +350,7 @@ export abstract class User {
    * @param email New primary email to set
    * @returns Object containing the updated email (for route schema compatibility)
    */
-  static async updateEmail(
-    clerkId: string,
-    email: string,
-  ): Promise<UserModel.SignUpResponse> {
+  static async updateEmail(clerkId: string, email: string): Promise<UserModel.SignUpResponse> {
     try {
       // Resolve target user
       const user = await db.query.users.findFirst({
@@ -393,10 +375,7 @@ export abstract class User {
       }
 
       // Update
-      await db
-        .update(users)
-        .set({ email, updatedAt: new Date() })
-        .where(eq(users.id, user.id));
+      await db.update(users).set({ email, updatedAt: new Date() }).where(eq(users.id, user.id));
 
       return { email };
     } catch (error: any) {

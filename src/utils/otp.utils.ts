@@ -1,4 +1,4 @@
-import { logger } from './logger';
+import { logger } from "./logger";
 
 /**
  * Utility functions for OTP generation and validation
@@ -14,7 +14,7 @@ export class OtpUtils {
     const min = 10 ** (length - 1);
     const max = 10 ** length - 1;
     const otp = Math.floor(min + Math.random() * (max - min + 1)).toString();
-    
+
     logger.debug(`Generated OTP: ${otp}`);
     return otp;
   }
@@ -49,12 +49,12 @@ export class OtpUtils {
    */
   static validateOtp(inputOtp: string, storedOtp: string | null, expiryTime: Date | null): boolean {
     if (!storedOtp || !expiryTime) {
-      logger.debug('No stored OTP or expiry time found');
+      logger.debug("No stored OTP or expiry time found");
       return false;
     }
 
     if (OtpUtils.isOtpExpired(expiryTime)) {
-      logger.debug('OTP has expired');
+      logger.debug("OTP has expired");
       return false;
     }
 

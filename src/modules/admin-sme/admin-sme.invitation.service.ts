@@ -1,9 +1,9 @@
-import type { AdminSMEModel } from "./admin-sme.model";
-import { db } from "../../db";
-import { users, businessProfiles } from "../../db/schema";
-import { logger } from "../../utils/logger";
-import { eq, and, isNull } from "drizzle-orm";
 import { clerkClient } from "@clerk/fastify";
+import { and, eq, isNull } from "drizzle-orm";
+import { db } from "../../db";
+import { businessProfiles, users } from "../../db/schema";
+import { logger } from "../../utils/logger";
+import type { AdminSMEModel } from "./admin-sme.model";
 import { httpError } from "./admin-sme.utils";
 
 /**
@@ -17,7 +17,7 @@ export abstract class AdminSMEInvitationService {
    */
   static async sendSMEInvitation(
     userId: string,
-    adminClerkId: string,
+    _adminClerkId: string
   ): Promise<AdminSMEModel.InvitationResponse> {
     try {
       // Verify user exists
@@ -31,14 +31,14 @@ export abstract class AdminSMEInvitationService {
 
       // Check if user has a business (required before sending invitation)
       const business = await db.query.businessProfiles.findFirst({
-        where: and(
-          eq(businessProfiles.userId, userId),
-          isNull(businessProfiles.deletedAt)
-        ),
+        where: and(eq(businessProfiles.userId, userId), isNull(businessProfiles.deletedAt)),
       });
 
       if (!business) {
-        throw httpError(400, "[NO_BUSINESS] User must have a business profile before invitation can be sent. Please complete Step 2 first.");
+        throw httpError(
+          400,
+          "[NO_BUSINESS] User must have a business profile before invitation can be sent. Please complete Step 2 first."
+        );
       }
 
       // Check if user already has an active Clerk account
@@ -54,7 +54,7 @@ export abstract class AdminSMEInvitationService {
           {
             userId,
             email: user.email,
-          },
+          }
         );
       }
 
@@ -100,10 +100,13 @@ export abstract class AdminSMEInvitationService {
 
         // If Clerk reports a duplicate invitation, try to revoke existing and create a fresh one
         if (String(clerkMessage).toLowerCase().includes("duplicate invitation")) {
-          logger.warn("[AdminSME Invitation] Duplicate invitation detected, attempting revoke + resend", {
-            email: user.email,
-            userId,
-          });
+          logger.warn(
+            "[AdminSME Invitation] Duplicate invitation detected, attempting revoke + resend",
+            {
+              email: user.email,
+              userId,
+            }
+          );
 
           try {
             // Best-effort: list active invitations for this email and revoke them
@@ -147,7 +150,7 @@ export abstract class AdminSMEInvitationService {
             const err: any = new Error(
               reissueError?.errors?.[0]?.message ||
                 reissueError?.message ||
-                "Failed to reissue invitation",
+                "Failed to reissue invitation"
             );
             err.status = reissueError?.status || 400;
             logger.error("[AdminSME Invitation] Failed to reissue invitation after duplicate", {
@@ -197,5 +200,3 @@ export abstract class AdminSMEInvitationService {
     }
   }
 }
-
-

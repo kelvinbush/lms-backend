@@ -1,5 +1,5 @@
-import { pgTable, text, timestamp, integer, varchar, index } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import { index, integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { businessProfiles } from "./businessProfiles";
 
 /**
@@ -9,7 +9,9 @@ import { businessProfiles } from "./businessProfiles";
 export const businessPhotos = pgTable(
   "business_photos",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     businessId: varchar("business_id", { length: 24 })
       .notNull()
       .references(() => businessProfiles.id, { onDelete: "cascade" }),
@@ -32,6 +34,5 @@ export const businessPhotos = pgTable(
       ),
       idxBusinessPhotosCreated: index("idx_business_photos_created").on(table.createdAt),
     };
-  },
+  }
 );
-

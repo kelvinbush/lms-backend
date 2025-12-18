@@ -1,5 +1,5 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getAuth } from "@clerk/fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { DocumentRequestService } from "../modules/document-requests/document-request.service";
 import { UserModel } from "../modules/user/user.model";
 import { logger } from "../utils/logger";
@@ -16,12 +16,12 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
           properties: {
             loanApplicationId: { type: "string", minLength: 1 },
             requestedFrom: { type: "string", minLength: 1 },
-            documentType: { 
-              type: "string", 
+            documentType: {
+              type: "string",
               enum: [
                 // Personal documents
                 "national_id_front",
-                "national_id_back", 
+                "national_id_back",
                 "passport_bio_page",
                 "drivers_license",
                 "utility_bill",
@@ -40,8 +40,8 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
                 "annual_bank_statement",
                 "audited_financial_statements",
                 // Other
-                "other"
-              ]
+                "other",
+              ],
             },
             description: { type: "string", minLength: 1, maxLength: 1000 },
             isRequired: { type: "boolean" },
@@ -70,7 +70,18 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
                   createdAt: { type: "string" },
                   updatedAt: { type: "string" },
                 },
-                required: ["id", "loanApplicationId", "requestedBy", "requestedFrom", "documentType", "description", "isRequired", "status", "createdAt", "updatedAt"],
+                required: [
+                  "id",
+                  "loanApplicationId",
+                  "requestedBy",
+                  "requestedFrom",
+                  "documentType",
+                  "description",
+                  "isRequired",
+                  "status",
+                  "createdAt",
+                  "updatedAt",
+                ],
               },
             },
             required: ["success", "message", "data"],
@@ -123,9 +134,12 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
         }
         return reply
           .code(500)
-          .send({ error: "Failed to create document request", code: "CREATE_DOCUMENT_REQUEST_FAILED" });
+          .send({
+            error: "Failed to create document request",
+            code: "CREATE_DOCUMENT_REQUEST_FAILED",
+          });
       }
-    },
+    }
   );
 
   // FULFILL document request
@@ -170,7 +184,18 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
                   createdAt: { type: "string" },
                   updatedAt: { type: "string" },
                 },
-                required: ["id", "loanApplicationId", "requestedBy", "requestedFrom", "documentType", "description", "isRequired", "status", "createdAt", "updatedAt"],
+                required: [
+                  "id",
+                  "loanApplicationId",
+                  "requestedBy",
+                  "requestedFrom",
+                  "documentType",
+                  "description",
+                  "isRequired",
+                  "status",
+                  "createdAt",
+                  "updatedAt",
+                ],
               },
             },
             required: ["success", "message", "data"],
@@ -213,9 +238,12 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
         }
         return reply
           .code(500)
-          .send({ error: "Failed to fulfill document request", code: "FULFILL_DOCUMENT_REQUEST_FAILED" });
+          .send({
+            error: "Failed to fulfill document request",
+            code: "FULFILL_DOCUMENT_REQUEST_FAILED",
+          });
       }
-    },
+    }
   );
 
   // GET pending document requests for a user
@@ -254,7 +282,18 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
                     createdAt: { type: "string" },
                     updatedAt: { type: "string" },
                   },
-                  required: ["id", "loanApplicationId", "requestedBy", "requestedFrom", "documentType", "description", "isRequired", "status", "createdAt", "updatedAt"],
+                  required: [
+                    "id",
+                    "loanApplicationId",
+                    "requestedBy",
+                    "requestedFrom",
+                    "documentType",
+                    "description",
+                    "isRequired",
+                    "status",
+                    "createdAt",
+                    "updatedAt",
+                  ],
                 },
               },
             },
@@ -294,9 +333,12 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
         }
         return reply
           .code(500)
-          .send({ error: "Failed to get pending document requests", code: "GET_PENDING_DOCUMENT_REQUESTS_FAILED" });
+          .send({
+            error: "Failed to get pending document requests",
+            code: "GET_PENDING_DOCUMENT_REQUESTS_FAILED",
+          });
       }
-    },
+    }
   );
 
   // GET document request by ID
@@ -333,7 +375,18 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
                   createdAt: { type: "string" },
                   updatedAt: { type: "string" },
                 },
-                required: ["id", "loanApplicationId", "requestedBy", "requestedFrom", "documentType", "description", "isRequired", "status", "createdAt", "updatedAt"],
+                required: [
+                  "id",
+                  "loanApplicationId",
+                  "requestedBy",
+                  "requestedFrom",
+                  "documentType",
+                  "description",
+                  "isRequired",
+                  "status",
+                  "createdAt",
+                  "updatedAt",
+                ],
               },
             },
             required: ["success", "message", "data"],
@@ -374,6 +427,6 @@ export async function documentRequestsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to get document request", code: "GET_DOCUMENT_REQUEST_FAILED" });
       }
-    },
+    }
   );
 }

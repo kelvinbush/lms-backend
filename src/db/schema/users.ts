@@ -1,5 +1,14 @@
-import { pgTable, text, timestamp, varchar, index, boolean, pgEnum, integer } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import {
+  boolean,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/pg-core";
 
 // Enum for onboarding status
 export const onboardingStatusEnum = pgEnum("onboarding_status", [
@@ -11,7 +20,9 @@ export const onboardingStatusEnum = pgEnum("onboarding_status", [
 export const users = pgTable(
   "users",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     clerkId: varchar("clerk_id", { length: 64 }).unique(), // Nullable for draft users
     firstName: varchar("first_name", { length: 100 }),
     lastName: varchar("last_name", { length: 100 }),
@@ -40,7 +51,7 @@ export const users = pgTable(
       idxUsersCreatedAt: index("idx_users_created_at").on(table.createdAt),
       idxUsersOnboardingStatus: index("idx_users_onboarding_status").on(table.onboardingStatus),
     };
-  },
+  }
 );
 
 // Type export for use in application code

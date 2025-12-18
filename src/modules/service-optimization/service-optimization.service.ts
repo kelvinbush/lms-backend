@@ -1,6 +1,6 @@
-import { logger } from '../../utils/logger';
-import { CachingService } from '../caching/caching.service';
-import { SerializationService } from '../serialization/serialization.service';
+import { logger } from "../../utils/logger";
+import { CachingService } from "../caching/caching.service";
+import { SerializationService } from "../serialization/serialization.service";
 
 export interface OptimizationOptions {
   enableCaching?: boolean;
@@ -33,7 +33,7 @@ export abstract class ServiceOptimizationService {
     enableCaching: true,
     cacheTTL: 5 * 60, // 5 minutes
     enableSerializationOptimization: true,
-    serializationPreset: 'apiResponse',
+    serializationPreset: "apiResponse",
     enableParallelExecution: true,
     enableBatchProcessing: false,
     batchSize: 100,
@@ -63,7 +63,7 @@ export abstract class ServiceOptimizationService {
         if (cached !== null) {
           cacheHit = true;
           const executionTime = Date.now() - startTime;
-          
+
           return {
             data: cached,
             metrics: {
@@ -106,7 +106,9 @@ export abstract class ServiceOptimizationService {
 
       // Log performance metrics if enabled
       if (opts.enablePerformanceMonitoring) {
-        logger.info(`Service method ${methodName} completed in ${executionTime}ms, cache: ${cacheHit ? 'HIT' : 'MISS'}, size: ${dataSize} bytes`);
+        logger.info(
+          `Service method ${methodName} completed in ${executionTime}ms, cache: ${cacheHit ? "HIT" : "MISS"}, size: ${dataSize} bytes`
+        );
       }
 
       return {
@@ -143,13 +145,13 @@ export abstract class ServiceOptimizationService {
     const batchSize = opts.batchSize || 100;
     const results: R[] = [];
     let cacheHits = 0;
-    let cacheMisses = 0;
+    let _cacheMisses = 0;
 
     try {
       // Process items in batches
       for (let i = 0; i < items.length; i += batchSize) {
         const batch = items.slice(i, i + batchSize);
-        
+
         if (opts.enableCaching) {
           // Check cache for each item in batch
           const cachePromises = batch.map(async (item) => {
@@ -159,20 +161,22 @@ export abstract class ServiceOptimizationService {
               cacheHits++;
               return { item, result: cached, cached: true };
             }
-            cacheMisses++;
+            _cacheMisses++;
             return { item, result: null, cached: false };
           });
 
           const cacheResults = await Promise.all(cachePromises);
-          const cachedResults = cacheResults.filter(r => r.cached && r.result !== null).map(r => r.result as R);
-          const uncachedItems = cacheResults.filter(r => !r.cached).map(r => r.item);
+          const cachedResults = cacheResults
+            .filter((r) => r.cached && r.result !== null)
+            .map((r) => r.result as R);
+          const uncachedItems = cacheResults.filter((r) => !r.cached).map((r) => r.item);
 
           results.push(...cachedResults);
 
           // Process uncached items
           if (uncachedItems.length > 0) {
             const batchResults = await batchProcessor(uncachedItems);
-            
+
             // Cache the results
             const cachePromises = uncachedItems.map(async (item, index) => {
               const cacheKey = cacheKeyGenerator(item);
@@ -195,7 +199,9 @@ export abstract class ServiceOptimizationService {
       const cacheHitRatio = totalItems > 0 ? (cacheHits / totalItems) * 100 : 0;
 
       if (opts.enablePerformanceMonitoring) {
-        logger.info(`Batch method ${methodName} completed in ${executionTime}ms, processed ${totalItems} items, cache hit ratio: ${cacheHitRatio.toFixed(2)}%`);
+        logger.info(
+          `Batch method ${methodName} completed in ${executionTime}ms, processed ${totalItems} items, cache hit ratio: ${cacheHitRatio.toFixed(2)}%`
+        );
       }
 
       return {
@@ -230,10 +236,10 @@ export abstract class ServiceOptimizationService {
 
     try {
       let results: R[];
-      
+
       if (opts.enableParallelExecution) {
         // Execute all items in parallel
-        const promises = items.map(item => processor(item));
+        const promises = items.map((item) => processor(item));
         results = await Promise.all(promises);
       } else {
         // Execute items sequentially
@@ -247,7 +253,9 @@ export abstract class ServiceOptimizationService {
       const executionTime = Date.now() - startTime;
 
       if (opts.enablePerformanceMonitoring) {
-        logger.info(`Parallel method ${methodName} completed in ${executionTime}ms, processed ${items.length} items`);
+        logger.info(
+          `Parallel method ${methodName} completed in ${executionTime}ms, processed ${items.length} items`
+        );
       }
 
       return {
@@ -323,8 +331,10 @@ export abstract class ServiceOptimizationService {
           const executionTime = endTime - startTime;
           const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
 
-          logger.info(`Performance monitor ${name}: ${executionTime}ms, memory delta: ${memoryDelta} bytes`);
-          
+          logger.info(
+            `Performance monitor ${name}: ${executionTime}ms, memory delta: ${memoryDelta} bytes`
+          );
+
           return {
             executionTime,
             memoryDelta,
@@ -347,7 +357,7 @@ export abstract class ServiceOptimizationService {
       enableCaching: true,
       cacheTTL: 10 * 60, // 10 minutes
       enableSerializationOptimization: true,
-      serializationPreset: 'minimal' as const,
+      serializationPreset: "minimal" as const,
       enableParallelExecution: true,
       enableBatchProcessing: true,
       batchSize: 50,
@@ -361,7 +371,7 @@ export abstract class ServiceOptimizationService {
       enableCaching: true,
       cacheTTL: 5 * 60, // 5 minutes
       enableSerializationOptimization: true,
-      serializationPreset: 'apiResponse' as const,
+      serializationPreset: "apiResponse" as const,
       enableParallelExecution: true,
       enableBatchProcessing: false,
       enablePerformanceMonitoring: false,

@@ -1,5 +1,5 @@
-import AfricasTalking from 'africastalking';
-import { logger } from '../utils/logger';
+import AfricasTalking from "africastalking";
+import { logger } from "../utils/logger";
 
 /**
  * SMS Service for handling all SMS operations using Africa's Talking API
@@ -9,11 +9,11 @@ export class SmsService {
   private sms: any;
 
   private constructor() {
-    const username = process.env.AT_USERNAME || '';
-    const apiKey = process.env.AT_API_KEY || '';
+    const username = process.env.AT_USERNAME || "";
+    const apiKey = process.env.AT_API_KEY || "";
 
     if (!username || !apiKey) {
-      logger.warn('Africa\'s Talking credentials not found. SMS service will not work properly.');
+      logger.warn("Africa's Talking credentials not found. SMS service will not work properly.");
     }
 
     // Initialize the SDK

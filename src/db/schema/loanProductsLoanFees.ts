@@ -1,7 +1,7 @@
-import { pgTable, timestamp, varchar, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
-import { loanProducts } from "./loanProducts";
+import { index, pgTable, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { loanFees } from "./loanFees";
+import { loanProducts } from "./loanProducts";
 
 /**
  * Junction table for many-to-many relationship between loan products and loan fees
@@ -10,7 +10,9 @@ import { loanFees } from "./loanFees";
 export const loanProductsLoanFees = pgTable(
   "loan_products_loan_fees",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     loanProductId: varchar("loan_product_id", { length: 24 })
       .notNull()
       .references(() => loanProducts.id, { onDelete: "cascade" }),
@@ -35,5 +37,5 @@ export const loanProductsLoanFees = pgTable(
         table.createdAt
       ),
     };
-  },
+  }
 );

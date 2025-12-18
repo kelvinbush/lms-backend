@@ -1,10 +1,10 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getAuth } from "@clerk/fastify";
-import { logger } from "../utils/logger";
-import { Documents } from "../modules/documents/documents.service";
-import { DocumentsModel } from "../modules/documents/documents.model";
-import { UserModel } from "../modules/user/user.model";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { CachingService } from "../modules/caching/caching.service";
+import { DocumentsModel } from "../modules/documents/documents.model";
+import { Documents } from "../modules/documents/documents.service";
+import { UserModel } from "../modules/user/user.model";
+import { logger } from "../utils/logger";
 
 export async function documentsRoutes(fastify: FastifyInstance) {
   // POST /documents — upsert one or many personal documents
@@ -30,16 +30,22 @@ export async function documentsRoutes(fastify: FastifyInstance) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
 
-        const result = await Documents.upsert(userId, request.body as DocumentsModel.AddDocumentsBody);
-        
+        const result = await Documents.upsert(
+          userId,
+          request.body as DocumentsModel.AddDocumentsBody
+        );
+
         // Invalidate personal documents cache for this user
         try {
           await CachingService.invalidatePattern(`personal_documents:${userId}:*`);
           logger.debug(`Cache invalidated for personal documents of user ${userId}`);
         } catch (cacheError) {
-          logger.error(`Error invalidating cache for personal documents of user ${userId}:`, cacheError);
+          logger.error(
+            `Error invalidating cache for personal documents of user ${userId}:`,
+            cacheError
+          );
         }
-        
+
         return reply.send(result);
       } catch (error: any) {
         logger.error("Error upserting personal documents:", error);
@@ -53,7 +59,7 @@ export async function documentsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to upsert documents", code: "UPSERT_DOCUMENTS_FAILED" });
       }
-    },
+    }
   );
 
   // GET /documents — list all active personal documents
@@ -92,6 +98,6 @@ export async function documentsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to list documents", code: "LIST_DOCUMENTS_FAILED" });
       }
-    },
+    }
   );
 }

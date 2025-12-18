@@ -1,30 +1,30 @@
 export namespace LoanFeesModel {
   export interface CreateLoanFeeBody {
     name: string; // Required, max 255 chars
-    calculationMethod: 'flat' | 'percentage';
+    calculationMethod: "flat" | "percentage";
     rate: number; // Required, fee rate/percentage
-    collectionRule: 'upfront' | 'end_of_term';
+    collectionRule: "upfront" | "end_of_term";
     allocationMethod: string; // e.g., "first_installment", "spread_installments"
-    calculationBasis: 'principal' | 'total_disbursed';
+    calculationBasis: "principal" | "total_disbursed";
   }
 
   export interface UpdateLoanFeeBody {
     name?: string;
-    calculationMethod?: 'flat' | 'percentage';
+    calculationMethod?: "flat" | "percentage";
     rate?: number;
-    collectionRule?: 'upfront' | 'end_of_term';
+    collectionRule?: "upfront" | "end_of_term";
     allocationMethod?: string;
-    calculationBasis?: 'principal' | 'total_disbursed';
+    calculationBasis?: "principal" | "total_disbursed";
   }
 
   export interface LoanFeeItem {
     id: string;
     name: string;
-    calculationMethod: 'flat' | 'percentage';
+    calculationMethod: "flat" | "percentage";
     rate: number;
-    collectionRule: 'upfront' | 'end_of_term';
+    collectionRule: "upfront" | "end_of_term";
     allocationMethod: string;
-    calculationBasis: 'principal' | 'total_disbursed';
+    calculationBasis: "principal" | "total_disbursed";
     isArchived: boolean;
     createdAt: string; // ISO 8601 timestamp
     updatedAt: string; // ISO 8601 timestamp
@@ -56,7 +56,14 @@ export namespace LoanFeesModel {
       allocationMethod: { type: "string", minLength: 1 },
       calculationBasis: { type: "string", enum: ["principal", "total_disbursed"] },
     },
-    required: ["name", "calculationMethod", "rate", "collectionRule", "allocationMethod", "calculationBasis"],
+    required: [
+      "name",
+      "calculationMethod",
+      "rate",
+      "collectionRule",
+      "allocationMethod",
+      "calculationBasis",
+    ],
   } as const;
 
   export const UpdateLoanFeeBodySchema = {
@@ -87,7 +94,18 @@ export namespace LoanFeesModel {
       createdAt: { type: "string" },
       updatedAt: { type: "string" },
     },
-    required: ["id", "name", "calculationMethod", "rate", "collectionRule", "allocationMethod", "calculationBasis", "isArchived", "createdAt", "updatedAt"],
+    required: [
+      "id",
+      "name",
+      "calculationMethod",
+      "rate",
+      "collectionRule",
+      "allocationMethod",
+      "calculationBasis",
+      "isArchived",
+      "createdAt",
+      "updatedAt",
+    ],
     additionalProperties: true,
   } as const;
 

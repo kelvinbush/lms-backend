@@ -1,5 +1,5 @@
-import type { UserModel } from "./user.model";
 import type { WebhookEvent } from "@clerk/fastify";
+import type { UserModel } from "./user.model";
 
 // Define proper types for Clerk webhook data
 interface ClerkEmailAddress {
@@ -43,9 +43,7 @@ export interface UserDataExtractionResult {
  * @param event The Clerk webhook event
  * @returns UserDataExtractionResult with success status and user data or error
  */
-export const extractUserDataFromWebhook = (
-  event: WebhookEvent,
-): UserDataExtractionResult => {
+export const extractUserDataFromWebhook = (event: WebhookEvent): UserDataExtractionResult => {
   try {
     // Cast data to our defined type for better type safety
     const data = event.data as ClerkUserData;
@@ -60,8 +58,8 @@ export const extractUserDataFromWebhook = (
 
     // Find primary email with proper type safety
     const primaryEmail = Array.isArray(email_addresses)
-      ? (email_addresses.find((e) => e.id === primary_email_address_id)
-          ?.email_address ?? email_addresses[0]?.email_address)
+      ? (email_addresses.find((e) => e.id === primary_email_address_id)?.email_address ??
+        email_addresses[0]?.email_address)
       : undefined;
 
     // Extract metadata
@@ -122,7 +120,7 @@ export const extractUserDataFromWebhook = (
       success: true,
       userData,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       success: false,
       error: {
@@ -137,7 +135,7 @@ export const extractUserDataFromWebhook = (
  * Extracts clerkId and primary email from any Clerk user webhook event (e.g. user.updated)
  */
 export const extractEmailUpdateFromWebhook = (
-  event: WebhookEvent,
+  event: WebhookEvent
 ): {
   success: boolean;
   clerkId?: string;
@@ -150,10 +148,8 @@ export const extractEmailUpdateFromWebhook = (
     const { email_addresses, primary_email_address_id } = data;
 
     const primaryEmail = Array.isArray(email_addresses)
-      ? (
-          email_addresses.find((e) => e.id === primary_email_address_id)
-            ?.email_address ?? email_addresses[0]?.email_address
-        )
+      ? (email_addresses.find((e) => e.id === primary_email_address_id)?.email_address ??
+        email_addresses[0]?.email_address)
       : undefined;
 
     if (!clerkId || !primaryEmail) {
@@ -167,7 +163,7 @@ export const extractEmailUpdateFromWebhook = (
     }
 
     return { success: true, clerkId, email: primaryEmail };
-  } catch (error) {
+  } catch (_error) {
     return {
       success: false,
       error: {

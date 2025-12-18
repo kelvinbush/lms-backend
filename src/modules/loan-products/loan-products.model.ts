@@ -1,13 +1,13 @@
 import {
+  amortizationMethodEnum,
+  gracePeriodUnitEnum,
+  interestCollectionMethodEnum,
+  interestRatePeriodEnum,
+  interestRecognitionCriteriaEnum,
   type loanProducts,
   loanTermUnitEnum,
-  interestRatePeriodEnum,
-  repaymentFrequencyEnum,
-  amortizationMethodEnum,
-  interestCollectionMethodEnum,
-  interestRecognitionCriteriaEnum,
-  gracePeriodUnitEnum,
   productStatusEnum,
+  repaymentFrequencyEnum,
 } from "../../db/schema";
 
 export namespace LoanProductsModel {
@@ -23,9 +23,11 @@ export namespace LoanProductsModel {
   export const AmortizationMethodEnum = amortizationMethodEnum.enumValues;
   export type AmortizationMethod = (typeof loanProducts.$inferSelect)["amortizationMethod"];
   export const InterestCollectionMethodEnum = interestCollectionMethodEnum.enumValues;
-  export type InterestCollectionMethod = (typeof loanProducts.$inferSelect)["interestCollectionMethod"];
+  export type InterestCollectionMethod =
+    (typeof loanProducts.$inferSelect)["interestCollectionMethod"];
   export const InterestRecognitionCriteriaEnum = interestRecognitionCriteriaEnum.enumValues;
-  export type InterestRecognitionCriteria = (typeof loanProducts.$inferSelect)["interestRecognitionCriteria"];
+  export type InterestRecognitionCriteria =
+    (typeof loanProducts.$inferSelect)["interestRecognitionCriteria"];
   export const GracePeriodUnitEnum = gracePeriodUnitEnum.enumValues;
   export type GracePeriodUnit = (typeof loanProducts.$inferSelect)["maxGraceUnit"];
 
@@ -37,11 +39,11 @@ export namespace LoanProductsModel {
   export interface LoanFeeConfiguration {
     loanFeeId?: string; // Optional, ID of existing loan fee
     feeName?: string; // Required if loanFeeId not provided
-    calculationMethod: 'flat' | 'percentage';
+    calculationMethod: "flat" | "percentage";
     rate: number;
-    collectionRule: 'upfront' | 'end_of_term';
+    collectionRule: "upfront" | "end_of_term";
     allocationMethod: string;
-    calculationBasis: 'principal' | 'total_disbursed';
+    calculationBasis: "principal" | "total_disbursed";
   }
 
   // Create product input
@@ -55,8 +57,8 @@ export namespace LoanProductsModel {
     currency: string; // ISO 4217 preferred
     minAmount: number; // decimal
     maxAmount: number; // decimal
-    minTerm: number;   // integer, in termUnit
-    maxTerm: number;   // integer, in termUnit
+    minTerm: number; // integer, in termUnit
+    maxTerm: number; // integer, in termUnit
     termUnit: LoanTermUnit;
     availabilityStartDate?: string; // ISO 8601 date string (YYYY-MM-DD)
     availabilityEndDate?: string; // ISO 8601 date string (YYYY-MM-DD)
@@ -104,7 +106,9 @@ export namespace LoanProductsModel {
   }
 
   // Params with :id
-  export interface LoanProductIdParams { id: string; }
+  export interface LoanProductIdParams {
+    id: string;
+  }
 
   // Query parameters for listing products
   export interface ListLoanProductsQuery {
@@ -167,7 +171,13 @@ export namespace LoanProductsModel {
             allocationMethod: { type: "string" },
             calculationBasis: { type: "string", enum: ["principal", "total_disbursed"] },
           },
-          required: ["calculationMethod", "rate", "collectionRule", "allocationMethod", "calculationBasis"],
+          required: [
+            "calculationMethod",
+            "rate",
+            "collectionRule",
+            "allocationMethod",
+            "calculationBasis",
+          ],
         },
       },
       status: { type: "string", enum: ProductStatusEnum },

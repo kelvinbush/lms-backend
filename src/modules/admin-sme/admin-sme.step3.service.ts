@@ -1,15 +1,9 @@
-import type { AdminSMEModel } from "./admin-sme.model";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
-import {
-  users,
-  businessProfiles,
-  smeOnboardingProgress,
-  businessCountries,
-} from "../../db/schema";
+import { businessCountries, businessProfiles, smeOnboardingProgress, users } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { eq, and, isNull } from "drizzle-orm";
+import type { AdminSMEModel } from "./admin-sme.model";
 import { httpError } from "./admin-sme.utils";
-import { AdminSMEService } from "./admin-sme.service";
 
 /**
  * Step 3: Location Info Service
@@ -21,7 +15,7 @@ export abstract class AdminSMEStep3Service {
    */
   static async saveLocationInfo(
     userId: string,
-    payload: AdminSMEModel.Step3LocationInfoBody,
+    payload: AdminSMEModel.Step3LocationInfoBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
       // Execute in transaction - all queries inside for consistency and performance
@@ -37,14 +31,14 @@ export abstract class AdminSMEStep3Service {
 
         // Get existing business (must exist from Step 2)
         const business = await tx.query.businessProfiles.findFirst({
-          where: and(
-            eq(businessProfiles.userId, userId),
-            isNull(businessProfiles.deletedAt)
-          ),
+          where: and(eq(businessProfiles.userId, userId), isNull(businessProfiles.deletedAt)),
         });
 
         if (!business) {
-          throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found. Please complete Step 2 first.");
+          throw httpError(
+            404,
+            "[BUSINESS_NOT_FOUND] Business not found. Please complete Step 2 first."
+          );
         }
 
         // Get existing progress to compute completed steps
@@ -177,7 +171,9 @@ export abstract class AdminSMEStep3Service {
                 ? Number(updatedBusiness.avgYearlyTurnover)
                 : null,
               previousLoans: updatedBusiness.borrowingHistory ?? null,
-              loanAmount: updatedBusiness.amountBorrowed ? Number(updatedBusiness.amountBorrowed) : null,
+              loanAmount: updatedBusiness.amountBorrowed
+                ? Number(updatedBusiness.amountBorrowed)
+                : null,
               defaultCurrency: updatedBusiness.currency ?? null,
               recentLoanStatus: updatedBusiness.loanStatus ?? null,
               defaultReason: updatedBusiness.defaultReason ?? null,
@@ -194,4 +190,3 @@ export abstract class AdminSMEStep3Service {
     }
   }
 }
-

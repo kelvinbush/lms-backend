@@ -1,6 +1,6 @@
+import type { WebhookEvent } from "@clerk/fastify";
 import { Webhook } from "svix";
 import { logger } from "./logger";
-import type { WebhookEvent } from "@clerk/fastify";
 
 export interface WebhookVerificationResult {
   success: boolean;
@@ -55,7 +55,7 @@ export const verifyClerkWebhook = (
     const wh = new Webhook(WEBHOOK_SECRET);
 
     // Use raw payload when provided; fallback to JSON stringified body
-    const payload = typeof body === 'string' ? body : JSON.stringify(body);
+    const payload = typeof body === "string" ? body : JSON.stringify(body);
 
     const evt: WebhookEvent = wh.verify(payload, {
       "svix-id": svix_id,

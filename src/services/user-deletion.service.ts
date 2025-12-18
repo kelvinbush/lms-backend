@@ -1,8 +1,13 @@
+import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { users, personalDocuments, businessProfiles, loanApplicationSnapshots, applicationAuditTrail, documentRequests, investorOpportunityBookmarks, loanApplications, offerLetters } from "../db/schema";
-import { eq, or } from "drizzle-orm";
-import { logger } from "../utils/logger";
+import {
+  businessProfiles,
+  investorOpportunityBookmarks,
+  personalDocuments,
+  users,
+} from "../db/schema";
 import { CachingService } from "../modules/caching/caching.service";
+import { logger } from "../utils/logger";
 
 export class UserDeletionService {
   static async deleteUserAndAllRelatedData(clerkId: string): Promise<void> {
@@ -21,88 +26,42 @@ export class UserDeletionService {
       const userId = user.id;
       logger.info("Found user for deletion", { userId, clerkId });
 
-      // Get all loan applications before deletion (needed for cache invalidation)
-      const userLoanApplications = await db.query.loanApplications.findMany({
-        where: eq(loanApplications.userId, userId),
-      });
-
       // Wrap all deletions in a transaction
       await db.transaction(async (tx) => {
-
-        await tx
-          .delete(documentRequests)
-          .where(
-            or(
-              eq(documentRequests.requestedBy, userId),
-              eq(documentRequests.requestedFrom, userId)
-            )
-          );
-        logger.info("Deleted document requests", { userId });
+        // TODO: Re-add loan application related deletions when loan applications are re-implemented
+        // This includes: documentRequests, loanApplicationSnapshots, applicationAuditTrail,
+        // loanApplications, offerLetters
 
         await tx
           .delete(investorOpportunityBookmarks)
           .where(eq(investorOpportunityBookmarks.userId, userId));
         logger.info("Deleted investor opportunity bookmarks", { userId });
 
-        await tx
-          .delete(loanApplicationSnapshots)
-          .where(eq(loanApplicationSnapshots.createdBy, userId));
-        logger.info("Deleted loan application snapshots", { userId });
-
-        await tx
-          .delete(applicationAuditTrail)
-          .where(eq(applicationAuditTrail.userId, userId));
-        logger.info("Deleted audit trail entries", { userId });
-
-        const userLoanApplications = await tx.query.loanApplications.findMany({
-          where: eq(loanApplications.userId, userId),
-        });
-
-        if (userLoanApplications.length > 0) {
-          const loanAppIds = userLoanApplications.map((app) => app.id);
-          await tx
-            .delete(offerLetters)
-            .where(
-              or(...loanAppIds.map((id) => eq(offerLetters.loanApplicationId, id)))
-            );
-          logger.info("Deleted offer letters", { userId });
-        }
-
-        await tx
-          .delete(loanApplications)
-          .where(eq(loanApplications.userId, userId));
-        logger.info("Deleted loan applications", { userId });
-
-        await tx
-          .delete(businessProfiles)
-          .where(eq(businessProfiles.userId, userId));
+        await tx.delete(businessProfiles).where(eq(businessProfiles.userId, userId));
         logger.info("Deleted business profiles", { userId });
 
-        await tx
-          .delete(personalDocuments)
-          .where(eq(personalDocuments.userId, userId));
+        await tx.delete(personalDocuments).where(eq(personalDocuments.userId, userId));
         logger.info("Deleted personal documents", { userId });
 
-        await tx
-          .delete(users)
-          .where(eq(users.id, userId));
+        await tx.delete(users).where(eq(users.id, userId));
         logger.info("Deleted user record", { userId, clerkId });
       });
 
-      logger.info("User deletion completed successfully", { userId, clerkId, transactionCommitted: true });
+      logger.info("User deletion completed successfully", {
+        userId,
+        clerkId,
+        transactionCommitted: true,
+      });
 
-      // Invalidate all cache entries for this user and their loan applications
+      // Invalidate all cache entries for this user
       try {
         logger.info("Invalidating cache for deleted user", { userId, clerkId });
-        
+
         // Invalidate user-specific cache
         await CachingService.invalidateUser(userId);
-        
-        // Invalidate cache for all loan applications owned by this user
-        for (const loanApp of userLoanApplications) {
-          await CachingService.invalidateLoanApplication(loanApp.id);
-        }
-        
+
+        // TODO: Re-add loan application cache invalidation when loan applications are re-implemented
+
         logger.info("Cache invalidation completed for deleted user", { userId, clerkId });
       } catch (cacheError) {
         logger.error("Error invalidating cache after user deletion", {

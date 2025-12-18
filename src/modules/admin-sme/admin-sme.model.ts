@@ -806,7 +806,7 @@ export namespace AdminSMEModel {
           onboardingStatus: { type: "string" },
           idNumber: { type: ["string", "null"] },
           taxNumber: { type: ["string", "null"] },
-          idType: { type: ["string", "null"] }, 
+          idType: { type: ["string", "null"] },
         },
         required: ["email", "onboardingStatus"],
       },
@@ -1064,4 +1064,3 @@ export namespace AdminSMEModel {
     required: ["userId", "user"],
   } as const;
 }
-

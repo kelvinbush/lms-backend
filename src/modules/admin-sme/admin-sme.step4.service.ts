@@ -1,14 +1,9 @@
-import type { AdminSMEModel } from "./admin-sme.model";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../db";
-import {
-  users,
-  personalDocuments,
-  smeOnboardingProgress,
-} from "../../db/schema";
+import { personalDocuments, smeOnboardingProgress, users } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import type { AdminSMEModel } from "./admin-sme.model";
 import { httpError } from "./admin-sme.utils";
-import { AdminSMEService } from "./admin-sme.service";
 
 /**
  * Step 4: Personal Documents Service
@@ -20,7 +15,7 @@ export abstract class AdminSMEStep4Service {
    */
   static async savePersonalDocuments(
     userId: string,
-    payload: AdminSMEModel.Step4PersonalDocumentsBody,
+    payload: AdminSMEModel.Step4PersonalDocumentsBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
       // Normalize to array and dedupe by docType (last one wins)
@@ -59,7 +54,10 @@ export abstract class AdminSMEStep4Service {
         const existing = await tx.query.personalDocuments.findMany({
           where: and(
             eq(personalDocuments.userId, user.id),
-            inArray(personalDocuments.docType, upserts.map((d) => d.docType)),
+            inArray(
+              personalDocuments.docType,
+              upserts.map((d) => d.docType)
+            ),
             isNull(personalDocuments.deletedAt)
           ),
           columns: { id: true, docType: true, docUrl: true },
@@ -204,4 +202,3 @@ export abstract class AdminSMEStep4Service {
     }
   }
 }
-

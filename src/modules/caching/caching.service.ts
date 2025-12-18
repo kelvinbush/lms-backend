@@ -1,4 +1,4 @@
-import { createClient, type RedisClientType } from 'redis';
+import { type RedisClientType, createClient } from "redis";
 import { logger } from "../../utils/logger";
 
 export abstract class CachingService {
@@ -16,36 +16,36 @@ export abstract class CachingService {
 
     try {
       CachingService.client = createClient({
-        url: process.env.REDIS_URL || 'redis://localhost:6379',
+        url: process.env.REDIS_URL || "redis://localhost:6379",
         socket: {
           reconnectStrategy: (retries) => {
             if (retries > 10) {
-              logger.error('Redis connection failed after 10 retries');
-              return new Error('Redis connection failed');
+              logger.error("Redis connection failed after 10 retries");
+              return new Error("Redis connection failed");
             }
             return Math.min(retries * 100, 3000);
           },
         },
       });
 
-      CachingService.client.on('error', (err) => {
-        logger.error('Redis Client Error:', err);
+      CachingService.client.on("error", (err) => {
+        logger.error("Redis Client Error:", err);
         CachingService.isConnected = false;
       });
 
-      CachingService.client.on('connect', () => {
-        logger.info('Redis client connected');
+      CachingService.client.on("connect", () => {
+        logger.info("Redis client connected");
         CachingService.isConnected = true;
       });
 
-      CachingService.client.on('disconnect', () => {
-        logger.warn('Redis client disconnected');
+      CachingService.client.on("disconnect", () => {
+        logger.warn("Redis client disconnected");
         CachingService.isConnected = false;
       });
 
       await CachingService.client.connect();
     } catch (error) {
-      logger.error('Failed to initialize Redis client:', error);
+      logger.error("Failed to initialize Redis client:", error);
       CachingService.isConnected = false;
       throw error;
     }
@@ -57,7 +57,7 @@ export abstract class CachingService {
   private static async getClient(): Promise<RedisClientType> {
     await CachingService.initializeClient();
     if (!CachingService.client || !CachingService.isConnected) {
-      throw new Error('Redis client not available');
+      throw new Error("Redis client not available");
     }
     return CachingService.client;
   }
@@ -70,7 +70,7 @@ export abstract class CachingService {
       const client = await CachingService.getClient();
       const ttl = ttlSeconds || CachingService.defaultTTL;
       const serializedValue = JSON.stringify(value);
-      
+
       await client.setEx(key, ttl, serializedValue);
       logger.debug(`Cache SET: ${key} (TTL: ${ttl}s)`);
     } catch (error) {
@@ -86,7 +86,7 @@ export abstract class CachingService {
     try {
       const client = await CachingService.getClient();
       const value = await client.get(key);
-      
+
       if (value === null) {
         logger.debug(`Cache MISS: ${key}`);
         return null;
@@ -108,7 +108,7 @@ export abstract class CachingService {
       const client = await CachingService.getClient();
       const result = await client.del(key);
       const deleted = result > 0;
-      
+
       if (deleted) {
         logger.debug(`Cache DELETE: ${key}`);
       }
@@ -144,16 +144,16 @@ export abstract class CachingService {
       const client = await CachingService.getClient();
       const info = await client.info();
       const keys: string[] = [];
-      let cursor = '0';
-      
+      let cursor = "0";
+
       // Use SCAN instead of KEYS to avoid permission issues
       do {
-        const result = await client.scan(cursor, { MATCH: '*', COUNT: 100 });
+        const result = await client.scan(cursor, { MATCH: "*", COUNT: 100 });
         cursor = result.cursor;
         keys.push(...result.keys);
         if (keys.length >= 100) break; // Limit to first 100 keys
-      } while (cursor !== '0');
-      
+      } while (cursor !== "0");
+
       return {
         connected: CachingService.isConnected,
         info: CachingService.parseRedisInfo(info),
@@ -171,16 +171,16 @@ export abstract class CachingService {
    * Parse Redis INFO command output
    */
   private static parseRedisInfo(info: string): any {
-    const lines = info.split('\r\n');
+    const lines = info.split("\r\n");
     const result: any = {};
-    
+
     for (const line of lines) {
-      if (line.includes(':')) {
-        const [key, value] = line.split(':');
+      if (line.includes(":")) {
+        const [key, value] = line.split(":");
         result[key] = value;
       }
     }
-    
+
     return result;
   }
 
@@ -198,43 +198,39 @@ export abstract class CachingService {
    * Cache key generators for common patterns
    */
   static generateKey(prefix: string, ...parts: (string | number)[]): string {
-    return `${prefix}:${parts.join(':')}`;
+    return `${prefix}:${parts.join(":")}`;
   }
 
   // Common cache key patterns
   static keys = {
-    user: (userId: string) => this.generateKey('user', userId),
-    loanApplication: (id: string) => this.generateKey('loan_application', id),
-    loanApplicationSummary: (id: string) => this.generateKey('loan_application_summary', id),
-    auditTrail: (loanApplicationId: string, params?: any) => 
-      this.generateKey('audit_trail', loanApplicationId, JSON.stringify(params || {})),
-    documentRequests: (loanApplicationId: string, params?: any) => 
-      this.generateKey('document_requests', loanApplicationId, JSON.stringify(params || {})),
-    snapshots: (loanApplicationId: string, params?: any) => 
-      this.generateKey('snapshots', loanApplicationId, JSON.stringify(params || {})),
-    documentStatistics: (loanApplicationId: string) => 
-      this.generateKey('document_statistics', loanApplicationId),
-    businessProfile: (businessId: string) => this.generateKey('business_profile', businessId),
-    personalDocuments: (userId: string) => this.generateKey('personal_documents', userId),
-    businessDocuments: (businessId: string) => this.generateKey('business_documents', businessId),
+    user: (userId: string) => this.generateKey("user", userId),
+    loanApplication: (id: string) => this.generateKey("loan_application", id),
+    loanApplicationSummary: (id: string) => this.generateKey("loan_application_summary", id),
+    auditTrail: (loanApplicationId: string, params?: any) =>
+      this.generateKey("audit_trail", loanApplicationId, JSON.stringify(params || {})),
+    documentRequests: (loanApplicationId: string, params?: any) =>
+      this.generateKey("document_requests", loanApplicationId, JSON.stringify(params || {})),
+    snapshots: (loanApplicationId: string, params?: any) =>
+      this.generateKey("snapshots", loanApplicationId, JSON.stringify(params || {})),
+    documentStatistics: (loanApplicationId: string) =>
+      this.generateKey("document_statistics", loanApplicationId),
+    businessProfile: (businessId: string) => this.generateKey("business_profile", businessId),
+    personalDocuments: (userId: string) => this.generateKey("personal_documents", userId),
+    businessDocuments: (businessId: string) => this.generateKey("business_documents", businessId),
   };
 
   /**
    * Cache wrapper for async functions
    */
-  static async withCache<T>(
-    key: string,
-    fn: () => Promise<T>,
-    ttlSeconds?: number
-  ): Promise<T> {
+  static async withCache<T>(key: string, fn: () => Promise<T>, ttlSeconds?: number): Promise<T> {
     // Try to get from cache first
     const cached = await CachingService.get<T>(key);
     if (cached !== null) {
       return cached;
     }
-      const result = await fn();
-      await CachingService.set(key, result, ttlSeconds);
-      return result;
+    const result = await fn();
+    await CachingService.set(key, result, ttlSeconds);
+    return result;
   }
 
   /**
@@ -244,15 +240,15 @@ export abstract class CachingService {
     try {
       const client = await CachingService.getClient();
       const keys: string[] = [];
-      let cursor = '0';
-      
+      let cursor = "0";
+
       // Use SCAN instead of KEYS to avoid permission issues
       do {
         const result = await client.scan(cursor, { MATCH: pattern, COUNT: 100 });
         cursor = result.cursor;
         keys.push(...result.keys);
-      } while (cursor !== '0');
-      
+      } while (cursor !== "0");
+
       if (keys.length > 0) {
         await client.del(keys);
         logger.debug(`Cache INVALIDATE PATTERN: ${pattern} (${keys.length} entries)`);
@@ -272,9 +268,9 @@ export abstract class CachingService {
     const patterns = [
       CachingService.keys.loanApplication(loanApplicationId),
       CachingService.keys.loanApplicationSummary(loanApplicationId),
-      CachingService.keys.auditTrail(loanApplicationId, '.*'),
-      CachingService.keys.documentRequests(loanApplicationId, '.*'),
-      CachingService.keys.snapshots(loanApplicationId, '.*'),
+      CachingService.keys.auditTrail(loanApplicationId, ".*"),
+      CachingService.keys.documentRequests(loanApplicationId, ".*"),
+      CachingService.keys.snapshots(loanApplicationId, ".*"),
       CachingService.keys.documentStatistics(loanApplicationId),
     ];
 
@@ -328,9 +324,9 @@ export abstract class CachingService {
       try {
         await CachingService.client.quit();
         CachingService.isConnected = false;
-        logger.info('Redis client disconnected gracefully');
+        logger.info("Redis client disconnected gracefully");
       } catch (error) {
-        logger.error('Error closing Redis client:', error);
+        logger.error("Error closing Redis client:", error);
       }
     }
   }

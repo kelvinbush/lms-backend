@@ -1,9 +1,15 @@
-import { and, eq, inArray, isNull, count, or, like, desc } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { db } from "../../db";
-import { userGroups, userGroupMembers, users, businessProfiles, businessUserGroups } from "../../db/schema";
-import type { UserGroupsModel } from "./user-groups.model";
+import {
+  businessProfiles,
+  businessUserGroups,
+  userGroupMembers,
+  userGroups,
+  users,
+} from "../../db/schema";
 import { logger } from "../../utils/logger";
 import { ResponseCachingService } from "../response-caching/response-caching.service";
+import type { UserGroupsModel } from "./user-groups.model";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -37,7 +43,7 @@ function mapRow(r: GroupRow, businessCount?: number): UserGroupsModel.GroupItem 
 export abstract class UserGroupsService {
   static async create(
     clerkId: string,
-    body: UserGroupsModel.CreateGroupBody,
+    body: UserGroupsModel.CreateGroupBody
   ): Promise<UserGroupsModel.GroupItem> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -99,7 +105,11 @@ export abstract class UserGroupsService {
     }
   }
 
-  static async list(): Promise<{ success: boolean; message: string; data: UserGroupsModel.GroupItem[] }> {
+  static async list(): Promise<{
+    success: boolean;
+    message: string;
+    data: UserGroupsModel.GroupItem[];
+  }> {
     try {
       // Optimized query: Get groups with business counts in a single query
       const rows = await db
@@ -113,10 +123,7 @@ export abstract class UserGroupsService {
           businessCount: count(businessUserGroups.id),
         })
         .from(userGroups)
-        .leftJoin(
-          businessUserGroups,
-          eq(businessUserGroups.groupId, userGroups.id)
-        )
+        .leftJoin(businessUserGroups, eq(businessUserGroups.groupId, userGroups.id))
         .where(isNull(userGroups.deletedAt))
         .groupBy(userGroups.id);
 
@@ -146,14 +153,11 @@ export abstract class UserGroupsService {
           businessCount: count(businessUserGroups.id),
         })
         .from(userGroups)
-        .leftJoin(
-          businessUserGroups,
-          eq(businessUserGroups.groupId, userGroups.id)
-        )
+        .leftJoin(businessUserGroups, eq(businessUserGroups.groupId, userGroups.id))
         .where(and(eq(userGroups.id, id), isNull(userGroups.deletedAt)))
         .groupBy(userGroups.id)
         .limit(1);
-      
+
       if (!result) throw httpError(404, "[USER_GROUP_NOT_FOUND] Group not found");
       return mapRow(result, Number(result.businessCount));
     } catch (error: any) {
@@ -166,7 +170,7 @@ export abstract class UserGroupsService {
   static async update(
     clerkId: string,
     id: string,
-    body: UserGroupsModel.EditGroupBody,
+    body: UserGroupsModel.EditGroupBody
   ): Promise<UserGroupsModel.GroupItem> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -228,7 +232,7 @@ export abstract class UserGroupsService {
         await ResponseCachingService.invalidateByPattern(`GET:/user-groups/${id}/members*`);
       } else {
         // Incremental add/remove
-        if (body.addUserIds && body.addUserIds.length) {
+        if (body.addUserIds?.length) {
           const uniqueUserIds = Array.from(new Set(body.addUserIds));
           const found = await db
             .select({ id: users.id })
@@ -240,11 +244,13 @@ export abstract class UserGroupsService {
             .map((uid) => ({ userId: uid, groupId: id }));
           if (rows.length) await db.insert(userGroupMembers).values(rows).onConflictDoNothing();
         }
-        if (body.removeUserIds && body.removeUserIds.length) {
+        if (body.removeUserIds?.length) {
           const uniqueUserIds = Array.from(new Set(body.removeUserIds));
           await db
             .delete(userGroupMembers)
-            .where(and(eq(userGroupMembers.groupId, id), inArray(userGroupMembers.userId, uniqueUserIds)));
+            .where(
+              and(eq(userGroupMembers.groupId, id), inArray(userGroupMembers.userId, uniqueUserIds))
+            );
         }
         // Invalidate members cache for this group
         await ResponseCachingService.invalidateByPattern(`GET:/user-groups/${id}/members*`);
@@ -258,10 +264,7 @@ export abstract class UserGroupsService {
     }
   }
 
-  static async remove(
-    clerkId: string,
-    id: string,
-  ): Promise<{ success: boolean; message: string }> {
+  static async remove(clerkId: string, id: string): Promise<{ success: boolean; message: string }> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
 
@@ -290,7 +293,12 @@ export abstract class UserGroupsService {
   static async listMembers(
     groupId: string,
     query: UserGroupsModel.ListGroupMembersQuery = {}
-  ): Promise<{ success: boolean; message: string; data: UserGroupsModel.GroupMemberItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data: UserGroupsModel.GroupMemberItem[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
     try {
       // Ensure group exists (soft-delete aware)
       const [group] = await db
@@ -301,8 +309,8 @@ export abstract class UserGroupsService {
       if (!group) throw httpError(404, "[USER_GROUP_NOT_FOUND] Group not found");
 
       // Pagination
-      const page = query.page ? Math.max(1, parseInt(query.page)) : 1;
-      const limit = Math.min(query.limit ? Math.max(1, parseInt(query.limit)) : 20, 100);
+      const page = query.page ? Math.max(1, Number.parseInt(query.page)) : 1;
+      const limit = Math.min(query.limit ? Math.max(1, Number.parseInt(query.limit)) : 20, 100);
       const offset = (page - 1) * limit;
 
       const [{ total }] = await db
@@ -354,15 +362,15 @@ export abstract class UserGroupsService {
 
   /**
    * Search businesses for assignment to a user group
-   * 
+   *
    * @description Efficiently searches active businesses by name or owner email,
    * and indicates if each business is already assigned to the specified group.
    * Uses a single optimized query with LEFT JOIN to check membership.
-   * 
+   *
    * @param groupId - The user group ID
    * @param query - Search query parameters
    * @returns Paginated list of businesses with membership status
-   * 
+   *
    * @throws {404} If group is not found
    * @throws {500} If search fails
    */
@@ -385,8 +393,8 @@ export abstract class UserGroupsService {
       if (!group) throw httpError(404, "[USER_GROUP_NOT_FOUND] Group not found");
 
       // Pagination
-      const page = query.page ? Math.max(1, parseInt(query.page)) : 1;
-      const limit = Math.min(query.limit ? Math.max(1, parseInt(query.limit)) : 20, 100);
+      const page = query.page ? Math.max(1, Number.parseInt(query.page)) : 1;
+      const limit = Math.min(query.limit ? Math.max(1, Number.parseInt(query.limit)) : 20, 100);
       const offset = (page - 1) * limit;
 
       // Build search conditions
@@ -396,10 +404,7 @@ export abstract class UserGroupsService {
         const searchTerm = `%${query.search.trim()}%`;
         // Search by business name (indexed) or owner email (indexed)
         whereConditions.push(
-          or(
-            like(businessProfiles.name, searchTerm),
-            like(users.email, searchTerm)
-          )!
+          or(like(businessProfiles.name, searchTerm), like(users.email, searchTerm))!
         );
       }
 
@@ -438,10 +443,7 @@ export abstract class UserGroupsService {
       if (query.search && query.search.trim().length > 0) {
         const searchTerm = `%${query.search.trim()}%`;
         countConditions.push(
-          or(
-            like(businessProfiles.name, searchTerm),
-            like(users.email, searchTerm)
-          )!
+          or(like(businessProfiles.name, searchTerm), like(users.email, searchTerm))!
         );
       }
 
@@ -488,14 +490,14 @@ export abstract class UserGroupsService {
 
   /**
    * Assign businesses to a user group
-   * 
+   *
    * @description Efficiently assigns one or more businesses to a user group.
    * Skips businesses that are already assigned and validates that businesses exist.
-   * 
+   *
    * @param groupId - The user group ID
    * @param businessIds - Array of business IDs to assign
    * @returns Assignment result with counts
-   * 
+   *
    * @throws {404} If group is not found
    * @throws {400} If businessIds array is empty
    * @throws {500} If assignment fails
@@ -525,10 +527,7 @@ export abstract class UserGroupsService {
         .select({ id: businessProfiles.id })
         .from(businessProfiles)
         .where(
-          and(
-            inArray(businessProfiles.id, uniqueBusinessIds),
-            isNull(businessProfiles.deletedAt)
-          )
+          and(inArray(businessProfiles.id, uniqueBusinessIds), isNull(businessProfiles.deletedAt))
         );
 
       const validBusinessIds = new Set(validBusinesses.map((b) => b.id));
@@ -583,13 +582,13 @@ export abstract class UserGroupsService {
 
   /**
    * Remove a business from a user group
-   * 
+   *
    * @description Removes a business from a user group.
-   * 
+   *
    * @param groupId - The user group ID
    * @param businessId - The business ID to remove
    * @returns Success message
-   * 
+   *
    * @throws {404} If group or business assignment is not found
    * @throws {500} If removal fails
    */
@@ -619,10 +618,7 @@ export abstract class UserGroupsService {
         .limit(1);
 
       if (!assignment) {
-        throw httpError(
-          404,
-          "[BUSINESS_NOT_IN_GROUP] Business is not assigned to this group"
-        );
+        throw httpError(404, "[BUSINESS_NOT_IN_GROUP] Business is not assigned to this group");
       }
 
       // Remove assignment

@@ -1,18 +1,20 @@
-import { pgTable, text, timestamp, boolean, numeric, varchar, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import {
+  boolean,
+  index,
+  numeric,
+  pgTable,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { pgEnum } from "drizzle-orm/pg-core";
 
 // Enum for fee calculation method
-export const feeCalculationMethodEnum = pgEnum("fee_calculation_method", [
-  "flat",
-  "percentage",
-]);
+export const feeCalculationMethodEnum = pgEnum("fee_calculation_method", ["flat", "percentage"]);
 
 // Enum for fee collection rule
-export const feeCollectionRuleEnum = pgEnum("fee_collection_rule", [
-  "upfront",
-  "end_of_term",
-]);
+export const feeCollectionRuleEnum = pgEnum("fee_collection_rule", ["upfront", "end_of_term"]);
 
 // Enum for fee calculation basis
 export const feeCalculationBasisEnum = pgEnum("fee_calculation_basis", [
@@ -27,7 +29,9 @@ export const feeCalculationBasisEnum = pgEnum("fee_calculation_basis", [
 export const loanFees = pgTable(
   "loan_fees",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
     calculationMethod: feeCalculationMethodEnum("calculation_method").notNull(),
     rate: numeric("rate", { precision: 15, scale: 4 }).notNull(), // Fee rate/percentage
@@ -46,5 +50,5 @@ export const loanFees = pgTable(
       idxLoanFeesDeletedAt: index("idx_loan_fees_deleted_at").on(table.deletedAt),
       idxLoanFeesCreatedAt: index("idx_loan_fees_created_at").on(table.createdAt),
     };
-  },
+  }
 );

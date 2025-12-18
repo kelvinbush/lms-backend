@@ -1,7 +1,7 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getAuth } from "@clerk/fastify";
-import { OfferLettersService } from "../modules/offer-letters/offer-letters.service";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { OfferLettersModel } from "../modules/offer-letters/offer-letters.model";
+import { OfferLettersService } from "../modules/offer-letters/offer-letters.service";
 import { UserModel } from "../modules/user/user.model";
 import { logger } from "../utils/logger";
 
@@ -30,7 +30,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
         }
         const result = await OfferLettersService.create(
           userId,
-          request.body as OfferLettersModel.CreateOfferLetterBody,
+          request.body as OfferLettersModel.CreateOfferLetterBody
         );
         return reply.send(result);
       } catch (error: any) {
@@ -45,7 +45,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to create offer letter", code: "CREATE_OFFER_LETTER_FAILED" });
       }
-    },
+    }
   );
 
   // SEND offer letter via DocuSign
@@ -75,7 +75,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
         const result = await OfferLettersService.sendOfferLetter(
           userId,
           id,
-          request.body as OfferLettersModel.SendOfferLetterBody,
+          request.body as OfferLettersModel.SendOfferLetterBody
         );
         return reply.send(result);
       } catch (error: any) {
@@ -90,7 +90,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to send offer letter", code: "SEND_OFFER_LETTER_FAILED" });
       }
-    },
+    }
   );
 
   // LIST offer letters with optional query parameters
@@ -130,7 +130,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to list offer letters", code: "LIST_OFFER_LETTERS_FAILED" });
       }
-    },
+    }
   );
 
   // GET offer letter by ID
@@ -170,7 +170,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to get offer letter", code: "GET_OFFER_LETTER_FAILED" });
       }
-    },
+    }
   );
 
   // UPDATE offer letter
@@ -200,7 +200,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
         const result = await OfferLettersService.update(
           userId,
           id,
-          request.body as OfferLettersModel.UpdateOfferLetterBody,
+          request.body as OfferLettersModel.UpdateOfferLetterBody
         );
         return reply.send(result);
       } catch (error: any) {
@@ -215,7 +215,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to update offer letter", code: "UPDATE_OFFER_LETTER_FAILED" });
       }
-    },
+    }
   );
 
   // VOID offer letter
@@ -255,7 +255,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to void offer letter", code: "VOID_OFFER_LETTER_FAILED" });
       }
-    },
+    }
   );
 
   // DELETE offer letter (soft delete)
@@ -295,7 +295,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to delete offer letter", code: "DELETE_OFFER_LETTER_FAILED" });
       }
-    },
+    }
   );
 
   // DOCUSIGN WEBHOOK - Handle DocuSign status updates
@@ -321,7 +321,7 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
         // if (!isValid) return reply.code(401).send({ error: "Invalid signature" });
 
         const result = await OfferLettersService.handleDocuSignWebhook(
-          request.body as OfferLettersModel.DocuSignWebhookBody,
+          request.body as OfferLettersModel.DocuSignWebhookBody
         );
         return reply.send(result);
       } catch (error: any) {
@@ -336,9 +336,6 @@ export async function offerLettersRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to process DocuSign webhook", code: "DOCUSIGN_WEBHOOK_FAILED" });
       }
-    },
+    }
   );
 }
-
-
-

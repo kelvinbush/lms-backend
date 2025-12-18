@@ -7,10 +7,13 @@
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -w -p tsconfig.json",
     "start": "bun run dist/server.js",
-    "lint": "biome lint",
+    "lint": "biome lint .",
     "lint:fix": "biome lint --write --unsafe .",
     "format": "biome format --write=false .",
     "format:fix": "biome format --write .",
+    "check": "biome check .",
+    "check:fix": "biome check --write --unsafe .",
+    "organize-imports": "biome check --write --only=organizeImports .",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
@@ -50,14 +53,15 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
-    "@fastify/type-provider-typebox": "^5.2.0",
     "@biomejs/biome": "^1.9.4",
+    "@fastify/type-provider-typebox": "^5.2.0",
     "@types/africastalking": "^0.6.2",
     "@types/node": "^24.4.0",
     "@types/redis": "^4.0.11",
     "bun-types": "^1.2.22",
     "dotenv": "^17.2.2",
     "prettier": "^3.6.2",
+    "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },

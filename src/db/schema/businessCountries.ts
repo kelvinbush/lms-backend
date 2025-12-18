@@ -1,5 +1,5 @@
-import { pgTable, varchar, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import { index, pgTable, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { businessProfiles } from "./businessProfiles";
 
 /**
@@ -9,7 +9,9 @@ import { businessProfiles } from "./businessProfiles";
 export const businessCountries = pgTable(
   "business_countries",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     businessId: varchar("business_id", { length: 24 })
       .notNull()
       .references(() => businessProfiles.id, { onDelete: "cascade" }),
@@ -19,19 +21,11 @@ export const businessCountries = pgTable(
   (table) => {
     return {
       // Ensure a business can only have a country listed once
-      uqBusinessCountry: uniqueIndex("uq_business_countries").on(
-        table.businessId,
-        table.country
-      ),
+      uqBusinessCountry: uniqueIndex("uq_business_countries").on(table.businessId, table.country),
       // Indexes for common queries
-      idxBusinessCountriesBusiness: index("idx_business_countries_business").on(
-        table.businessId
-      ),
+      idxBusinessCountriesBusiness: index("idx_business_countries_business").on(table.businessId),
       idxBusinessCountriesCountry: index("idx_business_countries_country").on(table.country),
-      idxBusinessCountriesCreated: index("idx_business_countries_created").on(
-        table.createdAt
-      ),
+      idxBusinessCountriesCreated: index("idx_business_countries_created").on(table.createdAt),
     };
-  },
+  }
 );
-

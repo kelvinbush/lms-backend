@@ -1,8 +1,8 @@
-import { and, eq, isNull, count, desc, like, ne } from "drizzle-orm";
+import { and, count, desc, eq, isNull, like } from "drizzle-orm";
 import { db } from "../../db";
 import { loanFees, loanProductsLoanFees } from "../../db/schema";
-import type { LoanFeesModel } from "./loan-fees.model";
 import { logger } from "../../utils/logger";
+import type { LoanFeesModel } from "./loan-fees.model";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -112,9 +112,7 @@ export abstract class LoanFeesService {
   /**
    * Create loan fee
    */
-  static async create(
-    body: LoanFeesModel.CreateLoanFeeBody
-  ): Promise<LoanFeesModel.LoanFeeItem> {
+  static async create(body: LoanFeesModel.CreateLoanFeeBody): Promise<LoanFeesModel.LoanFeeItem> {
     try {
       if (!body.name || body.name.trim().length === 0) {
         throw httpError(400, "[INVALID_INPUT] name is required and cannot be empty");
@@ -252,15 +250,14 @@ export abstract class LoanFeesService {
           success: true,
           message: `Loan fee archived successfully (linked to ${linkCount.count} loan product(s))`,
         };
-      } else {
-        // Soft delete
-        await db
-          .update(loanFees)
-          .set({ deletedAt: new Date(), updatedAt: new Date() })
-          .where(eq(loanFees.id, id));
-
-        return { success: true, message: "Loan fee deleted successfully" };
       }
+      // Soft delete
+      await db
+        .update(loanFees)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(eq(loanFees.id, id));
+
+      return { success: true, message: "Loan fee deleted successfully" };
     } catch (error: any) {
       logger.error("Error deleting loan fee:", error);
       if (error?.status) throw error;

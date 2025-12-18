@@ -1,4 +1,4 @@
-import { logger } from '../../utils/logger';
+import { logger } from "../../utils/logger";
 
 export interface SerializationOptions {
   includeTimestamps?: boolean;
@@ -29,11 +29,11 @@ export abstract class SerializationService {
    */
   static optimizeObject<T>(obj: T, options: SerializationOptions = {}): T {
     const opts = { ...SerializationService.DEFAULT_OPTIONS, ...options };
-    
+
     try {
       return SerializationService.transformObject(obj, opts, 0) as T;
     } catch (error) {
-      logger.error('Error optimizing object serialization:', error);
+      logger.error("Error optimizing object serialization:", error);
       return obj; // Return original object if optimization fails
     }
   }
@@ -43,15 +43,15 @@ export abstract class SerializationService {
    */
   private static transformObject(obj: any, options: SerializationOptions, depth: number): any {
     if (depth >= (options.maxDepth || SerializationService.MAX_DEPTH)) {
-      return '[Max Depth Reached]';
+      return "[Max Depth Reached]";
     }
 
     if (obj === null || obj === undefined) {
       return obj;
     }
 
-    if (typeof obj === 'function') {
-      return '[Function]';
+    if (typeof obj === "function") {
+      return "[Function]";
     }
 
     if (obj instanceof Date) {
@@ -59,12 +59,12 @@ export abstract class SerializationService {
     }
 
     if (Array.isArray(obj)) {
-      return obj.map(item => SerializationService.transformObject(item, options, depth + 1));
+      return obj.map((item) => SerializationService.transformObject(item, options, depth + 1));
     }
 
-    if (typeof obj === 'object') {
+    if (typeof obj === "object") {
       const result: any = {};
-      
+
       for (const [key, value] of Object.entries(obj)) {
         // Skip excluded fields
         if (options.excludeFields?.includes(key)) {
@@ -93,21 +93,24 @@ export abstract class SerializationService {
   /**
    * Serialize with size optimization
    */
-  static serializeOptimized<T>(data: T, options: SerializationOptions = {}): OptimizedSerializationResult {
+  static serializeOptimized<T>(
+    data: T,
+    options: SerializationOptions = {}
+  ): OptimizedSerializationResult {
     const startTime = Date.now();
-    
+
     try {
       // Optimize the object first
       const optimizedData = SerializationService.optimizeObject(data, options);
-      
+
       // Serialize to JSON
       const serialized = JSON.stringify(optimizedData);
-      
+
       // Calculate sizes
       const originalSize = JSON.stringify(data).length;
       const optimizedSize = serialized.length;
       const compressionRatio = originalSize > 0 ? (1 - optimizedSize / originalSize) * 100 : 0;
-      
+
       const result: OptimizedSerializationResult = {
         data: optimizedData,
         size: optimizedSize,
@@ -116,11 +119,13 @@ export abstract class SerializationService {
       };
 
       const duration = Date.now() - startTime;
-      logger.debug(`Serialization completed in ${duration}ms, size: ${optimizedSize} bytes, compression: ${compressionRatio.toFixed(2)}%`);
+      logger.debug(
+        `Serialization completed in ${duration}ms, size: ${optimizedSize} bytes, compression: ${compressionRatio.toFixed(2)}%`
+      );
 
       return result;
     } catch (error) {
-      logger.error('Error in optimized serialization:', error);
+      logger.error("Error in optimized serialization:", error);
       // Fallback to standard serialization
       const serialized = JSON.stringify(data);
       return {
@@ -139,7 +144,7 @@ export abstract class SerializationService {
     try {
       return JSON.parse(serialized) as T;
     } catch (error) {
-      logger.error('Error deserializing data:', error);
+      logger.error("Error deserializing data:", error);
       return fallback || null;
     }
   }
@@ -154,7 +159,7 @@ export abstract class SerializationService {
     minimal: {
       includeTimestamps: false,
       includeMetadata: false,
-      excludeFields: ['createdAt', 'updatedAt', 'deletedAt', 'metadata', 'beforeData', 'afterData'],
+      excludeFields: ["createdAt", "updatedAt", "deletedAt", "metadata", "beforeData", "afterData"],
     },
 
     /**
@@ -163,10 +168,10 @@ export abstract class SerializationService {
     apiResponse: {
       includeTimestamps: true,
       includeMetadata: false,
-      excludeFields: ['deletedAt', 'internalId', 'secretKey'],
+      excludeFields: ["deletedAt", "internalId", "secretKey"],
       transformFields: {
-        createdAt: (value: any) => value instanceof Date ? value.toISOString() : value,
-        updatedAt: (value: any) => value instanceof Date ? value.toISOString() : value,
+        createdAt: (value: any) => (value instanceof Date ? value.toISOString() : value),
+        updatedAt: (value: any) => (value instanceof Date ? value.toISOString() : value),
       },
     },
 
@@ -176,12 +181,12 @@ export abstract class SerializationService {
     auditTrail: {
       includeTimestamps: true,
       includeMetadata: true,
-      excludeFields: ['deletedAt'],
+      excludeFields: ["deletedAt"],
       transformFields: {
-        createdAt: (value: any) => value instanceof Date ? value.toISOString() : value,
-        beforeData: (value: any) => typeof value === 'string' ? JSON.parse(value) : value,
-        afterData: (value: any) => typeof value === 'string' ? JSON.parse(value) : value,
-        metadata: (value: any) => typeof value === 'string' ? JSON.parse(value) : value,
+        createdAt: (value: any) => (value instanceof Date ? value.toISOString() : value),
+        beforeData: (value: any) => (typeof value === "string" ? JSON.parse(value) : value),
+        afterData: (value: any) => (typeof value === "string" ? JSON.parse(value) : value),
+        metadata: (value: any) => (typeof value === "string" ? JSON.parse(value) : value),
       },
     },
 
@@ -191,8 +196,16 @@ export abstract class SerializationService {
     userProfile: {
       includeTimestamps: true,
       includeMetadata: false,
-      excludeFields: ['password', 'secretKey', 'internalNotes'],
-      includeFields: ['id', 'email', 'firstName', 'lastName', 'phoneNumber', 'createdAt', 'updatedAt'],
+      excludeFields: ["password", "secretKey", "internalNotes"],
+      includeFields: [
+        "id",
+        "email",
+        "firstName",
+        "lastName",
+        "phoneNumber",
+        "createdAt",
+        "updatedAt",
+      ],
     },
 
     /**
@@ -201,12 +214,12 @@ export abstract class SerializationService {
     loanApplication: {
       includeTimestamps: true,
       includeMetadata: false,
-      excludeFields: ['deletedAt', 'internalNotes'],
+      excludeFields: ["deletedAt", "internalNotes"],
       transformFields: {
-        createdAt: (value: any) => value instanceof Date ? value.toISOString() : value,
-        updatedAt: (value: any) => value instanceof Date ? value.toISOString() : value,
-        submittedAt: (value: any) => value instanceof Date ? value.toISOString() : value,
-        coApplicantIds: (value: any) => typeof value === 'string' ? JSON.parse(value) : value,
+        createdAt: (value: any) => (value instanceof Date ? value.toISOString() : value),
+        updatedAt: (value: any) => (value instanceof Date ? value.toISOString() : value),
+        submittedAt: (value: any) => (value instanceof Date ? value.toISOString() : value),
+        coApplicantIds: (value: any) => (typeof value === "string" ? JSON.parse(value) : value),
       },
     },
 
@@ -216,10 +229,10 @@ export abstract class SerializationService {
     document: {
       includeTimestamps: true,
       includeMetadata: false,
-      excludeFields: ['deletedAt', 'docPassword'],
+      excludeFields: ["deletedAt", "docPassword"],
       transformFields: {
-        createdAt: (value: any) => value instanceof Date ? value.toISOString() : value,
-        updatedAt: (value: any) => value instanceof Date ? value.toISOString() : value,
+        createdAt: (value: any) => (value instanceof Date ? value.toISOString() : value),
+        updatedAt: (value: any) => (value instanceof Date ? value.toISOString() : value),
       },
     },
   };
@@ -227,22 +240,28 @@ export abstract class SerializationService {
   /**
    * Batch serialize multiple objects
    */
-  static batchSerialize<T>(items: T[], options: SerializationOptions = {}): OptimizedSerializationResult[] {
+  static batchSerialize<T>(
+    items: T[],
+    options: SerializationOptions = {}
+  ): OptimizedSerializationResult[] {
     const startTime = Date.now();
-    
+
     try {
-      const results = items.map(item => SerializationService.serializeOptimized(item, options));
-      
+      const results = items.map((item) => SerializationService.serializeOptimized(item, options));
+
       const duration = Date.now() - startTime;
       const totalSize = results.reduce((sum, result) => sum + result.size, 0);
-      const avgCompression = results.reduce((sum, result) => sum + (result.compressionRatio || 0), 0) / results.length;
-      
-      logger.debug(`Batch serialization completed in ${duration}ms, ${items.length} items, total size: ${totalSize} bytes, avg compression: ${avgCompression.toFixed(2)}%`);
-      
+      const avgCompression =
+        results.reduce((sum, result) => sum + (result.compressionRatio || 0), 0) / results.length;
+
+      logger.debug(
+        `Batch serialization completed in ${duration}ms, ${items.length} items, total size: ${totalSize} bytes, avg compression: ${avgCompression.toFixed(2)}%`
+      );
+
       return results;
     } catch (error) {
-      logger.error('Error in batch serialization:', error);
-      return items.map(item => ({
+      logger.error("Error in batch serialization:", error);
+      return items.map((item) => ({
         data: item,
         size: JSON.stringify(item).length,
         serialized: JSON.stringify(item),
@@ -282,14 +301,15 @@ export abstract class SerializationService {
       const startTime = Date.now();
       const result = SerializationService.serializeOptimized(data, options);
       const duration = Date.now() - startTime;
-      
+
       results.push(result);
       times.push(duration);
     }
 
     const avgTime = times.reduce((sum, time) => sum + time, 0) / times.length;
     const avgSize = results.reduce((sum, result) => sum + result.size, 0) / results.length;
-    const avgCompression = results.reduce((sum, result) => sum + (result.compressionRatio || 0), 0) / results.length;
+    const avgCompression =
+      results.reduce((sum, result) => sum + (result.compressionRatio || 0), 0) / results.length;
 
     return {
       avgTime,

@@ -9,7 +9,7 @@ export namespace BusinessModel {
     country: string; // ISO country code or country name
     yearOfIncorporation: number; // four-digit year
     isOwned: boolean;
-    sector: string// whether the current user owns equity in this business
+    sector: string; // whether the current user owns equity in this business
     ownershipPercentage?: number; // 0..100, required when isOwned=true
     ownershipType?: string; // e.g., individual | joint | company | government | trust | other
   }
@@ -33,14 +33,7 @@ export namespace BusinessModel {
       ownershipPercentage: { type: "number", minimum: 0, maximum: 100 },
       ownershipType: { type: "string", minLength: 1, maxLength: 100 },
     },
-    required: [
-      "name",
-      "entityType",
-      "country",
-      "yearOfIncorporation",
-      "isOwned",
-      "sector",
-    ],
+    required: ["name", "entityType", "country", "yearOfIncorporation", "isOwned", "sector"],
     allOf: [
       // If isOwned is true, require ownershipPercentage and ownershipType
       {

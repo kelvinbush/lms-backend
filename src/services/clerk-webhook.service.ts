@@ -1,14 +1,17 @@
-import { db } from "../db";
-import { users, internalInvitations } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
-import { logger } from "../utils/logger";
-import { extractEmailUpdateFromWebhook, extractUserDataFromWebhook } from "../modules/user/user.utils";
-import { sendWelcomeEmail } from "../utils/email.utils";
-import { User } from "../modules/user/user.service";
-import { emailService } from "./email.service";
-import { UserDeletionService } from "./user-deletion.service";
 import type { WebhookEvent } from "@clerk/fastify";
 import { clerkClient } from "@clerk/fastify";
+import { desc, eq } from "drizzle-orm";
+import { db } from "../db";
+import { internalInvitations, users } from "../db/schema";
+import { User } from "../modules/user/user.service";
+import {
+  extractEmailUpdateFromWebhook,
+  extractUserDataFromWebhook,
+} from "../modules/user/user.utils";
+import { sendWelcomeEmail } from "../utils/email.utils";
+import { logger } from "../utils/logger";
+import { emailService } from "./email.service";
+import { UserDeletionService } from "./user-deletion.service";
 
 export interface ClerkWebhookHandlerResult {
   success: boolean;
@@ -39,8 +42,8 @@ export class ClerkWebhookService {
       const email_addresses = data.email_addresses || [];
       const primary_email_address_id = data.primary_email_address_id;
       const primaryEmail = Array.isArray(email_addresses)
-        ? (email_addresses.find((e: any) => e.id === primary_email_address_id)
-            ?.email_address ?? email_addresses[0]?.email_address)
+        ? (email_addresses.find((e: any) => e.id === primary_email_address_id)?.email_address ??
+          email_addresses[0]?.email_address)
         : undefined;
 
       if (!primaryEmail || !clerkUserId) {
@@ -61,7 +64,11 @@ export class ClerkWebhookService {
       let userResult;
       let user;
 
-      if (existingUser && (existingUser.onboardingStatus === "draft" || existingUser.onboardingStatus === "pending_invitation")) {
+      if (
+        existingUser &&
+        (existingUser.onboardingStatus === "draft" ||
+          existingUser.onboardingStatus === "pending_invitation")
+      ) {
         // User was pre-created by admin - link Clerk account
         logger.info("[WEBHOOK user.created] Linking existing local user to Clerk account", {
           email: primaryEmail,
@@ -81,25 +88,23 @@ export class ClerkWebhookService {
         if (unsafeMetadata.gender) updateData.gender = unsafeMetadata.gender;
         if (unsafeMetadata.phoneNumber) updateData.phoneNumber = unsafeMetadata.phoneNumber;
         if (unsafeMetadata.dob) {
-          const dob = typeof unsafeMetadata.dob === "string" 
-            ? new Date(unsafeMetadata.dob) 
-            : unsafeMetadata.dob;
+          const dob =
+            typeof unsafeMetadata.dob === "string"
+              ? new Date(unsafeMetadata.dob)
+              : unsafeMetadata.dob;
           if (!Number.isNaN(dob.getTime())) {
             updateData.dob = dob;
           }
         }
 
         // Update existing user with clerkId and set status to active
-        await db
-          .update(users)
-          .set(updateData)
-          .where(eq(users.id, existingUser.id));
+        await db.update(users).set(updateData).where(eq(users.id, existingUser.id));
 
         user = await db.query.users.findFirst({
           where: eq(users.id, existingUser.id),
         });
 
-        userResult = { email: user!.email };
+        userResult = { email: user?.email };
       } else {
         // New user - proceed with normal flow
         // Extract and validate user data
@@ -112,7 +117,9 @@ export class ClerkWebhookService {
           return {
             success: false,
             error: {
-              message: userDataResult.error?.message || `Missing required fields: ${userDataResult.missingFields?.join(", ")}`,
+              message:
+                userDataResult.error?.message ||
+                `Missing required fields: ${userDataResult.missingFields?.join(", ")}`,
               code: userDataResult.error?.code || "INVALID_METADATA",
             },
           };
@@ -122,19 +129,19 @@ export class ClerkWebhookService {
         try {
           userResult = await User.signUp(userDataResult.userData!);
           logger.info("[WEBHOOK user.created] local user created", {
-            email: userDataResult.userData!.email,
-            clerkId: userDataResult.userData!.clerkId,
+            email: userDataResult.userData?.email,
+            clerkId: userDataResult.userData?.clerkId,
           });
         } catch (e: any) {
           logger.error("[WEBHOOK user.created] local user creation failed", {
-            email: userDataResult.userData!.email,
+            email: userDataResult.userData?.email,
             error: e?.message,
           });
           throw e;
         }
 
         // Fetch user for subsequent operations
-        user = await User.findByEmail(userDataResult.userData!.email);
+        user = await User.findByEmail(userDataResult.userData?.email);
       }
 
       if (!user) {
@@ -151,7 +158,8 @@ export class ClerkWebhookService {
       }
 
       // Extract metadata for internal user handling
-      const publicMeta: any = (event as any)?.data?.public_metadata || (event as any)?.data?.publicMeta;
+      const publicMeta: any =
+        (event as any)?.data?.public_metadata || (event as any)?.data?.publicMeta;
       const isInternal: boolean = publicMeta?.internal === true;
       const invitedRole: string | undefined = publicMeta?.role;
 
@@ -230,8 +238,11 @@ export class ClerkWebhookService {
       // Send welcome email and phone OTP for non-internal users (async, non-blocking)
       // Using Promise.allSettled to run in parallel without blocking on errors
       // Skip for admin-created users (they were already set up)
-      const wasPreCreated = existingUser && (existingUser.onboardingStatus === "draft" || existingUser.onboardingStatus === "pending_invitation");
-      
+      const wasPreCreated =
+        existingUser &&
+        (existingUser.onboardingStatus === "draft" ||
+          existingUser.onboardingStatus === "pending_invitation");
+
       if (!isInternal && !wasPreCreated && user.clerkId) {
         Promise.allSettled([
           sendWelcomeEmail(user.firstName || "", user.email),
@@ -325,14 +336,14 @@ export class ClerkWebhookService {
       if (slug === "verification_code") {
         const code: string | undefined = payload?.data?.otp_code;
         if (code) {
-          return await this.handleVerificationCodeEmail(toEmail, code);
+          return await ClerkWebhookService.handleVerificationCodeEmail(toEmail, code);
         }
       }
 
       if (slug === "reset_password_code") {
         const code: string | undefined = payload?.data?.otp_code;
         if (code) {
-          return await this.handleResetPasswordEmail(toEmail, code);
+          return await ClerkWebhookService.handleResetPasswordEmail(toEmail, code);
         }
       }
 
@@ -340,7 +351,7 @@ export class ClerkWebhookService {
         const inviteUrl: string | undefined =
           payload?.data?.action_url || payload?.data?.url || payload?.data?.links?.[0]?.url;
         if (inviteUrl) {
-          return await this.handleInvitationEmail(toEmail, inviteUrl);
+          return await ClerkWebhookService.handleInvitationEmail(toEmail, inviteUrl);
         }
       }
 
@@ -348,14 +359,14 @@ export class ClerkWebhookService {
       const code: string | undefined = payload?.data?.otp_code;
       if (code && !slug) {
         // Default to verification code if slug is missing but code is present
-        return await this.handleVerificationCodeEmail(toEmail, code);
+        return await ClerkWebhookService.handleVerificationCodeEmail(toEmail, code);
       }
 
       const inviteUrl: string | undefined =
         payload?.data?.action_url || payload?.data?.url || payload?.data?.links?.[0]?.url;
       if (inviteUrl && !slug) {
         // Default to invitation if slug is missing but URL is present
-        return await this.handleInvitationEmail(toEmail, inviteUrl);
+        return await ClerkWebhookService.handleInvitationEmail(toEmail, inviteUrl);
       }
 
       // If email type not recognized, ignore
@@ -528,7 +539,8 @@ export class ClerkWebhookService {
 
       if (internalInviteRecord) {
         // This is an internal user invitation
-        const role: "super-admin" | "admin" | "member" = (internalInviteRecord?.role as any) || "member";
+        const role: "super-admin" | "admin" | "member" =
+          (internalInviteRecord?.role as any) || "member";
         logger.info("[WEBHOOK email.created] sending internal invite email", { toEmail, role });
 
         const sendInvite = await emailService.sendInternalInviteEmail({
@@ -562,7 +574,10 @@ export class ClerkWebhookService {
         where: eq(users.email, toEmail),
       });
 
-      if (smeUser && (smeUser.onboardingStatus === "draft" || smeUser.onboardingStatus === "pending_invitation")) {
+      if (
+        smeUser &&
+        (smeUser.onboardingStatus === "draft" || smeUser.onboardingStatus === "pending_invitation")
+      ) {
         // This is an SME invitation
         logger.info("[WEBHOOK email.created] sending SME invite email", {
           toEmail,
@@ -598,9 +613,12 @@ export class ClerkWebhookService {
 
       // Fallback: If no internal invitation record and no SME user found,
       // default to internal invite (for backward compatibility)
-      logger.warn("[WEBHOOK email.created] no invitation record found, defaulting to internal invite", {
-        toEmail,
-      });
+      logger.warn(
+        "[WEBHOOK email.created] no invitation record found, defaulting to internal invite",
+        {
+          toEmail,
+        }
+      );
 
       const sendInvite = await emailService.sendInternalInviteEmail({
         email: toEmail,
@@ -687,13 +705,13 @@ export class ClerkWebhookService {
 
     switch (type) {
       case "user.created":
-        return await this.handleUserCreated(event);
+        return await ClerkWebhookService.handleUserCreated(event);
       case "user.updated":
-        return await this.handleUserUpdated(event);
+        return await ClerkWebhookService.handleUserUpdated(event);
       case "email.created":
-        return await this.handleEmailCreated(event);
+        return await ClerkWebhookService.handleEmailCreated(event);
       case "user.deleted":
-        return await this.handleUserDeleted(event);
+        return await ClerkWebhookService.handleUserDeleted(event);
       default:
         logger.info("[WEBHOOK] unhandled event type", { type });
         return {
@@ -703,4 +721,3 @@ export class ClerkWebhookService {
     }
   }
 }
-

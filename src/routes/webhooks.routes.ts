@@ -1,18 +1,18 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { docuSignService, type DocuSignWebhookEvent } from "../services/docusign.service";
+import { ClerkWebhookService } from "../services/clerk-webhook.service";
+import { DocuSignWebhookService } from "../services/docusign-webhook.service";
+import { type DocuSignWebhookEvent, docuSignService } from "../services/docusign.service";
 import { logger } from "../utils/logger";
 import { verifyClerkWebhook } from "../utils/webhook.utils";
-import { DocuSignWebhookService } from "../services/docusign-webhook.service";
-import { ClerkWebhookService } from "../services/clerk-webhook.service";
 
 export async function webhookRoutes(fastify: FastifyInstance) {
   // DocuSign webhook endpoint
   fastify.post("/docusign", async (request, reply) => {
     try {
       const event = request.body as any; // Use any for better debugging
-      
+
       logger.info("Received DocuSign webhook - Raw payload:", JSON.stringify(event, null, 2));
-      
+
       // Check if the event has the expected structure
       if (!event || !event.event) {
         logger.error("Invalid webhook payload - missing event field:", event);
@@ -23,19 +23,19 @@ export async function webhookRoutes(fastify: FastifyInstance) {
       // Try to extract envelope information with fallback
       let envelopeId: string;
       let status: string;
-      
+
       if (event.data?.envelopeSummary) {
         envelopeId = event.data.envelopeSummary.envelopeId;
         status = event.data.envelopeSummary.status;
       } else if (event.data?.envelopeId) {
         envelopeId = event.data.envelopeId;
-        status = event.data.status || 'unknown';
+        status = event.data.status || "unknown";
       } else {
         logger.error("Invalid webhook payload - missing envelope information:", event);
         reply.code(400).send({ error: "Missing envelope information" });
         return;
       }
-      
+
       logger.info("Received DocuSign webhook:", {
         event: event.event,
         envelopeId: envelopeId,
@@ -90,9 +90,10 @@ export async function webhookRoutes(fastify: FastifyInstance) {
 
         // Handle response based on result
         if (!result.success) {
-          const statusCode = result.error?.code?.includes("EXTRACTION") || result.error?.code?.includes("INVALID")
-            ? 400
-            : 500;
+          const statusCode =
+            result.error?.code?.includes("EXTRACTION") || result.error?.code?.includes("INVALID")
+              ? 400
+              : 500;
           return reply.code(statusCode).send({
             error: result.error?.message || "Failed to process webhook",
             code: result.error?.code || "WEBHOOK_HANDLER_ERROR",
@@ -107,11 +108,11 @@ export async function webhookRoutes(fastify: FastifyInstance) {
           code: "UNEXPECTED_ERROR",
         });
       }
-    },
+    }
   );
 
   // Health check for webhooks
-  fastify.get("/health", async (request, reply) => {
+  fastify.get("/health", async (_request, reply) => {
     reply.code(200).send({ status: "healthy", timestamp: new Date().toISOString() });
   });
 }

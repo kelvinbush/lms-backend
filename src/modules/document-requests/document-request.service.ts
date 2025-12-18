@@ -1,6 +1,10 @@
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "../../db";
-import { documentRequests, type DocumentRequestStatus, type RequestedDocumentType } from "../../db/schema/documentRequests";
-import { eq, and, desc } from "drizzle-orm";
+import {
+  type DocumentRequestStatus,
+  type RequestedDocumentType,
+  documentRequests,
+} from "../../db/schema/documentRequests";
 
 function httpError(status: number, message: string) {
   const error = new Error(message) as any;
@@ -40,19 +44,27 @@ export interface DocumentRequestEntry {
 export abstract class DocumentRequestService {
   /**
    * Create a document request
-   * 
+   *
    * @param params - Document request parameters
    * @returns Created document request entry
-   * 
+   *
    * @throws {400} If required parameters are missing
    * @throws {500} If creation fails
    */
   static async createRequest(params: CreateDocumentRequestParams): Promise<DocumentRequestEntry> {
     try {
       // Validate required parameters
-      if (!params.loanApplicationId || !params.requestedBy || !params.requestedFrom || 
-          !params.documentType || !params.description) {
-        throw httpError(400, "[INVALID_PARAMETERS] loanApplicationId, requestedBy, requestedFrom, documentType, and description are required");
+      if (
+        !params.loanApplicationId ||
+        !params.requestedBy ||
+        !params.requestedFrom ||
+        !params.documentType ||
+        !params.description
+      ) {
+        throw httpError(
+          400,
+          "[INVALID_PARAMETERS] loanApplicationId, requestedBy, requestedFrom, documentType, and description are required"
+        );
       }
 
       // Insert document request
@@ -70,7 +82,10 @@ export abstract class DocumentRequestService {
         .returning();
 
       if (!result) {
-        throw httpError(500, "[DOCUMENT_REQUEST_CREATION_FAILED] Failed to create document request");
+        throw httpError(
+          500,
+          "[DOCUMENT_REQUEST_CREATION_FAILED] Failed to create document request"
+        );
       }
 
       // Return formatted result
@@ -98,10 +113,10 @@ export abstract class DocumentRequestService {
 
   /**
    * Fulfill a document request
-   * 
+   *
    * @param params - Fulfillment parameters
    * @returns Updated document request entry
-   * 
+   *
    * @throws {400} If required parameters are missing
    * @throws {404} If document request not found
    * @throws {500} If update fails
@@ -154,10 +169,10 @@ export abstract class DocumentRequestService {
 
   /**
    * Get document request by ID
-   * 
+   *
    * @param requestId - Document request ID
    * @returns Document request entry
-   * 
+   *
    * @throws {400} If requestId is missing
    * @throws {404} If document request not found
    * @throws {500} If query fails
@@ -203,16 +218,16 @@ export abstract class DocumentRequestService {
 
   /**
    * Get document requests for a loan application
-   * 
+   *
    * @param loanApplicationId - Loan application ID
    * @param status - Optional status filter
    * @returns Array of document request entries
-   * 
+   *
    * @throws {400} If loanApplicationId is missing
    * @throws {500} If query fails
    */
   static async getRequests(
-    loanApplicationId: string, 
+    loanApplicationId: string,
     status?: DocumentRequestStatus
   ): Promise<DocumentRequestEntry[]> {
     try {
@@ -222,7 +237,7 @@ export abstract class DocumentRequestService {
 
       // Build query conditions
       const conditions = [eq(documentRequests.loanApplicationId, loanApplicationId)];
-      
+
       if (status) {
         conditions.push(eq(documentRequests.status, status));
       }
@@ -235,7 +250,7 @@ export abstract class DocumentRequestService {
         .orderBy(desc(documentRequests.createdAt));
 
       // Format results
-      return results.map(result => ({
+      return results.map((result) => ({
         id: result.id,
         loanApplicationId: result.loanApplicationId,
         requestedBy: result.requestedBy,
@@ -259,10 +274,10 @@ export abstract class DocumentRequestService {
 
   /**
    * Get pending document requests for a user
-   * 
+   *
    * @param userId - User ID
    * @returns Array of pending document request entries
-   * 
+   *
    * @throws {400} If userId is missing
    * @throws {500} If query fails
    */
@@ -276,15 +291,12 @@ export abstract class DocumentRequestService {
         .select()
         .from(documentRequests)
         .where(
-          and(
-            eq(documentRequests.requestedFrom, userId),
-            eq(documentRequests.status, "pending")
-          )
+          and(eq(documentRequests.requestedFrom, userId), eq(documentRequests.status, "pending"))
         )
         .orderBy(desc(documentRequests.createdAt));
 
       // Format results
-      return results.map(result => ({
+      return results.map((result) => ({
         id: result.id,
         loanApplicationId: result.loanApplicationId,
         requestedBy: result.requestedBy,
@@ -308,10 +320,10 @@ export abstract class DocumentRequestService {
 
   /**
    * Get document request statistics for a loan application
-   * 
+   *
    * @param loanApplicationId - Loan application ID
    * @returns Statistics about document requests
-   * 
+   *
    * @throws {400} If loanApplicationId is missing
    * @throws {500} If query fails
    */
@@ -333,9 +345,9 @@ export abstract class DocumentRequestService {
 
       // Calculate statistics
       const total = results.length;
-      const pending = results.filter(r => r.status === "pending").length;
-      const fulfilled = results.filter(r => r.status === "fulfilled").length;
-      const overdue = results.filter(r => r.status === "overdue").length;
+      const pending = results.filter((r) => r.status === "pending").length;
+      const fulfilled = results.filter((r) => r.status === "fulfilled").length;
+      const overdue = results.filter((r) => r.status === "overdue").length;
 
       return {
         total,

@@ -1,5 +1,5 @@
-import { pgTable, timestamp, varchar, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import { index, pgTable, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { loanProducts } from "./loanProducts";
 import { userGroups } from "./userGroups";
 
@@ -10,7 +10,9 @@ import { userGroups } from "./userGroups";
 export const loanProductsUserGroups = pgTable(
   "loan_products_user_groups",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     loanProductId: varchar("loan_product_id", { length: 24 })
       .notNull()
       .references(() => loanProducts.id, { onDelete: "cascade" }),
@@ -30,10 +32,12 @@ export const loanProductsUserGroups = pgTable(
       idxLoanProductsUserGroupsProduct: index("idx_loan_products_user_groups_product").on(
         table.loanProductId
       ),
-      idxLoanProductsUserGroupsGroup: index("idx_loan_products_user_groups_group").on(table.userGroupId),
+      idxLoanProductsUserGroupsGroup: index("idx_loan_products_user_groups_group").on(
+        table.userGroupId
+      ),
       idxLoanProductsUserGroupsCreated: index("idx_loan_products_user_groups_created").on(
         table.createdAt
       ),
     };
-  },
+  }
 );

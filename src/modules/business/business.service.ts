@@ -1,9 +1,9 @@
-import type { BusinessModel } from "./business.model";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import { businessProfiles } from "../../db/schema";
-import { logger } from "../../utils/logger";
 import { users } from "../../db/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { logger } from "../../utils/logger";
+import type { BusinessModel } from "./business.model";
 
 // Lightweight HTTP error helper compatible with our route error handling
 function httpError(status: number, message: string) {
@@ -20,7 +20,7 @@ export abstract class Business {
    */
   static async register(
     clerkId: string,
-    payload: BusinessModel.RegisterBusinessInput,
+    payload: BusinessModel.RegisterBusinessInput
   ): Promise<{ id: string }> {
     try {
       if (!clerkId) {
@@ -64,7 +64,7 @@ export abstract class Business {
       if (error?.status) throw error;
       throw httpError(
         500,
-        "[BUSINESS_REGISTER_ERROR] An error occurred while registering the business",
+        "[BUSINESS_REGISTER_ERROR] An error occurred while registering the business"
       );
     }
   }
@@ -78,7 +78,7 @@ export abstract class Business {
   static async edit(
     clerkId: string,
     businessId: string,
-    payload: BusinessModel.EditBusinessBody,
+    payload: BusinessModel.EditBusinessBody
   ): Promise<{ id: string }> {
     try {
       if (!clerkId) {
@@ -96,10 +96,7 @@ export abstract class Business {
 
       // Ensure the business exists and belongs to the user
       const existing = await db.query.businessProfiles.findFirst({
-        where: and(
-          eq(businessProfiles.id, businessId),
-          eq(businessProfiles.userId, user.id),
-        ),
+        where: and(eq(businessProfiles.id, businessId), eq(businessProfiles.userId, user.id)),
       });
 
       if (!existing) {
@@ -109,8 +106,7 @@ export abstract class Business {
       // Build the updates object only with provided fields
       const updates: any = {};
       if (payload.name !== undefined) updates.name = payload.name;
-      if (payload.description !== undefined)
-        updates.description = payload.description ?? null;
+      if (payload.description !== undefined) updates.description = payload.description ?? null;
       if (payload.imageUrl !== undefined) updates.imageUrl = payload.imageUrl ?? null;
       if (payload.coverImage !== undefined) updates.coverImage = payload.coverImage ?? null;
       if (payload.entityType !== undefined) updates.entityType = payload.entityType;
@@ -170,26 +166,18 @@ export abstract class Business {
       const updated = await db
         .update(businessProfiles)
         .set(updates)
-        .where(
-          and(eq(businessProfiles.id, businessId), eq(businessProfiles.userId, user.id)),
-        )
+        .where(and(eq(businessProfiles.id, businessId), eq(businessProfiles.userId, user.id)))
         .returning({ id: businessProfiles.id });
 
       if (!updated?.length) {
-        throw httpError(
-          500,
-          "[BUSINESS_EDIT_ERROR] Failed to update business profile",
-        );
+        throw httpError(500, "[BUSINESS_EDIT_ERROR] Failed to update business profile");
       }
 
       return { id: updated[0].id };
     } catch (error: any) {
       logger.error("Error editing business:", error);
       if (error?.status) throw error;
-      throw httpError(
-        500,
-        "[BUSINESS_EDIT_ERROR] An error occurred while editing the business",
-      );
+      throw httpError(500, "[BUSINESS_EDIT_ERROR] An error occurred while editing the business");
     }
   }
 
@@ -197,9 +185,7 @@ export abstract class Business {
    * List all active business profiles belonging to the user
    * @param clerkId Clerk user id, used to resolve internal users.id
    */
-  static async listByUser(
-    clerkId: string,
-  ): Promise<BusinessModel.ListBusinessesResponse> {
+  static async listByUser(clerkId: string): Promise<BusinessModel.ListBusinessesResponse> {
     try {
       if (!clerkId) {
         throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -271,4 +257,3 @@ export abstract class Business {
     }
   }
 }
-

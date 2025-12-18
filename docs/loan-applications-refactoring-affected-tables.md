@@ -2,160 +2,114 @@
 
 This document lists all database tables, schemas, services, and code files that are related to loan applications and will need to be cleaned up or refactored based on the new `loanProducts.ts` schema and business logic requirements.
 
+## ✅ Cleanup Status: COMPLETED
+
+All loan application related tables, services, and code have been deleted/removed. The codebase is now ready for fresh implementation based on the new API requirements.
+
 ## Database Tables (Schema Files)
 
 ### Core Loan Application Tables
 
-1. **`loan_applications`** (`src/db/schema/loanApplications.ts`)
-   - Main loan applications table
-   - Contains: applicationNumber, userId, businessId, loanProductId, loanAmount, loanTerm, currency, purpose, status, etc.
-   - **Status**: Needs complete refactoring to align with new API requirements
-   - **Relations**: References users, businessProfiles, loanProducts
+**✅ DELETED** - All core loan application tables have been removed:
 
-2. **`loan_application_snapshots`** (`src/db/schema/loanApplicationSnapshots.ts`)
-   - Immutable snapshots of loan applications at approval points
-   - **Status**: May need refactoring if snapshot structure changes
-   - **Relations**: References loanApplications (cascade delete)
-
-3. **`application_audit_trail`** (`src/db/schema/applicationAuditTrail.ts`)
-   - Audit trail for all loan application actions
-   - **Status**: May need updates if action types change
-   - **Relations**: References loanApplications (cascade delete), users
-
-4. **`loan_product_snapshots`** (`src/db/schema/loanProductSnapshots.ts`)
-   - Snapshots of loan products at application creation time
-   - **Status**: May need updates if product structure changes
-   - **Relations**: References loanApplications (cascade delete), loanProducts
-
-5. **`document_requests`** (`src/db/schema/documentRequests.ts`)
-   - Document requests related to loan applications
-   - **Status**: May need updates if workflow changes
-   - **Relations**: References loanApplications (cascade delete), users
-
-6. **`offer_letters`** (`src/db/schema/offerLetters.ts`)
-   - Offer letters linked to loan applications
-   - **Status**: May need updates if offer letter workflow changes
-   - **Relations**: References loanApplications (cascade delete)
+1. ~~**`loan_applications`** (`src/db/schema/loanApplications.ts`)**~~ - ✅ DELETED
+2. ~~**`loan_application_snapshots`** (`src/db/schema/loanApplicationSnapshots.ts`)**~~ - ✅ DELETED
+3. ~~**`application_audit_trail`** (`src/db/schema/applicationAuditTrail.ts`)**~~ - ✅ DELETED
+4. ~~**`loan_product_snapshots`** (`src/db/schema/loanProductSnapshots.ts`)**~~ - ✅ DELETED
+5. ~~**`document_requests`** (`src/db/schema/documentRequests.ts`)**~~ - ✅ DELETED
+6. ~~**`offer_letters`** (`src/db/schema/offerLetters.ts`)**~~ - ✅ DELETED
 
 ### Related Tables (Indirect Dependencies)
 
+**✅ UPDATED** - Relations have been removed:
+
 7. **`users`** (`src/db/schema/users.ts`)
-   - Has relation: `loanApplications: many(loanApplications)`
-   - **Status**: Relation may need updates
+   - ~~Has relation: `loanApplications: many(loanApplications)`~~ - ✅ REMOVED
+   - **Status**: Relations cleaned up
 
 8. **`business_profiles`** (`src/db/schema/businessProfiles.ts`)
-   - Has relation: `loanApplications: many(loanApplications)`
-   - **Status**: Relation may need updates
+   - ~~Has relation: `loanApplications: many(loanApplications)`~~ - ✅ REMOVED
+   - **Status**: Relations cleaned up
 
 9. **`loan_products`** (`src/db/schema/loanProducts.ts`)
-   - Has relation: `loanApplications: many(loanApplications)`
-   - **Status**: This is the NEW schema - keep as reference
-   - **Note**: This table is being used as the basis for refactoring
+   - ~~Has relation: `loanApplications: many(loanApplications)`~~ - ✅ REMOVED (with TODO comment)
+   - **Status**: This is the NEW schema - kept as reference
+   - **Note**: Loan application logic removed from service with TODO comments for re-implementation
 
 ## Database Relations
 
 **File**: `src/db/schema/relations.ts`
 
-The following relations need to be reviewed/updated:
-- `loanApplicationsRelations` - Main relations for loan applications
-- `loanApplicationSnapshotsRelations` - Relations for snapshots
-- `applicationAuditTrailRelations` - Relations for audit trail
-- `documentRequestsRelations` - Relations for document requests
-- `offerLettersRelations` - Relations for offer letters
-- `loanProductSnapshotsRelations` - Relations for product snapshots
-- `usersRelations` - Contains `loanApplications: many(loanApplications)`
-- `businessProfilesRelations` - Contains `loanApplications: many(loanApplications)`
-- `loanProductsRelations` - Contains `loanApplications: many(loanApplications)`
+**✅ CLEANED UP** - All loan application relations have been removed:
+
+- ~~`loanApplicationsRelations`~~ - ✅ DELETED
+- ~~`loanApplicationSnapshotsRelations`~~ - ✅ DELETED
+- ~~`applicationAuditTrailRelations`~~ - ✅ DELETED
+- ~~`documentRequestsRelations`~~ - ✅ DELETED
+- ~~`offerLettersRelations`~~ - ✅ DELETED
+- ~~`loanProductSnapshotsRelations`~~ - ✅ DELETED
+- `usersRelations` - ✅ REMOVED `loanApplications: many(loanApplications)`
+- `businessProfilesRelations` - ✅ REMOVED `loanApplications: many(loanApplications)`
+- `loanProductsRelations` - ✅ REMOVED `loanApplications: many(loanApplications)` (with TODO comment)
 
 ## Service/Module Files
 
 ### Core Loan Application Services
 
-1. **`src/modules/loan-applications/loan-applications.service.ts`**
-   - Main service for loan application operations
-   - Contains: create, list, get, update, delete methods
-   - **Status**: Needs complete refactoring
+**✅ DELETED** - All core loan application services have been removed:
 
-2. **`src/modules/loan-applications/loan-applications.model.ts`**
-   - TypeScript models and interfaces for loan applications
-   - **Status**: Needs refactoring to match new API requirements
-
-3. **`src/modules/loan-applications/loan-applications.schemas.ts`**
-   - JSON schemas for validation
-   - **Status**: Needs refactoring to match new API requirements
-
-4. **`src/modules/loan-applications/loan-applications.mapper.ts`**
-   - Data mapping functions
-   - **Status**: Needs refactoring to match new data structure
+1. ~~**`src/modules/loan-applications/loan-applications.service.ts`**~~ - ✅ DELETED
+2. ~~**`src/modules/loan-applications/loan-applications.model.ts`**~~ - ✅ DELETED
+3. ~~**`src/modules/loan-applications/loan-applications.schemas.ts`**~~ - ✅ DELETED
+4. ~~**`src/modules/loan-applications/loan-applications.mapper.ts`**~~ - ✅ DELETED
 
 ### Route Files
 
-5. **`src/routes/loan-applications.routes.ts`**
-   - API routes for loan applications
-   - **Status**: Needs refactoring to match new API requirements
+**✅ DELETED** - Loan application routes have been removed:
 
-### Supporting Services (May Reference Loan Applications)
+5. ~~**`src/routes/loan-applications.routes.ts`**~~ - ✅ DELETED
 
-6. **`src/modules/status/status.service.ts`**
-   - Status management service
-   - **Status**: May need updates if status workflow changes
-   - **References**: Uses `loanApplications` table
+### Supporting Services
 
-7. **`src/modules/snapshots/snapshot.service.ts`**
-   - Snapshot creation service
-   - **Status**: May need updates if snapshot structure changes
-   - **References**: Uses `loanApplications` table
+**✅ DELETED** - All supporting services that were loan-application specific have been removed:
 
-8. **`src/modules/audit-trail/audit-trail.service.ts`**
-   - Audit trail service
-   - **Status**: May need updates if audit actions change
-   - **References**: Uses `applicationAuditTrail` table
+6. ~~**`src/modules/status/status.service.ts`**~~ - ✅ DELETED
+7. ~~**`src/modules/status/status.model.ts`**~~ - ✅ DELETED
+8. ~~**`src/modules/snapshots/snapshot.service.ts`**~~ - ✅ DELETED
+9. ~~**`src/modules/audit-trail/audit-trail.service.ts`**~~ - ✅ DELETED
+10. ~~**`src/modules/notifications/notification.service.ts`**~~ - ✅ DELETED
+11. ~~**`src/modules/notifications/notification.model.ts`**~~ - ✅ DELETED
+12. ~~**`src/modules/offer-letters/offer-letters.service.ts`**~~ - ✅ DELETED
+13. ~~**`src/modules/offer-letters/offer-letters.model.ts`**~~ - ✅ DELETED
+14. ~~**`src/modules/offer-letters/offer-letters.mapper.ts`**~~ - ✅ DELETED
+15. ~~**`src/services/docusign-webhook.service.ts`**~~ - ✅ DELETED
 
-9. **`src/modules/notifications/notification.service.ts`**
-   - Notification service
-   - **Status**: May need updates if notification triggers change
-   - **References**: Uses `loanApplications` table
+**✅ REFACTORED** - Services that had loan application dependencies have been cleaned up:
 
-10. **`src/modules/offer-letters/offer-letters.service.ts`**
-    - Offer letter service
-    - **Status**: May need updates if offer letter workflow changes
-    - **References**: Uses `loanApplications` table
+16. **`src/services/user-deletion.service.ts`**
+    - ✅ REFACTORED - Removed all loan application deletion logic
+    - Added TODO comments for re-implementation
 
-11. **`src/services/docusign-webhook.service.ts`**
-    - DocuSign webhook handler
-    - **Status**: May need updates if offer letter workflow changes
-    - **References**: Uses `loanApplications` and `offerLetters` tables
-
-12. **`src/services/user-deletion.service.ts`**
-    - User deletion service
-    - **Status**: May need updates if cascade logic changes
-    - **References**: Uses `loanApplications` and related tables
-
-13. **`src/modules/query-optimization/query-optimization.service.ts`**
-    - Query optimization service
-    - **Status**: May need updates if query patterns change
-    - **References**: Uses `loanApplications` table
-
-14. **`src/modules/loan-products/loan-products.service.ts`**
-    - Loan products service
-    - **Status**: May need updates if product-application relationship changes
-    - **References**: Uses `loanApplications` table for statistics/queries
+17. **`src/modules/loan-products/loan-products.service.ts`**
+    - ✅ REFACTORED - Removed all loan application queries and logic
+    - Added TODO comments throughout for re-implementation
+    - Removed `loansCount` from queries (commented out with TODOs)
+    - Removed loan application validation checks (commented out with TODOs)
 
 ## Schema Exports
 
 **File**: `src/db/schema/index.ts`
-- Exports all schema files including loan application related schemas
-- **Status**: Review to ensure all exports are correct
-
-**File**: `src/db/schema.ts` (if exists)
-- May export schema files
-- **Status**: Review if exists
+- ✅ UPDATED - Removed all loan application related schema exports
+- All loan application schema exports have been removed
 
 ## Server Registration
 
 **File**: `src/server.ts`
-- Registers `loanApplicationsRoutes`
-- **Status**: Should remain, but routes will be updated
+- ✅ UPDATED - Removed loan application route registration
+- `loanApplicationsRoutes` registration commented out with TODO
+- `offerLettersRoutes` registration commented out with TODO
+- `documentRequestsRoutes` registration commented out with TODO
+- `webhookRoutes` registration commented out with TODO
 
 ## Key Differences to Address
 
@@ -199,39 +153,53 @@ Based on the API requirements document, the new structure should support:
 ## Cleanup Checklist
 
 ### Database Tables
-- [ ] Review and refactor `loan_applications` table schema
-- [ ] Review `loan_application_snapshots` table (may need updates)
-- [ ] Review `application_audit_trail` table (update action types if needed)
-- [ ] Review `loan_product_snapshots` table
-- [ ] Review `document_requests` table
-- [ ] Review `offer_letters` table
-- [ ] Update all relations in `relations.ts`
+- [x] ✅ Delete `loan_applications` table schema
+- [x] ✅ Delete `loan_application_snapshots` table schema
+- [x] ✅ Delete `application_audit_trail` table schema
+- [x] ✅ Delete `loan_product_snapshots` table schema
+- [x] ✅ Delete `document_requests` table schema
+- [x] ✅ Delete `offer_letters` table schema
+- [x] ✅ Remove all loan application relations from `relations.ts`
+- [x] ✅ Remove loan application exports from `schema/index.ts`
 
 ### Services
-- [ ] Refactor `loan-applications.service.ts`
-- [ ] Refactor `loan-applications.model.ts`
-- [ ] Refactor `loan-applications.schemas.ts`
-- [ ] Refactor `loan-applications.mapper.ts`
-- [ ] Review `status.service.ts`
-- [ ] Review `snapshot.service.ts`
-- [ ] Review `audit-trail.service.ts`
-- [ ] Review `notification.service.ts`
-- [ ] Review `offer-letters.service.ts`
-- [ ] Review `docusign-webhook.service.ts`
-- [ ] Review `user-deletion.service.ts`
-- [ ] Review `query-optimization.service.ts`
-- [ ] Review `loan-products.service.ts`
+- [x] ✅ Delete `loan-applications.service.ts`
+- [x] ✅ Delete `loan-applications.model.ts`
+- [x] ✅ Delete `loan-applications.schemas.ts`
+- [x] ✅ Delete `loan-applications.mapper.ts`
+- [x] ✅ Delete `status.service.ts`
+- [x] ✅ Delete `status.model.ts`
+- [x] ✅ Delete `snapshot.service.ts`
+- [x] ✅ Delete `audit-trail.service.ts`
+- [x] ✅ Delete `notification.service.ts`
+- [x] ✅ Delete `notification.model.ts`
+- [x] ✅ Delete `offer-letters.service.ts`
+- [x] ✅ Delete `offer-letters.model.ts`
+- [x] ✅ Delete `offer-letters.mapper.ts`
+- [x] ✅ Delete `docusign-webhook.service.ts`
+- [x] ✅ Refactor `user-deletion.service.ts` (removed loan application logic)
+- [x] ✅ Refactor `loan-products.service.ts` (removed loan application logic, added TODOs)
 
 ### Routes
-- [ ] Refactor `loan-applications.routes.ts`
+- [x] ✅ Delete `loan-applications.routes.ts`
+- [x] ✅ Remove route registrations from `server.ts` (commented with TODOs)
 
 ### Documentation
-- [ ] Update any documentation referencing old loan application structure
+- [x] ✅ Update refactoring documentation
 
 ## Notes
 
-- The `loanProducts` table is the NEW schema and should be kept as reference
-- All other tables and code should be reviewed and refactored to align with the new requirements
-- Consider data migration strategy if there's existing data in production
-- Ensure foreign key constraints are properly updated
-- Update all enum types to match new status values and other enums
+- ✅ **Cleanup Complete**: All loan application related code has been removed
+- The `loanProducts` table is the NEW schema and is kept as reference
+- All loan application logic has been removed from `loan-products.service.ts` with TODO comments for re-implementation
+- Route registrations have been commented out in `server.ts` with TODO comments
+- The codebase is now ready for fresh implementation based on the new API requirements
+
+## Next Steps
+
+1. **Create New Loan Application Schema**: Based on the new API requirements
+2. **Implement New Services**: Create fresh loan application services matching the new requirements
+3. **Re-wire Loan Products Service**: Uncomment and update the TODO sections in `loan-products.service.ts`
+4. **Re-implement Routes**: Create new route handlers for loan applications
+5. **Re-implement Supporting Services**: Create new status, snapshot, audit trail, and notification services as needed
+6. **Update Relations**: Add back loan application relations when new schema is ready

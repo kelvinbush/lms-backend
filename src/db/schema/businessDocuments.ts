@@ -1,9 +1,9 @@
-import { pgTable, text, timestamp, varchar, index } from "drizzle-orm/pg-core";
-import { businessProfiles } from "./businessProfiles";
 import { createId } from "@paralleldrive/cuid2";
+import { index, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { businessProfiles } from "./businessProfiles";
 
 // Define a Postgres enum for known business document types to enforce integrity
-import { pgEnum, boolean, integer, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, integer, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const businessDocumentTypeEnum = pgEnum("business_document_type", [
   // Core entity and incorporation docs
@@ -29,7 +29,7 @@ export const businessDocumentTypeEnum = pgEnum("business_document_type", [
   "annual_bank_statement",
   "audited_financial_statements",
   "income_statements",
-  "personal_bank_statement"
+  "personal_bank_statement",
 ]);
 
 // Type alias for use in application code
@@ -38,8 +38,12 @@ export type BusinessDocumentType = (typeof businessDocumentTypeEnum.enumValues)[
 export const businessDocuments = pgTable(
   "business_documents",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
-    businessId: varchar("business_id", { length: 24 }).notNull().references(() => businessProfiles.id, { onDelete: "cascade" }),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
+    businessId: varchar("business_id", { length: 24 })
+      .notNull()
+      .references(() => businessProfiles.id, { onDelete: "cascade" }),
     // Use enum for doc type for better consistency
     docType: businessDocumentTypeEnum("doc_type").notNull(),
     docUrl: text("doc_url"),
@@ -65,17 +69,17 @@ export const businessDocuments = pgTable(
         table.businessId,
         table.docType,
         table.docYear,
-        table.docBankName,
+        table.docBankName
       ),
       idxBusinessDocsBusinessDeleted: index("idx_business_docs_business_deleted").on(
         table.businessId,
-        table.deletedAt,
+        table.deletedAt
       ),
       idxBusinessDocsBusinessCreated: index("idx_business_docs_business_created").on(
         table.businessId,
-        table.createdAt,
+        table.createdAt
       ),
-      
+
       // Additional performance indexes for common query patterns
       idxBusinessDocsBusinessType: index("idx_business_docs_business_type").on(
         table.businessId,
@@ -87,6 +91,5 @@ export const businessDocuments = pgTable(
         table.deletedAt
       ),
     };
-  },
+  }
 );
-

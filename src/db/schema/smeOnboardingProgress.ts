@@ -1,5 +1,13 @@
-import { pgTable, varchar, timestamp, integer, index, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { users } from "./users";
 
 /**
@@ -9,7 +17,9 @@ import { users } from "./users";
 export const smeOnboardingProgress = pgTable(
   "sme_onboarding_progress",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     userId: varchar("user_id", { length: 24 })
       .notNull()
       .references(() => users.id, { onDelete: "cascade" })
@@ -23,9 +33,7 @@ export const smeOnboardingProgress = pgTable(
   (table) => {
     return {
       // Ensure one progress record per user
-      uqSmeOnboardingProgressUser: uniqueIndex("uq_sme_onboarding_progress_user").on(
-        table.userId
-      ),
+      uqSmeOnboardingProgressUser: uniqueIndex("uq_sme_onboarding_progress_user").on(table.userId),
       // Indexes for common queries
       idxSmeOnboardingProgressUser: index("idx_sme_onboarding_progress_user").on(table.userId),
       idxSmeOnboardingProgressCurrentStep: index("idx_sme_onboarding_progress_current_step").on(
@@ -35,6 +43,5 @@ export const smeOnboardingProgress = pgTable(
         table.createdAt
       ),
     };
-  },
+  }
 );
-

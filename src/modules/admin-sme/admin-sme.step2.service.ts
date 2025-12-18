@@ -1,17 +1,16 @@
-import type { AdminSMEModel } from "./admin-sme.model";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import {
-  users,
-  businessProfiles,
-  smeOnboardingProgress,
-  businessUserGroups,
   businessPhotos,
+  businessProfiles,
+  businessUserGroups,
   businessVideoLinks,
+  smeOnboardingProgress,
+  users,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { eq, and, isNull } from "drizzle-orm";
+import type { AdminSMEModel } from "./admin-sme.model";
 import { httpError } from "./admin-sme.utils";
-import { AdminSMEService } from "./admin-sme.service";
 
 /**
  * Step 2: Business Basic Info Service
@@ -23,7 +22,7 @@ export abstract class AdminSMEStep2Service {
    */
   static async saveBusinessBasicInfo(
     userId: string,
-    payload: AdminSMEModel.Step2BusinessBasicInfoBody,
+    payload: AdminSMEModel.Step2BusinessBasicInfoBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
       // Validate business photos (max 5)
@@ -44,10 +43,7 @@ export abstract class AdminSMEStep2Service {
 
         // Get existing business if it exists
         const existingBusiness = await tx.query.businessProfiles.findFirst({
-          where: and(
-            eq(businessProfiles.userId, userId),
-            isNull(businessProfiles.deletedAt)
-          ),
+          where: and(eq(businessProfiles.userId, userId), isNull(businessProfiles.deletedAt)),
         });
 
         let businessId: string;
@@ -168,10 +164,7 @@ export abstract class AdminSMEStep2Service {
                 .update(businessPhotos)
                 .set({ deletedAt: new Date() })
                 .where(
-                  and(
-                    eq(businessPhotos.businessId, businessId),
-                    isNull(businessPhotos.deletedAt)
-                  )
+                  and(eq(businessPhotos.businessId, businessId), isNull(businessPhotos.deletedAt))
                 );
 
               // Insert new photos if provided
@@ -266,7 +259,9 @@ export abstract class AdminSMEStep2Service {
                 ? Number(updatedBusiness.avgYearlyTurnover)
                 : null,
               previousLoans: updatedBusiness.borrowingHistory ?? null,
-              loanAmount: updatedBusiness.amountBorrowed ? Number(updatedBusiness.amountBorrowed) : null,
+              loanAmount: updatedBusiness.amountBorrowed
+                ? Number(updatedBusiness.amountBorrowed)
+                : null,
               defaultCurrency: updatedBusiness.currency ?? null,
               recentLoanStatus: updatedBusiness.loanStatus ?? null,
               defaultReason: updatedBusiness.defaultReason ?? null,
@@ -283,4 +278,3 @@ export abstract class AdminSMEStep2Service {
     }
   }
 }
-

@@ -1,6 +1,6 @@
+import { config as loadEnv } from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { config as loadEnv } from "dotenv";
 import * as schema from "./schema";
 
 loadEnv();

@@ -2,16 +2,14 @@ import {
   Body,
   Container,
   Head,
-  Heading,
   Html,
   Img,
   Link,
   Preview,
   Section,
   Text,
-  Hr,
-} from '@react-email/components';
-import type * as React from 'react';
+} from "@react-email/components";
+import type * as React from "react";
 
 interface BaseTemplateProps {
   previewText: string;
@@ -29,12 +27,12 @@ export const BaseTemplate = ({
   previewText,
   title,
   children,
-  firstName = '',
-  supportEmail = 'support@melaninkapital.com',
-  supportPhone = '+254703680991',
-  termsUrl = 'https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jLsw0JXtTaSljhRqXr6mBuJN1opUPFeKbcZg3k',
-  privacyUrl = 'https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jLvFVCntHCgvpe94FiSQ72Z3oc8WVDqNGKtasB',
-  unsubscribeUrl = '#',
+  firstName = "",
+  supportEmail = "support@melaninkapital.com",
+  supportPhone = "+254703680991",
+  termsUrl = "https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jLsw0JXtTaSljhRqXr6mBuJN1opUPFeKbcZg3k",
+  privacyUrl = "https://pjccitj0ny.ufs.sh/f/ewYz0SdNs1jLvFVCntHCgvpe94FiSQ72Z3oc8WVDqNGKtasB",
+  unsubscribeUrl = "#",
 }: BaseTemplateProps) => {
   return (
     <Html>
@@ -52,7 +50,7 @@ export const BaseTemplate = ({
         <Container style={container}>
           {/* Gradient header */}
           <Section style={headerGradient} />
-          
+
           {/* Logo section */}
           <Section style={logoSection}>
             <Img
@@ -64,9 +62,7 @@ export const BaseTemplate = ({
 
           {/* Main content */}
           <Section style={content}>
-            {firstName && (
-              <Text style={greeting}>Hey {firstName},</Text>
-            )}
+            {firstName && <Text style={greeting}>Hey {firstName},</Text>}
             {children}
           </Section>
 
@@ -88,7 +84,10 @@ export const BaseTemplate = ({
                   style={socialIcon}
                 />
               </Link>
-              <Link href="https://www.linkedin.com/company/melaninkapital/mycompany/?viewAsMember=true" style={socialLink}>
+              <Link
+                href="https://www.linkedin.com/company/melaninkapital/mycompany/?viewAsMember=true"
+                style={socialLink}
+              >
                 <Img
                   src="https://img.icons8.com/ios-filled/50/444C53/linkedin.png"
                   alt="LinkedIn"
@@ -109,11 +108,17 @@ export const BaseTemplate = ({
             </Text>
 
             <Text style={footerLinks}>
-              <Link href={termsUrl} style={footerLink}>Terms of Service</Link>
-              {' | '}
-              <Link href={privacyUrl} style={footerLink}>Privacy Policy</Link>
-              {' | '}
-              <Link href={unsubscribeUrl} style={footerLink}>Unsubscribe</Link>
+              <Link href={termsUrl} style={footerLink}>
+                Terms of Service
+              </Link>
+              {" | "}
+              <Link href={privacyUrl} style={footerLink}>
+                Privacy Policy
+              </Link>
+              {" | "}
+              <Link href={unsubscribeUrl} style={footerLink}>
+                Unsubscribe
+              </Link>
             </Text>
 
             <Img
@@ -130,99 +135,99 @@ export const BaseTemplate = ({
 
 // Styles
 const main = {
-  backgroundColor: '#f8f9fa',
-  fontFamily: 'Arial, sans-serif',
-  margin: '0',
-  padding: '0',
+  backgroundColor: "#f8f9fa",
+  fontFamily: "Arial, sans-serif",
+  margin: "0",
+  padding: "0",
 };
 
 const container = {
-  margin: '0 auto',
-  backgroundColor: '#ffffff',
-  maxWidth: '600px',
+  margin: "0 auto",
+  backgroundColor: "#ffffff",
+  maxWidth: "600px",
 };
 
 const headerGradient = {
-  background: 'linear-gradient(90deg, #51EBEB 0%, #00CC99 100%)',
-  height: '4px',
-  width: '100%',
+  background: "linear-gradient(90deg, #51EBEB 0%, #00CC99 100%)",
+  height: "4px",
+  width: "100%",
 };
 
 const logoSection = {
-  backgroundColor: '#151F28',
-  padding: '20px',
-  textAlign: 'center' as const,
+  backgroundColor: "#151F28",
+  padding: "20px",
+  textAlign: "center" as const,
 };
 
 const logo = {
-  width: '200px',
-  height: 'auto',
-  border: '0',
-  display: 'block',
-  margin: '0 auto',
+  width: "200px",
+  height: "auto",
+  border: "0",
+  display: "block",
+  margin: "0 auto",
 };
 
 const content = {
-  padding: '30px',
-  backgroundColor: 'white',
-  color: '#151F28',
+  padding: "30px",
+  backgroundColor: "white",
+  color: "#151F28",
 };
 
 const greeting = {
-  margin: '0 0 20px 0',
-  padding: '0',
-  fontWeight: '600',
-  marginBlockEnd: '4px',
+  margin: "0 0 20px 0",
+  padding: "0",
+  fontWeight: "600",
+  marginBlockEnd: "4px",
 };
 
 const footer = {
-  padding: '20px',
-  textAlign: 'center' as const,
+  padding: "20px",
+  textAlign: "center" as const,
 };
 
 const socialSection = {
-  margin: '0 auto 20px auto',
-  textAlign: 'center' as const,
+  margin: "0 auto 20px auto",
+  textAlign: "center" as const,
 };
 
 const socialLink = {
-  textDecoration: 'none',
-  display: 'inline-block',
-  margin: '0 8px',
-  verticalAlign: 'middle',
+  textDecoration: "none",
+  display: "inline-block",
+  margin: "0 8px",
+  verticalAlign: "middle",
 };
 
 const socialIcon = {
-  width: '24px',
-  height: '24px',
-  display: 'block',
-  border: '0',
-  opacity: '0.7',
+  width: "24px",
+  height: "24px",
+  display: "block",
+  border: "0",
+  opacity: "0.7",
 };
 
 const address = {
-  color: '#444C53',
-  fontSize: '12px',
-  margin: '0 0 10px 0',
-  fontWeight: '600',
+  color: "#444C53",
+  fontSize: "12px",
+  margin: "0 0 10px 0",
+  fontWeight: "600",
 };
 
 const footerLinks = {
-  color: '#444C53',
-  fontSize: '12px',
-  margin: '0 0 10px 0',
+  color: "#444C53",
+  fontSize: "12px",
+  margin: "0 0 10px 0",
 };
 
 const footerLink = {
-  color: '#444C53',
-  textDecoration: 'underline',
-  margin: '0 5px',
+  color: "#444C53",
+  textDecoration: "underline",
+  margin: "0 5px",
 };
 
 const footerLogo = {
-  width: '32px',
-  height: '32px',
-  border: '0',
-  display: 'block',
-  margin: '0 auto',
+  width: "32px",
+  height: "32px",
+  border: "0",
+  display: "block",
+  margin: "0 auto",
 };

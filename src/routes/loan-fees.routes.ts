@@ -1,10 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getAuth } from "@clerk/fastify";
-import { LoanFeesService } from "../modules/loan-fees/loan-fees.service";
 import { LoanFeesModel } from "../modules/loan-fees/loan-fees.model";
+import { LoanFeesService } from "../modules/loan-fees/loan-fees.service";
 import { UserModel } from "../modules/user/user.model";
-import { logger } from "../utils/logger";
 import { requireRole } from "../utils/authz";
+import { logger } from "../utils/logger";
 
 export async function loanFeesRoutes(fastify: FastifyInstance) {
   // LIST loan fees (public read)
@@ -47,7 +46,7 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to list loan fees", code: "LIST_LOAN_FEES_FAILED" });
       }
-    },
+    }
   );
 
   // GET loan fee by ID (public read)
@@ -55,7 +54,12 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
     "/:id",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         response: {
           200: LoanFeesModel.LoanFeeItemSchema,
           400: UserModel.ErrorResponseSchema,
@@ -82,7 +86,7 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to get loan fee", code: "GET_LOAN_FEE_FAILED" });
       }
-    },
+    }
   );
 
   // CREATE loan fee (admin/super-admin/member only)
@@ -121,7 +125,7 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to create loan fee", code: "CREATE_LOAN_FEE_FAILED" });
       }
-    },
+    }
   );
 
   // UPDATE loan fee (admin/super-admin/member only)
@@ -129,7 +133,12 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
     "/:id",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         body: LoanFeesModel.UpdateLoanFeeBodySchema,
         response: {
           200: LoanFeesModel.LoanFeeItemSchema,
@@ -164,7 +173,7 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to update loan fee", code: "UPDATE_LOAN_FEE_FAILED" });
       }
-    },
+    }
   );
 
   // DELETE loan fee (admin/super-admin/member only) - archives if linked, deletes if not
@@ -172,7 +181,12 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
     "/:id",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         response: {
           200: UserModel.BasicSuccessResponseSchema,
           400: UserModel.ErrorResponseSchema,
@@ -202,7 +216,7 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to delete loan fee", code: "DELETE_LOAN_FEE_FAILED" });
       }
-    },
+    }
   );
 
   // UNARCHIVE loan fee (admin/super-admin/member only)
@@ -210,7 +224,12 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
     "/:id/unarchive",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         response: {
           200: LoanFeesModel.LoanFeeItemSchema,
           400: UserModel.ErrorResponseSchema,
@@ -240,6 +259,6 @@ export async function loanFeesRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to unarchive loan fee", code: "UNARCHIVE_LOAN_FEE_FAILED" });
       }
-    },
+    }
   );
 }

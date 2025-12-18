@@ -1,14 +1,10 @@
 import { clerkClient } from "@clerk/fastify";
-import { logger } from "../../utils/logger";
-import { db } from "../../db";
-import {
-  internalInvitations,
-  internalInvitationStatusEnum,
-  users,
-} from "../../db/schema";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
-import type { InternalUsersModel } from "./internal-users.model";
+import { db } from "../../db";
+import { type internalInvitationStatusEnum, internalInvitations, users } from "../../db/schema";
 import { emailService } from "../../services/email.service";
+import { logger } from "../../utils/logger";
+import type { InternalUsersModel } from "./internal-users.model";
 
 export class InternalUsersService {
   static async requireSuperAdminOrThrow(clerkUserId: string) {
@@ -57,7 +53,7 @@ export class InternalUsersService {
       });
     } catch (e: any) {
       const err: any = new Error(
-        e?.errors?.[0]?.message || e?.message || "Failed to create invitation",
+        e?.errors?.[0]?.message || e?.message || "Failed to create invitation"
       );
       err.status = e?.status || 400;
       logger.error("[INVITE] Clerk invitation failed", {
@@ -73,8 +69,7 @@ export class InternalUsersService {
       email: body.email,
       role: body.role,
       clerkInvitationId: (invitation as any).id,
-      status:
-        "pending" as (typeof internalInvitationStatusEnum.enumValues)[number],
+      status: "pending" as (typeof internalInvitationStatusEnum.enumValues)[number],
       invitedByUserId: invitedByClerkUserId,
       lastSentAt: now,
       createdAt: now,
@@ -94,25 +89,25 @@ export class InternalUsersService {
    */
   static async listInternalUsers(): Promise<InternalUsersModel.ListUsersResponse> {
     // Step 1: Fetch pending invitations
-    const pendingInvitations = await this.fetchPendingInvitations();
+    const pendingInvitations = await InternalUsersService.fetchPendingInvitations();
 
     // Step 2: Fetch local users with roles (internal users)
-    const localUsers = await this.fetchLocalUsersWithRoles();
+    const localUsers = await InternalUsersService.fetchLocalUsersWithRoles();
 
     // Step 3: Batch fetch Clerk user statuses (fixes N+1 query problem)
-    const clerkUserStatuses = await this.batchFetchClerkUserStatuses(
-      localUsers.map((u) => u.clerkId).filter((id): id is string => id !== null),
+    const clerkUserStatuses = await InternalUsersService.batchFetchClerkUserStatuses(
+      localUsers.map((u) => u.clerkId).filter((id): id is string => id !== null)
     );
 
     // Step 4: Transform invitations to items
-    const invitationItems = this.transformInvitationsToItems(pendingInvitations);
+    const invitationItems = InternalUsersService.transformInvitationsToItems(pendingInvitations);
 
     // Step 5: Transform local users to items with Clerk status
-    const userItems = this.transformUsersToItems(localUsers, clerkUserStatuses);
+    const userItems = InternalUsersService.transformUsersToItems(localUsers, clerkUserStatuses);
 
     // Step 6: Combine and deduplicate by email
     const allItems = [...invitationItems, ...userItems];
-    const deduplicatedItems = this.deduplicateItemsByEmail(allItems);
+    const deduplicatedItems = InternalUsersService.deduplicateItemsByEmail(allItems);
 
     return { items: deduplicatedItems };
   }
@@ -140,7 +135,7 @@ export class InternalUsersService {
    * Returns a map of clerkId -> { isActive: boolean, error?: string }
    */
   private static async batchFetchClerkUserStatuses(
-    clerkIds: string[],
+    clerkIds: string[]
   ): Promise<Map<string, { isActive: boolean; error?: string }>> {
     const statusMap = new Map<string, { isActive: boolean; error?: string }>();
 
@@ -155,7 +150,7 @@ export class InternalUsersService {
         const isActive =
           !(clerkUser as any)?.banned &&
           !(clerkUser as any)?.locked &&
-          !Boolean((clerkUser as any)?.lockout_expires_at);
+          !(clerkUser as any)?.lockout_expires_at;
 
         return {
           clerkId,
@@ -203,7 +198,7 @@ export class InternalUsersService {
    * Transforms pending invitations to ListedUserItem format
    */
   private static transformInvitationsToItems(
-    invitations: Awaited<ReturnType<typeof this.fetchPendingInvitations>>,
+    invitations: Awaited<ReturnType<typeof this.fetchPendingInvitations>>
   ): InternalUsersModel.ListedUserItem[] {
     return invitations.map((inv) => ({
       name: inv.email,
@@ -221,7 +216,7 @@ export class InternalUsersService {
    */
   private static transformUsersToItems(
     localUsers: Awaited<ReturnType<typeof this.fetchLocalUsersWithRoles>>,
-    clerkStatuses: Map<string, { isActive: boolean; error?: string }>,
+    clerkStatuses: Map<string, { isActive: boolean; error?: string }>
   ): InternalUsersModel.ListedUserItem[] {
     return localUsers.map((user) => {
       // Get Clerk status (default to inactive if not found or no clerkId)
@@ -236,8 +231,7 @@ export class InternalUsersService {
           };
 
       return {
-        name:
-          [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email,
+        name: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email,
         imageUrl: user.imageUrl || undefined,
         phoneNumber: user.phoneNumber || undefined,
         email: user.email,
@@ -256,7 +250,7 @@ export class InternalUsersService {
    * This handles the case where an invitation was sent but the user already exists
    */
   private static deduplicateItemsByEmail(
-    items: InternalUsersModel.ListedUserItem[],
+    items: InternalUsersModel.ListedUserItem[]
   ): InternalUsersModel.ListedUserItem[] {
     const byEmail = new Map<string, InternalUsersModel.ListedUserItem>();
 
@@ -283,11 +277,7 @@ export class InternalUsersService {
         byEmail.set(item.email, item);
       }
       // If priorities are equal, prefer the one with more information (has clerkId)
-      else if (
-        currentPriority === existingPriority &&
-        item.clerkId &&
-        !existing.clerkId
-      ) {
+      else if (currentPriority === existingPriority && item.clerkId && !existing.clerkId) {
         byEmail.set(item.email, item);
       }
     }
@@ -304,10 +294,7 @@ export class InternalUsersService {
     // Support passing Clerk invitation id as well
     if (!inv) {
       inv = await db.query.internalInvitations.findFirst({
-        where: eq(
-          internalInvitations.clerkInvitationId,
-          params.localInvitationId,
-        ),
+        where: eq(internalInvitations.clerkInvitationId, params.localInvitationId),
       });
     }
     if (!inv) {
@@ -319,7 +306,7 @@ export class InternalUsersService {
     if (inv.clerkInvitationId) {
       try {
         await clerkClient.invitations.revokeInvitation(inv.clerkInvitationId as any);
-      } catch (e: any) {
+      } catch (_e: any) {
         // Ignore - the invitation might already be revoked or expired
       }
     }
@@ -335,7 +322,7 @@ export class InternalUsersService {
       } as any);
     } catch (e: any) {
       const err: any = new Error(
-        e?.errors?.[0]?.message || e?.message || "Failed to create invitation",
+        e?.errors?.[0]?.message || e?.message || "Failed to create invitation"
       );
       err.status = e?.status || 400;
       logger.error("[INVITE] Resend failed", {
@@ -371,10 +358,7 @@ export class InternalUsersService {
         clerkInvitationId: params.localInvitationId,
       });
       inv = await db.query.internalInvitations.findFirst({
-        where: eq(
-          internalInvitations.clerkInvitationId,
-          params.localInvitationId,
-        ),
+        where: eq(internalInvitations.clerkInvitationId, params.localInvitationId),
       });
     }
     if (!inv || !inv.clerkInvitationId) {
@@ -383,12 +367,8 @@ export class InternalUsersService {
       throw err;
     }
     // Revoke via Clerk then remove local record
-    await clerkClient.invitations.revokeInvitation(
-      inv.clerkInvitationId as any,
-    );
-    await db
-      .delete(internalInvitations)
-      .where(eq(internalInvitations.id, inv.id));
+    await clerkClient.invitations.revokeInvitation(inv.clerkInvitationId as any);
+    await db.delete(internalInvitations).where(eq(internalInvitations.id, inv.id));
     logger.info("[INVITE] Revoked Clerk invitation and deleted local record", {
       email: inv.email,
       invitationId: inv.clerkInvitationId,

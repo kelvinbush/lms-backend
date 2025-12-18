@@ -1,16 +1,15 @@
-import type { AdminSMEModel } from "./admin-sme.model";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import {
-  users,
-  businessProfiles,
-  businessDocuments,
   businessDocumentTypeEnum,
+  businessDocuments,
+  businessProfiles,
   smeOnboardingProgress,
+  users,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { eq, and, isNull, inArray } from "drizzle-orm";
+import type { AdminSMEModel } from "./admin-sme.model";
 import { httpError } from "./admin-sme.utils";
-import { AdminSMEService } from "./admin-sme.service";
 
 /**
  * Step 5: Company Info Documents Service
@@ -23,7 +22,7 @@ export abstract class AdminSMEStep5Service {
    */
   static async saveCompanyInfoDocuments(
     userId: string,
-    payload: AdminSMEModel.Step5CompanyInfoDocumentsBody,
+    payload: AdminSMEModel.Step5CompanyInfoDocumentsBody
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
       // Normalize to array
@@ -72,14 +71,14 @@ export abstract class AdminSMEStep5Service {
 
         // Get business (must exist from Step 2)
         const business = await tx.query.businessProfiles.findFirst({
-          where: and(
-            eq(businessProfiles.userId, userId),
-            isNull(businessProfiles.deletedAt)
-          ),
+          where: and(eq(businessProfiles.userId, userId), isNull(businessProfiles.deletedAt)),
         });
 
         if (!business) {
-          throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found. Please complete Step 2 first.");
+          throw httpError(
+            404,
+            "[BUSINESS_NOT_FOUND] Business not found. Please complete Step 2 first."
+          );
         }
 
         // Get existing progress to compute completed steps
@@ -96,7 +95,10 @@ export abstract class AdminSMEStep5Service {
         const existingDocs = await tx.query.businessDocuments.findMany({
           where: and(
             eq(businessDocuments.businessId, business.id),
-            inArray(businessDocuments.docType, normalized.map((d) => d.docType as any)),
+            inArray(
+              businessDocuments.docType,
+              normalized.map((d) => d.docType as any)
+            ),
             isNull(businessDocuments.deletedAt)
           ),
         });
@@ -104,7 +106,7 @@ export abstract class AdminSMEStep5Service {
         const existingByType = new Map(existingDocs.map((d) => [d.docType, d]));
 
         // Prepare batch operations
-        const toUpdate: Array<{ id: string; doc: typeof normalized[0] }> = [];
+        const toUpdate: Array<{ id: string; doc: (typeof normalized)[0] }> = [];
         const toInsert: typeof normalized = [];
 
         for (const doc of normalized) {
@@ -230,7 +232,9 @@ export abstract class AdminSMEStep5Service {
                 ? Number(updatedBusiness.avgYearlyTurnover)
                 : null,
               previousLoans: updatedBusiness.borrowingHistory ?? null,
-              loanAmount: updatedBusiness.amountBorrowed ? Number(updatedBusiness.amountBorrowed) : null,
+              loanAmount: updatedBusiness.amountBorrowed
+                ? Number(updatedBusiness.amountBorrowed)
+                : null,
               defaultCurrency: updatedBusiness.currency ?? null,
               recentLoanStatus: updatedBusiness.loanStatus ?? null,
               defaultReason: updatedBusiness.defaultReason ?? null,
@@ -247,4 +251,3 @@ export abstract class AdminSMEStep5Service {
     }
   }
 }
-

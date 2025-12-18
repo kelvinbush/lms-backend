@@ -2,11 +2,10 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import { users } from "../../db/schema";
 import { businessProfiles } from "../../db/schema";
-import { businessDocuments, businessDocumentTypeEnum } from "../../db/schema";
-import type { BusinessDocumentsModel } from "./business-documents.model";
+import { businessDocumentTypeEnum, businessDocuments } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { AuditTrailService } from "../audit-trail/audit-trail.service";
 import { DocumentRequestService } from "../document-requests/document-request.service";
+import type { BusinessDocumentsModel } from "./business-documents.model";
 
 // Lightweight HTTP error helper compatible with our route error handling
 function httpError(status: number, message: string) {
@@ -24,7 +23,7 @@ export abstract class BusinessDocuments {
   static async upsert(
     clerkId: string,
     businessId: string,
-    input: BusinessDocumentsModel.AddDocumentsBody,
+    input: BusinessDocumentsModel.AddDocumentsBody
   ): Promise<BusinessDocumentsModel.BasicSuccessResponse> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -65,7 +64,7 @@ export abstract class BusinessDocuments {
           throw httpError(
             400,
             `[INVALID_DOC_TYPE] ${idxInfo}: docType is required and must be a valid business document type. ` +
-              `received="${received}" (len=${received.length}); allowed=[${allowed}]`,
+              `received="${received}" (len=${received.length}); allowed=[${allowed}]`
           );
         }
         if (!d.docUrl || typeof d.docUrl !== "string" || d.docUrl.length === 0) {
@@ -74,13 +73,25 @@ export abstract class BusinessDocuments {
 
         // Conditional rules mirroring JSON Schema (defensive, in case service is called directly)
         if (d.isPasswordProtected && (!d.docPassword || d.docPassword.length === 0)) {
-          throw httpError(400, `[INVALID_DOC_PASSWORD] ${idxInfo}: docPassword is required when isPasswordProtected is true`);
+          throw httpError(
+            400,
+            `[INVALID_DOC_PASSWORD] ${idxInfo}: docPassword is required when isPasswordProtected is true`
+          );
         }
         if (d.docType === "audited_financial_statements" && d.docYear === null) {
-          throw httpError(400, `[INVALID_DOC_YEAR] ${idxInfo}: docYear is required for audited_financial_statements`);
+          throw httpError(
+            400,
+            `[INVALID_DOC_YEAR] ${idxInfo}: docYear is required for audited_financial_statements`
+          );
         }
-        if (d.docType === "annual_bank_statement" && (d.docYear === null || d.docBankName === null)) {
-          throw httpError(400, `[INVALID_BANK_STATEMENT] ${idxInfo}: docYear and docBankName are required for annual_bank_statement`);
+        if (
+          d.docType === "annual_bank_statement" &&
+          (d.docYear === null || d.docBankName === null)
+        ) {
+          throw httpError(
+            400,
+            `[INVALID_BANK_STATEMENT] ${idxInfo}: docYear and docBankName are required for annual_bank_statement`
+          );
         }
       }
 
@@ -98,9 +109,16 @@ export abstract class BusinessDocuments {
               d.docBankName === null
                 ? isNull(businessDocuments.docBankName)
                 : (eq(businessDocuments.docBankName, d.docBankName) as any),
-              isNull(businessDocuments.deletedAt),
+              isNull(businessDocuments.deletedAt)
             ),
-            columns: { id: true, docUrl: true, isPasswordProtected: true, docPassword: true, docBankName: true, docYear: true },
+            columns: {
+              id: true,
+              docUrl: true,
+              isPasswordProtected: true,
+              docPassword: true,
+              docBankName: true,
+              docYear: true,
+            },
           });
 
           if (existing) {
@@ -148,7 +166,7 @@ export abstract class BusinessDocuments {
    */
   static async list(
     clerkId: string,
-    businessId: string,
+    businessId: string
   ): Promise<BusinessDocumentsModel.ListDocumentsResponse> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -165,7 +183,7 @@ export abstract class BusinessDocuments {
       const rows = await db.query.businessDocuments.findMany({
         where: and(
           eq(businessDocuments.businessId, businessId),
-          isNull(businessDocuments.deletedAt),
+          isNull(businessDocuments.deletedAt)
         ),
         columns: {
           docType: true,
@@ -216,7 +234,7 @@ export abstract class BusinessDocuments {
       if (!biz) throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found");
 
       // Create document request
-      const request = await DocumentRequestService.createRequest({
+      const _request = await DocumentRequestService.createRequest({
         loanApplicationId: businessId, // Using businessId as loanApplicationId for business documents
         requestedBy: user.id,
         requestedFrom: user.id,

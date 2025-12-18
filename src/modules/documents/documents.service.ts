@@ -1,12 +1,11 @@
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import { users } from "../../db/schema";
 import { personalDocuments } from "../../db/schema";
-import { and, eq, inArray, isNull } from "drizzle-orm";
-import type { DocumentsModel } from "./documents.model";
-import type { UserModel } from "../user/user.model";
 import { logger } from "../../utils/logger";
-import { AuditTrailService } from "../audit-trail/audit-trail.service";
 import { DocumentRequestService } from "../document-requests/document-request.service";
+import type { UserModel } from "../user/user.model";
+import type { DocumentsModel } from "./documents.model";
 
 // Lightweight HTTP error helper compatible with our route error handling
 function httpError(status: number, message: string) {
@@ -23,7 +22,7 @@ export abstract class Documents {
    */
   static async upsert(
     clerkId: string,
-    input: DocumentsModel.AddDocumentsBody,
+    input: DocumentsModel.AddDocumentsBody
   ): Promise<UserModel.BasicSuccessResponse> {
     try {
       // Resolve internal user by clerkId
@@ -38,15 +37,21 @@ export abstract class Documents {
       for (const d of docsArray) {
         byType.set(d.docType, d.docUrl);
       }
-      const upserts = Array.from(byType.entries()).map(([docType, docUrl]) => ({ docType, docUrl }));
+      const upserts = Array.from(byType.entries()).map(([docType, docUrl]) => ({
+        docType,
+        docUrl,
+      }));
 
       await db.transaction(async (tx) => {
         // Find existing active documents for these types
         const existing = await tx.query.personalDocuments.findMany({
           where: and(
             eq(personalDocuments.userId, user.id),
-            inArray(personalDocuments.docType, upserts.map((d) => d.docType)),
-            isNull(personalDocuments.deletedAt),
+            inArray(
+              personalDocuments.docType,
+              upserts.map((d) => d.docType)
+            ),
+            isNull(personalDocuments.deletedAt)
           ),
           columns: { id: true, docType: true, docUrl: true },
         });
@@ -57,8 +62,8 @@ export abstract class Documents {
 
         // Perform updates per type
         for (const d of toUpdate) {
-          const existingDoc = existing.find((e) => e.docType === d.docType);
-          
+          const _existingDoc = existing.find((e) => e.docType === d.docType);
+
           // Note: Audit trail logging for standalone document uploads is skipped
           // as it requires a loanApplicationId. Document uploads are logged when
           // they're part of a loan application workflow.
@@ -70,8 +75,8 @@ export abstract class Documents {
               and(
                 eq(personalDocuments.userId, user.id),
                 eq(personalDocuments.docType, d.docType),
-                isNull(personalDocuments.deletedAt),
-              ),
+                isNull(personalDocuments.deletedAt)
+              )
             );
         }
 
@@ -86,7 +91,7 @@ export abstract class Documents {
               userId: user.id,
               docType: d.docType,
               docUrl: d.docUrl,
-            })),
+            }))
           );
         }
       });
@@ -102,9 +107,7 @@ export abstract class Documents {
   /**
    * List all active personal documents for the current user
    */
-  static async list(
-    clerkId: string,
-  ): Promise<DocumentsModel.ListDocumentsResponse> {
+  static async list(clerkId: string): Promise<DocumentsModel.ListDocumentsResponse> {
     try {
       const user = await db.query.users.findFirst({ where: eq(users.clerkId, clerkId) });
       if (!user) {
@@ -150,7 +153,7 @@ export abstract class Documents {
       if (!user) throw httpError(404, "[USER_NOT_FOUND] User not found");
 
       // Create document request
-      const request = await DocumentRequestService.createRequest({
+      const _request = await DocumentRequestService.createRequest({
         loanApplicationId: user.id, // Using userId as loanApplicationId for personal documents
         requestedBy: user.id,
         requestedFrom: user.id,

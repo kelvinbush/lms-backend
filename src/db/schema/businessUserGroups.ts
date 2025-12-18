@@ -1,5 +1,5 @@
-import { pgTable, varchar, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import { index, pgTable, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { businessProfiles } from "./businessProfiles";
 import { userGroups } from "./userGroups";
 
@@ -10,7 +10,9 @@ import { userGroups } from "./userGroups";
 export const businessUserGroups = pgTable(
   "business_user_groups",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     businessId: varchar("business_id", { length: 24 })
       .notNull()
       .references(() => businessProfiles.id, { onDelete: "cascade" }),
@@ -22,19 +24,13 @@ export const businessUserGroups = pgTable(
   (table) => {
     return {
       // Ensure a business can only be in a group once
-      uqBusinessGroup: uniqueIndex("uq_business_user_groups").on(
-        table.businessId,
-        table.groupId
-      ),
+      uqBusinessGroup: uniqueIndex("uq_business_user_groups").on(table.businessId, table.groupId),
       // Indexes for common queries
       idxBusinessUserGroupsBusiness: index("idx_business_user_groups_business").on(
         table.businessId
       ),
       idxBusinessUserGroupsGroup: index("idx_business_user_groups_group").on(table.groupId),
-      idxBusinessUserGroupsCreated: index("idx_business_user_groups_created").on(
-        table.createdAt
-      ),
+      idxBusinessUserGroupsCreated: index("idx_business_user_groups_created").on(table.createdAt),
     };
-  },
+  }
 );
-

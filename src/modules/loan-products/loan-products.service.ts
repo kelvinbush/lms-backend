@@ -1,8 +1,16 @@
-import { and, eq, isNull, count, desc, or, asc, like, gte, lte, sql, ne, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, like, lte, ne, or } from "drizzle-orm";
 import { db } from "../../db";
-import { loanProducts, loanApplications, loanProductsUserGroups, loanProductsLoanFees, loanFees, organizations, userGroups } from "../../db/schema";
-import type { LoanProductsModel } from "./loan-products.model";
+// TODO: Re-add loanApplications import when loan applications are re-implemented
+import {
+  loanFees,
+  loanProducts,
+  loanProductsLoanFees,
+  loanProductsUserGroups,
+  organizations,
+  userGroups,
+} from "../../db/schema";
 import { logger } from "../../utils/logger";
+import type { LoanProductsModel } from "./loan-products.model";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -43,8 +51,8 @@ function mapRow(
     minTerm: r.minTerm,
     maxTerm: r.maxTerm,
     termUnit: r.termUnit,
-    availabilityStartDate: r.availabilityStartDate?.toISOString()?.split('T')[0] ?? null,
-    availabilityEndDate: r.availabilityEndDate?.toISOString()?.split('T')[0] ?? null,
+    availabilityStartDate: r.availabilityStartDate?.toISOString()?.split("T")[0] ?? null,
+    availabilityEndDate: r.availabilityEndDate?.toISOString()?.split("T")[0] ?? null,
     repaymentFrequency: r.repaymentFrequency,
     maxGracePeriod: r.maxGracePeriod ?? null,
     maxGraceUnit: r.maxGraceUnit ?? null,
@@ -68,9 +76,7 @@ function mapRow(
 }
 
 // Batch fetch relationships for multiple products (efficient)
-async function fetchRelationshipsForProducts(
-  productIds: string[]
-): Promise<{
+async function fetchRelationshipsForProducts(productIds: string[]): Promise<{
   userGroupIdsMap: Map<string, string[]>;
   feesMap: Map<string, LoanProductsModel.LoanFeeConfiguration[]>;
 }> {
@@ -130,14 +136,14 @@ async function fetchRelationshipsForProducts(
 export abstract class LoanProductsService {
   /**
    * Create a new loan product
-   * 
+   *
    * @description Creates a new loan product with draft status by default.
    * Products must be approved and activated before they can be used for applications.
-   * 
+   *
    * @param clerkId - The ID of the user creating the product
    * @param body - Product creation data
    * @returns Created product with draft status
-   * 
+   *
    * @throws {400} If product data is invalid
    * @throws {401} If user is not authorized
    * @throws {409} If product name already exists
@@ -145,7 +151,7 @@ export abstract class LoanProductsService {
    */
   static async create(
     clerkId: string,
-    body: LoanProductsModel.CreateLoanProductBody,
+    body: LoanProductsModel.CreateLoanProductBody
   ): Promise<LoanProductsModel.LoanProductItem> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -161,7 +167,10 @@ export abstract class LoanProductsService {
         const startDate = new Date(body.availabilityStartDate);
         const endDate = new Date(body.availabilityEndDate);
         if (endDate < startDate) {
-          throw httpError(400, "[INVALID_DATE_RANGE] availabilityEndDate cannot be before availabilityStartDate");
+          throw httpError(
+            400,
+            "[INVALID_DATE_RANGE] availabilityEndDate cannot be before availabilityStartDate"
+          );
         }
       }
 
@@ -187,11 +196,11 @@ export abstract class LoanProductsService {
       }
 
       // Parse availability dates
-      const availabilityStartDate = body.availabilityStartDate 
-        ? new Date(body.availabilityStartDate + 'T00:00:00Z')
+      const availabilityStartDate = body.availabilityStartDate
+        ? new Date(`${body.availabilityStartDate}T00:00:00Z`)
         : null;
       const availabilityEndDate = body.availabilityEndDate
-        ? new Date(body.availabilityEndDate + 'T23:59:59Z')
+        ? new Date(`${body.availabilityEndDate}T23:59:59Z`)
         : null;
 
       // Create loan product and relationships in a transaction
@@ -217,21 +226,18 @@ export abstract class LoanProductsService {
           interestCollectionMethod: body.interestCollectionMethod as any,
           interestRecognitionCriteria: body.interestRecognitionCriteria as any,
           maxGracePeriod: body.maxGracePeriod ?? null,
-          maxGraceUnit: body.maxGraceUnit as any ?? null,
+          maxGraceUnit: (body.maxGraceUnit as any) ?? null,
           version: 1,
           status: (body.status ?? "draft") as any,
           isActive: body.isActive ?? true,
         };
 
-        const [row] = await tx
-          .insert(loanProducts)
-          .values(values)
-          .returning();
+        const [row] = await tx.insert(loanProducts).values(values).returning();
 
         // Create user group associations
         if (body.userGroupIds && body.userGroupIds.length > 0) {
           await tx.insert(loanProductsUserGroups).values(
-            body.userGroupIds.map(userGroupId => ({
+            body.userGroupIds.map((userGroupId) => ({
               loanProductId: row.id,
               userGroupId,
             }))
@@ -241,32 +247,35 @@ export abstract class LoanProductsService {
         // Handle fees - create new fees if needed, then link them
         if (body.fees && body.fees.length > 0) {
           const feeLinks: Array<{ loanProductId: string; loanFeeId: string }> = [];
-          
+
           for (const feeConfig of body.fees) {
             let feeId: string;
-            
+
             if (feeConfig.loanFeeId) {
               // Use existing fee
               feeId = feeConfig.loanFeeId;
             } else if (feeConfig.feeName) {
               // Create new fee inline
-              const [newFee] = await tx.insert(loanFees).values({
-                name: feeConfig.feeName,
-                calculationMethod: feeConfig.calculationMethod as any,
-                rate: feeConfig.rate as any,
-                collectionRule: feeConfig.collectionRule as any,
-                allocationMethod: feeConfig.allocationMethod,
-                calculationBasis: feeConfig.calculationBasis as any,
-                isArchived: false,
-              }).returning();
+              const [newFee] = await tx
+                .insert(loanFees)
+                .values({
+                  name: feeConfig.feeName,
+                  calculationMethod: feeConfig.calculationMethod as any,
+                  rate: feeConfig.rate as any,
+                  collectionRule: feeConfig.collectionRule as any,
+                  allocationMethod: feeConfig.allocationMethod,
+                  calculationBasis: feeConfig.calculationBasis as any,
+                  isArchived: false,
+                })
+                .returning();
               feeId = newFee.id;
             } else {
               throw httpError(400, "[INVALID_FEE] Fee must have either loanFeeId or feeName");
             }
-            
+
             feeLinks.push({ loanProductId: row.id, loanFeeId: feeId });
           }
-          
+
           if (feeLinks.length > 0) {
             await tx.insert(loanProductsLoanFees).values(feeLinks);
           }
@@ -288,15 +297,15 @@ export abstract class LoanProductsService {
 
   /**
    * List loan products with comprehensive filtering and pagination
-   * 
+   *
    * @description Retrieves loan products with advanced filtering, sorting, and pagination.
    * Supports filtering by status, currency, amount ranges, terms, and search functionality.
-   * 
+   *
    * Product Status Rules:
    * - draft: Being configured, not available for applications
    * - active: Available for new loan applications
    * - archived: Historical record only, no new applications
-   * 
+   *
    * @param clerkId - The ID of the user requesting the list
    * @param query - Comprehensive filtering and pagination parameters
    * @param query.page - Page number (default: 1)
@@ -318,12 +327,12 @@ export abstract class LoanProductsService {
    * @param query.sortBy - Sort field (default: createdAt)
    * @param query.sortOrder - Sort order (default: desc)
    * @returns Paginated list of products matching the criteria
-   * 
+   *
    * @throws {401} If user is not authorized
    * @throws {500} If listing fails
    */
   static async list(
-    clerkId: string, 
+    clerkId: string,
     query: LoanProductsModel.ListLoanProductsQuery = {}
   ): Promise<LoanProductsModel.ListLoanProductsResponse> {
     try {
@@ -414,26 +423,31 @@ export abstract class LoanProductsService {
       // Build sorting
       const sortBy = query.sortBy || "createdAt";
       const sortOrder = query.sortOrder || "desc";
-      
+
       let orderByClause;
       switch (sortBy) {
         case "name":
           orderByClause = sortOrder === "asc" ? asc(loanProducts.name) : desc(loanProducts.name);
           break;
         case "interestRate":
-          orderByClause = sortOrder === "asc" ? asc(loanProducts.interestRate) : desc(loanProducts.interestRate);
+          orderByClause =
+            sortOrder === "asc" ? asc(loanProducts.interestRate) : desc(loanProducts.interestRate);
           break;
         case "minAmount":
-          orderByClause = sortOrder === "asc" ? asc(loanProducts.minAmount) : desc(loanProducts.minAmount);
+          orderByClause =
+            sortOrder === "asc" ? asc(loanProducts.minAmount) : desc(loanProducts.minAmount);
           break;
         case "maxAmount":
-          orderByClause = sortOrder === "asc" ? asc(loanProducts.maxAmount) : desc(loanProducts.maxAmount);
+          orderByClause =
+            sortOrder === "asc" ? asc(loanProducts.maxAmount) : desc(loanProducts.maxAmount);
           break;
         case "updatedAt":
-          orderByClause = sortOrder === "asc" ? asc(loanProducts.updatedAt) : desc(loanProducts.updatedAt);
+          orderByClause =
+            sortOrder === "asc" ? asc(loanProducts.updatedAt) : desc(loanProducts.updatedAt);
           break;
         default: // createdAt
-          orderByClause = sortOrder === "asc" ? asc(loanProducts.createdAt) : desc(loanProducts.createdAt);
+          orderByClause =
+            sortOrder === "asc" ? asc(loanProducts.createdAt) : desc(loanProducts.createdAt);
       }
 
       // Get paginated results with loan application counts (optimized single query)
@@ -470,29 +484,39 @@ export abstract class LoanProductsService {
           createdAt: loanProducts.createdAt,
           updatedAt: loanProducts.updatedAt,
           deletedAt: loanProducts.deletedAt,
-          loansCount: count(loanApplications.id),
+          // TODO: Re-add loansCount when loan applications are re-implemented
+          // loansCount: count(loanApplications.id),
         })
         .from(loanProducts)
-        .leftJoin(
-          loanApplications,
-          and(
-            eq(loanApplications.loanProductId, loanProducts.id),
-            isNull(loanApplications.deletedAt)
-          )
-        )
+        // TODO: Re-add loanApplications leftJoin when loan applications are re-implemented
+        // .leftJoin(
+        //   loanApplications,
+        //   and(
+        //     eq(loanApplications.loanProductId, loanProducts.id),
+        //     isNull(loanApplications.deletedAt)
+        //   )
+        // )
         .where(and(...whereConditions))
-        .groupBy(loanProducts.id)
+        // TODO: Re-add groupBy when loansCount is re-added
+        // .groupBy(loanProducts.id)
         .orderBy(orderByClause)
         .limit(limit)
         .offset(offset);
 
       // Batch fetch relationships for all products (efficient - only 2 queries total)
-      const productIds = rows.map(row => row.id);
+      const productIds = rows.map((row) => row.id);
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts(productIds);
 
       // Map rows synchronously using pre-fetched data
-      // Type assertion needed because GROUP BY with COUNT changes type inference
-      const mappedRows = rows.map(row => mapRow(row as LoanProductRow, userGroupIdsMap, feesMap, Number(row.loansCount)));
+      // TODO: Re-add loansCount parameter when loan applications are re-implemented
+      const mappedRows = rows.map((row) =>
+        mapRow(
+          row as LoanProductRow,
+          userGroupIdsMap,
+          feesMap,
+          0 /* loansCount: TODO - re-add when loan applications are re-implemented */
+        )
+      );
 
       return {
         success: true,
@@ -514,22 +538,19 @@ export abstract class LoanProductsService {
 
   /**
    * Get a loan product by ID
-   * 
+   *
    * @description Retrieves a specific loan product by its ID.
    * Returns the product regardless of status (including archived).
-   * 
+   *
    * @param clerkId - The ID of the user requesting the product
    * @param id - The product ID
    * @returns The requested product
-   * 
+   *
    * @throws {401} If user is not authorized
    * @throws {404} If product is not found
    * @throws {500} If retrieval fails
    */
-  static async getById(
-    clerkId: string,
-    id: string,
-  ): Promise<LoanProductsModel.LoanProductItem> {
+  static async getById(clerkId: string, id: string): Promise<LoanProductsModel.LoanProductItem> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
 
@@ -567,26 +588,34 @@ export abstract class LoanProductsService {
           createdAt: loanProducts.createdAt,
           updatedAt: loanProducts.updatedAt,
           deletedAt: loanProducts.deletedAt,
-          loansCount: count(loanApplications.id),
+          // TODO: Re-add loansCount when loan applications are re-implemented
+          // loansCount: count(loanApplications.id),
         })
         .from(loanProducts)
-        .leftJoin(
-          loanApplications,
-          and(
-            eq(loanApplications.loanProductId, loanProducts.id),
-            isNull(loanApplications.deletedAt)
-          )
-        )
+        // TODO: Re-add loanApplications leftJoin when loan applications are re-implemented
+        // .leftJoin(
+        //   loanApplications,
+        //   and(
+        //     eq(loanApplications.loanProductId, loanProducts.id),
+        //     isNull(loanApplications.deletedAt)
+        //   )
+        // )
         .where(and(eq(loanProducts.id, id), isNull(loanProducts.deletedAt)))
-        .groupBy(loanProducts.id)
+        // TODO: Re-add groupBy when loansCount is re-added
+        // .groupBy(loanProducts.id)
         .limit(1);
-      
+
       if (!result) throw httpError(404, "[LOAN_PRODUCT_NOT_FOUND] Loan product not found");
-      
+
       // Fetch relationships for this single product
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([result.id]);
-      // Type assertion needed because GROUP BY with COUNT changes type inference
-      return mapRow(result as LoanProductRow, userGroupIdsMap, feesMap, Number(result.loansCount));
+      // TODO: Re-add loansCount parameter when loan applications are re-implemented
+      return mapRow(
+        result as LoanProductRow,
+        userGroupIdsMap,
+        feesMap,
+        0 /* loansCount: TODO - re-add when loan applications are re-implemented */
+      );
     } catch (error: any) {
       logger.error("Error getting loan product:", error);
       if (error?.status) throw error;
@@ -596,22 +625,22 @@ export abstract class LoanProductsService {
 
   /**
    * Update a loan product
-   * 
+   *
    * @description Updates an existing loan product. The ability to edit depends on the product's status:
-   * 
+   *
    * Edit Rules by Status:
    * - draft: ✅ Can edit all fields (name, rates, terms, etc.)
    * - active: ✅ Can edit all fields with automatic versioning for critical changes
    * - archived: ❌ Cannot edit - read-only historical record
-   * 
+   *
    * For active products, critical field changes (rates, terms) automatically increment version.
    * Existing applications are protected by immutable snapshots, so changes are safe.
-   * 
+   *
    * @param clerkId - The ID of the user updating the product
    * @param id - The product ID
    * @param body - Updated product data
    * @returns Updated product
-   * 
+   *
    * @throws {400} If update data is invalid or violates edit rules
    * @throws {401} If user is not authorized
    * @throws {404} If product is not found
@@ -621,7 +650,7 @@ export abstract class LoanProductsService {
   static async update(
     clerkId: string,
     id: string,
-    body: LoanProductsModel.EditLoanProductBody,
+    body: LoanProductsModel.EditLoanProductBody
   ): Promise<LoanProductsModel.LoanProductItem> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -633,19 +662,15 @@ export abstract class LoanProductsService {
       ) {
         throw httpError(400, "[INVALID_AMOUNT_RANGE] minAmount cannot exceed maxAmount");
       }
-      if (
-        body.minTerm !== undefined &&
-        body.maxTerm !== undefined &&
-        body.minTerm > body.maxTerm
-      ) {
+      if (body.minTerm !== undefined && body.maxTerm !== undefined && body.minTerm > body.maxTerm) {
         throw httpError(400, "[INVALID_TERM_RANGE] minTerm cannot exceed maxTerm");
       }
 
       const [existing] = await db
-        .select({ 
-          id: loanProducts.id, 
+        .select({
+          id: loanProducts.id,
           status: loanProducts.status,
-          name: loanProducts.name 
+          name: loanProducts.name,
         })
         .from(loanProducts)
         .where(and(eq(loanProducts.id, id), isNull(loanProducts.deletedAt)));
@@ -653,17 +678,35 @@ export abstract class LoanProductsService {
 
       // Validate edit permissions based on status
       if (existing.status === "archived") {
-        throw httpError(400, "[PRODUCT_ARCHIVED] Cannot edit archived products - they are read-only historical records");
+        throw httpError(
+          400,
+          "[PRODUCT_ARCHIVED] Cannot edit archived products - they are read-only historical records"
+        );
       }
 
       // Check for critical field changes on active products (for versioning)
       let shouldIncrementVersion = false;
       if (existing.status === "active") {
-        const criticalFields = ['minAmount', 'maxAmount', 'minTerm', 'maxTerm', 'interestRate', 'ratePeriod', 'amortizationMethod', 'repaymentFrequency', 'interestCollectionMethod', 'interestRecognitionCriteria'];
-        shouldIncrementVersion = criticalFields.some(field => body[field as keyof typeof body] !== undefined);
-        
+        const criticalFields = [
+          "minAmount",
+          "maxAmount",
+          "minTerm",
+          "maxTerm",
+          "interestRate",
+          "ratePeriod",
+          "amortizationMethod",
+          "repaymentFrequency",
+          "interestCollectionMethod",
+          "interestRecognitionCriteria",
+        ];
+        shouldIncrementVersion = criticalFields.some(
+          (field) => body[field as keyof typeof body] !== undefined
+        );
+
         if (shouldIncrementVersion) {
-          logger.info(`[PRODUCT_VERSION_INCREMENT] Critical field change detected for product ${id} (${existing.name}). Version will be incremented.`);
+          logger.info(
+            `[PRODUCT_VERSION_INCREMENT] Critical field change detected for product ${id} (${existing.name}). Version will be incremented.`
+          );
         }
       }
 
@@ -691,11 +734,11 @@ export abstract class LoanProductsService {
       }
 
       // Parse availability dates if provided
-      const availabilityStartDate = body.availabilityStartDate 
-        ? new Date(body.availabilityStartDate + 'T00:00:00Z')
+      const availabilityStartDate = body.availabilityStartDate
+        ? new Date(`${body.availabilityStartDate}T00:00:00Z`)
         : undefined;
       const availabilityEndDate = body.availabilityEndDate
-        ? new Date(body.availabilityEndDate + 'T23:59:59Z')
+        ? new Date(`${body.availabilityEndDate}T23:59:59Z`)
         : undefined;
 
       // Get current version for incrementing
@@ -715,22 +758,30 @@ export abstract class LoanProductsService {
         if (body.summary !== undefined) updateData.summary = body.summary ?? null;
         if (body.description !== undefined) updateData.description = body.description ?? null;
         if (body.organizationId !== undefined) updateData.organizationId = body.organizationId;
-        if (body.availabilityStartDate !== undefined) updateData.availabilityStartDate = availabilityStartDate ?? null;
-        if (body.availabilityEndDate !== undefined) updateData.availabilityEndDate = availabilityEndDate ?? null;
+        if (body.availabilityStartDate !== undefined)
+          updateData.availabilityStartDate = availabilityStartDate ?? null;
+        if (body.availabilityEndDate !== undefined)
+          updateData.availabilityEndDate = availabilityEndDate ?? null;
         if (body.currency !== undefined) updateData.currency = body.currency;
         if (body.minAmount !== undefined) updateData.minAmount = body.minAmount as any;
         if (body.maxAmount !== undefined) updateData.maxAmount = body.maxAmount as any;
         if (body.minTerm !== undefined) updateData.minTerm = body.minTerm;
         if (body.maxTerm !== undefined) updateData.maxTerm = body.maxTerm;
         if (body.termUnit !== undefined) updateData.termUnit = body.termUnit as any;
-        if (body.repaymentFrequency !== undefined) updateData.repaymentFrequency = body.repaymentFrequency as any;
-        if (body.maxGracePeriod !== undefined) updateData.maxGracePeriod = body.maxGracePeriod ?? null;
-        if (body.maxGraceUnit !== undefined) updateData.maxGraceUnit = body.maxGraceUnit as any ?? null;
+        if (body.repaymentFrequency !== undefined)
+          updateData.repaymentFrequency = body.repaymentFrequency as any;
+        if (body.maxGracePeriod !== undefined)
+          updateData.maxGracePeriod = body.maxGracePeriod ?? null;
+        if (body.maxGraceUnit !== undefined)
+          updateData.maxGraceUnit = (body.maxGraceUnit as any) ?? null;
         if (body.interestRate !== undefined) updateData.interestRate = body.interestRate as any;
         if (body.ratePeriod !== undefined) updateData.ratePeriod = body.ratePeriod as any;
-        if (body.amortizationMethod !== undefined) updateData.amortizationMethod = body.amortizationMethod as any;
-        if (body.interestCollectionMethod !== undefined) updateData.interestCollectionMethod = body.interestCollectionMethod as any;
-        if (body.interestRecognitionCriteria !== undefined) updateData.interestRecognitionCriteria = body.interestRecognitionCriteria as any;
+        if (body.amortizationMethod !== undefined)
+          updateData.amortizationMethod = body.amortizationMethod as any;
+        if (body.interestCollectionMethod !== undefined)
+          updateData.interestCollectionMethod = body.interestCollectionMethod as any;
+        if (body.interestRecognitionCriteria !== undefined)
+          updateData.interestRecognitionCriteria = body.interestRecognitionCriteria as any;
         if (shouldIncrementVersion) updateData.version = (currentProduct?.version ?? 1) + 1;
         if (body.isActive !== undefined) updateData.isActive = body.isActive;
 
@@ -743,11 +794,13 @@ export abstract class LoanProductsService {
         // Update user group associations if provided
         if (body.userGroupIds !== undefined) {
           // Delete existing associations
-          await tx.delete(loanProductsUserGroups).where(eq(loanProductsUserGroups.loanProductId, id));
+          await tx
+            .delete(loanProductsUserGroups)
+            .where(eq(loanProductsUserGroups.loanProductId, id));
           // Insert new associations
           if (body.userGroupIds.length > 0) {
             await tx.insert(loanProductsUserGroups).values(
-              body.userGroupIds.map(userGroupId => ({
+              body.userGroupIds.map((userGroupId) => ({
                 loanProductId: id,
                 userGroupId,
               }))
@@ -762,30 +815,33 @@ export abstract class LoanProductsService {
           // Create new fees if needed and link them
           if (body.fees.length > 0) {
             const feeLinks: Array<{ loanProductId: string; loanFeeId: string }> = [];
-            
+
             for (const feeConfig of body.fees) {
               let feeId: string;
-              
+
               if (feeConfig.loanFeeId) {
                 feeId = feeConfig.loanFeeId;
               } else if (feeConfig.feeName) {
-                const [newFee] = await tx.insert(loanFees).values({
-                  name: feeConfig.feeName,
-                  calculationMethod: feeConfig.calculationMethod as any,
-                  rate: feeConfig.rate as any,
-                  collectionRule: feeConfig.collectionRule as any,
-                  allocationMethod: feeConfig.allocationMethod,
-                  calculationBasis: feeConfig.calculationBasis as any,
-                  isArchived: false,
-                }).returning();
+                const [newFee] = await tx
+                  .insert(loanFees)
+                  .values({
+                    name: feeConfig.feeName,
+                    calculationMethod: feeConfig.calculationMethod as any,
+                    rate: feeConfig.rate as any,
+                    collectionRule: feeConfig.collectionRule as any,
+                    allocationMethod: feeConfig.allocationMethod,
+                    calculationBasis: feeConfig.calculationBasis as any,
+                    isArchived: false,
+                  })
+                  .returning();
                 feeId = newFee.id;
               } else {
                 throw httpError(400, "[INVALID_FEE] Fee must have either loanFeeId or feeName");
               }
-              
+
               feeLinks.push({ loanProductId: id, loanFeeId: feeId });
             }
-            
+
             if (feeLinks.length > 0) {
               await tx.insert(loanProductsLoanFees).values(feeLinks);
             }
@@ -795,20 +851,26 @@ export abstract class LoanProductsService {
         return row;
       });
 
+      // TODO: Re-add loan application count when loan applications are re-implemented
       // Get loan application count for the updated product
-      const [{ loansCount }] = await db
-        .select({ loansCount: count(loanApplications.id) })
-        .from(loanApplications)
-        .where(
-          and(
-            eq(loanApplications.loanProductId, result.id),
-            isNull(loanApplications.deletedAt)
-          )
-        );
+      // const [{ loansCount }] = await db
+      //   .select({ loansCount: count(loanApplications.id) })
+      //   .from(loanApplications)
+      //   .where(
+      //     and(
+      //       eq(loanApplications.loanProductId, result.id),
+      //       isNull(loanApplications.deletedAt)
+      //     )
+      //   );
 
       // Fetch relationships for the updated product
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([result.id]);
-      return mapRow(result, userGroupIdsMap, feesMap, Number(loansCount));
+      return mapRow(
+        result,
+        userGroupIdsMap,
+        feesMap,
+        0 /* loansCount: TODO - re-add when loan applications are re-implemented */
+      );
     } catch (error: any) {
       logger.error("Error updating loan product:", error);
       if (error?.status) throw error;
@@ -818,69 +880,67 @@ export abstract class LoanProductsService {
 
   /**
    * Soft delete a loan product
-   * 
+   *
    * @description Soft deletes a loan product by setting deletedAt timestamp.
    * The product becomes unavailable for new applications but existing applications continue to work.
-   * 
+   *
    * Deletion Rules by Status:
    * - draft: ✅ Can delete (no applications exist)
    * - active: ⚠️ Can delete but check for existing applications first
    * - archived: ✅ Can delete (already archived)
-   * 
+   *
    * @param clerkId - The ID of the user deleting the product
    * @param id - The product ID
    * @returns Success message
-   * 
+   *
    * @throws {400} If product has active applications
    * @throws {401} If user is not authorized
    * @throws {404} If product is not found
    * @throws {500} If deletion fails
    */
-  static async remove(
-    clerkId: string,
-    id: string,
-  ): Promise<{ success: boolean; message: string }> {
+  static async remove(clerkId: string, id: string): Promise<{ success: boolean; message: string }> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
 
       const [existing] = await db
-        .select({ 
-          id: loanProducts.id, 
-          status: loanProducts.status 
+        .select({
+          id: loanProducts.id,
+          status: loanProducts.status,
         })
         .from(loanProducts)
         .where(and(eq(loanProducts.id, id), isNull(loanProducts.deletedAt)));
       if (!existing) throw httpError(404, "[LOAN_PRODUCT_NOT_FOUND] Loan product not found");
 
+      // TODO: Re-add loan application checks when loan applications are re-implemented
       // Check for existing applications (only for active products)
-      if (existing.status === "active") {
-        const [applicationCount] = await db
-          .select({ count: count() })
-          .from(loanApplications)
-          .where(and(
-            eq(loanApplications.loanProductId, id),
-            or(
-              eq(loanApplications.status, "submitted"),
-              eq(loanApplications.status, "under_review"),
-              eq(loanApplications.status, "approved"),
-              eq(loanApplications.status, "offer_letter_sent"),
-              eq(loanApplications.status, "offer_letter_signed"),
-              eq(loanApplications.status, "disbursed")
-            )
-          ));
-
-        if (applicationCount.count > 0) {
-          throw httpError(400, `[PRODUCT_HAS_APPLICATIONS] Cannot delete product with ${applicationCount.count} active applications. Archive the product instead.`);
-        }
-      }
+      // if (existing.status === "active") {
+      //   const [applicationCount] = await db
+      //     .select({ count: count() })
+      //     .from(loanApplications)
+      //     .where(and(
+      //       eq(loanApplications.loanProductId, id),
+      //       or(
+      //         eq(loanApplications.status, "submitted"),
+      //         eq(loanApplications.status, "under_review"),
+      //         eq(loanApplications.status, "approved"),
+      //         eq(loanApplications.status, "offer_letter_sent"),
+      //         eq(loanApplications.status, "offer_letter_signed"),
+      //         eq(loanApplications.status, "disbursed")
+      //       )
+      //     ));
+      //
+      //   if (applicationCount.count > 0) {
+      //     throw httpError(400, `[PRODUCT_HAS_APPLICATIONS] Cannot delete product with ${applicationCount.count} active applications. Archive the product instead.`);
+      //   }
+      // }
 
       await db
         .update(loanProducts)
-        .set({ 
-          deletedAt: new Date(), 
-          isActive: false, 
+        .set({
+          deletedAt: new Date(),
+          isActive: false,
           status: "archived" as any,
-          updatedAt: new Date() 
+          updatedAt: new Date(),
         })
         .where(eq(loanProducts.id, id));
 
@@ -894,25 +954,25 @@ export abstract class LoanProductsService {
 
   /**
    * Update product status
-   * 
+   *
    * @description Changes the status of a loan product. This is the primary way to manage product lifecycle.
-   * 
+   *
    * Note: Reactivation of archived products is safe due to immutable snapshots. Each application
    * maintains its own snapshot of the product state at the time of application, ensuring data integrity.
-   * 
+   *
    * Status Transition Rules:
    * - draft → active: ✅ Product becomes available for applications (requires approval)
    * - active → archived: ✅ Product becomes read-only historical record
    * - archived → active: ✅ Can reactivate with proper approval and audit logging
    * - Any status → draft: ❌ Cannot revert to draft once approved
-   * 
+   *
    * @param clerkId - The ID of the user changing the status
    * @param id - The product ID
    * @param newStatus - The new status to set
    * @param changeReason - Required reason for the status change
    * @param approvedBy - The ID of the user approving the change
    * @returns Updated product
-   * 
+   *
    * @throws {400} If status transition is invalid
    * @throws {401} If user is not authorized
    * @throws {404} If product is not found
@@ -927,15 +987,17 @@ export abstract class LoanProductsService {
   ): Promise<LoanProductsModel.LoanProductItem> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
-      if (!changeReason) throw httpError(400, "[MISSING_REASON] Change reason is required for status updates");
-      if (!approvedBy) throw httpError(400, "[MISSING_APPROVER] Approver ID is required for status updates");
+      if (!changeReason)
+        throw httpError(400, "[MISSING_REASON] Change reason is required for status updates");
+      if (!approvedBy)
+        throw httpError(400, "[MISSING_APPROVER] Approver ID is required for status updates");
 
       const [existing] = await db
-        .select({ 
-          id: loanProducts.id, 
+        .select({
+          id: loanProducts.id,
           status: loanProducts.status,
           name: loanProducts.name,
-          version: loanProducts.version
+          version: loanProducts.version,
         })
         .from(loanProducts)
         .where(and(eq(loanProducts.id, id), isNull(loanProducts.deletedAt)));
@@ -944,64 +1006,69 @@ export abstract class LoanProductsService {
       // Validate status transition
       const currentStatus = existing.status;
       const validTransitions: Record<string, string[]> = {
-        "draft": ["active"],
-        "active": ["archived"],
-        "archived": ["active"] // Can reactivate with proper approval
+        draft: ["active"],
+        active: ["archived"],
+        archived: ["active"], // Can reactivate with proper approval
       };
 
       if (!validTransitions[currentStatus]?.includes(newStatus)) {
-        throw httpError(400, `[INVALID_TRANSITION] Cannot change status from ${currentStatus} to ${newStatus}. Valid transitions: ${validTransitions[currentStatus]?.join(", ") || "none"}`);
+        throw httpError(
+          400,
+          `[INVALID_TRANSITION] Cannot change status from ${currentStatus} to ${newStatus}. Valid transitions: ${validTransitions[currentStatus]?.join(", ") || "none"}`
+        );
       }
 
+      // TODO: Re-add loan application validation when loan applications are re-implemented
       // Special validation for archiving
-      if (newStatus === "archived") {
-        const [applicationCount] = await db
-          .select({ count: count() })
-          .from(loanApplications)
-          .where(and(
-            eq(loanApplications.loanProductId, id),
-            or(
-              eq(loanApplications.status, "submitted"),
-              eq(loanApplications.status, "under_review"),
-              eq(loanApplications.status, "approved"),
-              eq(loanApplications.status, "offer_letter_sent"),
-              eq(loanApplications.status, "offer_letter_signed"),
-              eq(loanApplications.status, "disbursed")
-            )
-          ));
+      // if (newStatus === "archived") {
+      //   const [applicationCount] = await db
+      //     .select({ count: count() })
+      //     .from(loanApplications)
+      //     .where(and(
+      //       eq(loanApplications.loanProductId, id),
+      //       or(
+      //         eq(loanApplications.status, "submitted"),
+      //         eq(loanApplications.status, "under_review"),
+      //         eq(loanApplications.status, "approved"),
+      //         eq(loanApplications.status, "offer_letter_sent"),
+      //         eq(loanApplications.status, "offer_letter_signed"),
+      //         eq(loanApplications.status, "disbursed")
+      //       )
+      //     ));
+      //
+      //   if (applicationCount.count > 0) {
+      //     throw httpError(400, `[PRODUCT_HAS_APPLICATIONS] Cannot archive product with ${applicationCount.count} active applications. Wait for applications to complete.`);
+      //   }
+      // }
 
-        if (applicationCount.count > 0) {
-          throw httpError(400, `[PRODUCT_HAS_APPLICATIONS] Cannot archive product with ${applicationCount.count} active applications. Wait for applications to complete.`);
-        }
-      }
-
+      // TODO: Re-add loan application validation when loan applications are re-implemented
       // Special validation for reactivation (archived → active)
-      if (newStatus === "active" && currentStatus === "archived") {
-        // Check for any applications that might be affected by reactivation
-        // Since we have snapshots, this is mainly for business logic validation
-        const [applicationCount] = await db
-          .select({ count: count() })
-          .from(loanApplications)
-          .where(and(
-            eq(loanApplications.loanProductId, id),
-            or(
-              eq(loanApplications.status, "submitted"),
-              eq(loanApplications.status, "under_review"),
-              eq(loanApplications.status, "approved"),
-              eq(loanApplications.status, "offer_letter_sent"),
-              eq(loanApplications.status, "offer_letter_signed"),
-              eq(loanApplications.status, "disbursed")
-            )
-          ));
-
-        // Log reactivation for audit trail
-        logger.info(`[PRODUCT_REACTIVATION] Product ${id} (${existing.name}) reactivated by ${approvedBy}. Reason: ${changeReason}. Active applications: ${applicationCount.count}`);
-        
-        // Note: We allow reactivation even with active applications because:
-        // 1. Each application has its own immutable snapshot
-        // 2. New applications will use the current product state
-        // 3. Existing applications remain unaffected
-      }
+      // if (newStatus === "active" && currentStatus === "archived") {
+      //   // Check for any applications that might be affected by reactivation
+      //   // Since we have snapshots, this is mainly for business logic validation
+      //   const [applicationCount] = await db
+      //     .select({ count: count() })
+      //     .from(loanApplications)
+      //     .where(and(
+      //       eq(loanApplications.loanProductId, id),
+      //       or(
+      //         eq(loanApplications.status, "submitted"),
+      //         eq(loanApplications.status, "under_review"),
+      //         eq(loanApplications.status, "approved"),
+      //         eq(loanApplications.status, "offer_letter_sent"),
+      //         eq(loanApplications.status, "offer_letter_signed"),
+      //         eq(loanApplications.status, "disbursed")
+      //       )
+      //     ));
+      //
+      //   // Log reactivation for audit trail
+      //   logger.info(`[PRODUCT_REACTIVATION] Product ${id} (${existing.name}) reactivated by ${approvedBy}. Reason: ${changeReason}. Active applications: ${applicationCount.count}`);
+      //
+      //   // Note: We allow reactivation even with active applications because:
+      //   // 1. Each application has its own immutable snapshot
+      //   // 2. New applications will use the current product state
+      //   // 3. Existing applications remain unaffected
+      // }
 
       const [row] = await db
         .update(loanProducts)
@@ -1010,26 +1077,35 @@ export abstract class LoanProductsService {
           changeReason,
           approvedBy,
           approvedAt: new Date(),
-          version: newStatus === "active" && currentStatus === "draft" ? (existing.version ?? 1) + 1 : (existing.version ?? 1), // Increment version on activation
-          updatedAt: new Date()
+          version:
+            newStatus === "active" && currentStatus === "draft"
+              ? (existing.version ?? 1) + 1
+              : (existing.version ?? 1), // Increment version on activation
+          updatedAt: new Date(),
         })
         .where(eq(loanProducts.id, id))
         .returning();
 
+      // TODO: Re-add loan application count when loan applications are re-implemented
       // Get loan application count for the updated product
-      const [{ loansCount }] = await db
-        .select({ loansCount: count(loanApplications.id) })
-        .from(loanApplications)
-        .where(
-          and(
-            eq(loanApplications.loanProductId, id),
-            isNull(loanApplications.deletedAt)
-          )
-        );
+      // const [{ loansCount }] = await db
+      //   .select({ loansCount: count(loanApplications.id) })
+      //   .from(loanApplications)
+      //   .where(
+      //     and(
+      //       eq(loanApplications.loanProductId, id),
+      //       isNull(loanApplications.deletedAt)
+      //     )
+      //   );
 
       // Fetch relationships for the updated product
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts([row.id]);
-      return mapRow(row, userGroupIdsMap, feesMap, Number(loansCount));
+      return mapRow(
+        row,
+        userGroupIdsMap,
+        feesMap,
+        0 /* loansCount: TODO - re-add when loan applications are re-implemented */
+      );
     } catch (error: any) {
       logger.error("Error updating product status:", error);
       if (error?.status) throw error;
@@ -1039,17 +1115,19 @@ export abstract class LoanProductsService {
 
   /**
    * Get products available for applications
-   * 
+   *
    * @description Returns only products that are available for new loan applications.
    * This excludes draft, archived, and deleted products.
-   * 
+   *
    * @param clerkId - The ID of the user requesting available products
    * @returns List of products available for applications
-   * 
+   *
    * @throws {401} If user is not authorized
    * @throws {500} If retrieval fails
    */
-  static async getAvailableForApplications(clerkId: string): Promise<LoanProductsModel.ListLoanProductsResponse> {
+  static async getAvailableForApplications(
+    clerkId: string
+  ): Promise<LoanProductsModel.ListLoanProductsResponse> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
 
@@ -1087,30 +1165,37 @@ export abstract class LoanProductsService {
           createdAt: loanProducts.createdAt,
           updatedAt: loanProducts.updatedAt,
           deletedAt: loanProducts.deletedAt,
-          loansCount: count(loanApplications.id),
+          // TODO: Re-add loansCount when loan applications are re-implemented
+          // loansCount: count(loanApplications.id),
         })
         .from(loanProducts)
-        .leftJoin(
-          loanApplications,
-          and(
-            eq(loanApplications.loanProductId, loanProducts.id),
-            isNull(loanApplications.deletedAt)
-          )
-        )
-        .where(and(
-          isNull(loanProducts.deletedAt),
-          eq(loanProducts.status, "active")
-        ))
-        .groupBy(loanProducts.id)
+        // TODO: Re-add loanApplications leftJoin when loan applications are re-implemented
+        // .leftJoin(
+        //   loanApplications,
+        //   and(
+        //     eq(loanApplications.loanProductId, loanProducts.id),
+        //     isNull(loanApplications.deletedAt)
+        //   )
+        // )
+        .where(and(isNull(loanProducts.deletedAt), eq(loanProducts.status, "active")))
+        // TODO: Re-add groupBy when loansCount is re-added
+        // .groupBy(loanProducts.id)
         .orderBy(desc(loanProducts.createdAt));
 
       // Batch fetch relationships for all products (efficient - only 2 queries total)
-      const productIds = rows.map(row => row.id);
+      const productIds = rows.map((row) => row.id);
       const { userGroupIdsMap, feesMap } = await fetchRelationshipsForProducts(productIds);
 
       // Map rows synchronously using pre-fetched data
-      // Type assertion needed because GROUP BY with COUNT changes type inference
-      const mappedRows = rows.map(row => mapRow(row as LoanProductRow, userGroupIdsMap, feesMap, Number(row.loansCount)));
+      // TODO: Re-add loansCount parameter when loan applications are re-implemented
+      const mappedRows = rows.map((row) =>
+        mapRow(
+          row as LoanProductRow,
+          userGroupIdsMap,
+          feesMap,
+          0 /* loansCount: TODO - re-add when loan applications are re-implemented */
+        )
+      );
 
       return {
         success: true,

@@ -1,10 +1,10 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import { investorOpportunities } from "../../db/schema";
-import type { InvestorOpportunitiesModel } from "./investor-opportunities.model";
-import { logger } from "../../utils/logger";
 import { users } from "../../db/schema";
 import { investorOpportunityBookmarks } from "../../db/schema";
+import { logger } from "../../utils/logger";
+import type { InvestorOpportunitiesModel } from "./investor-opportunities.model";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -33,7 +33,7 @@ function mapRow(r: InvestorOpportunityRow): InvestorOpportunitiesModel.InvestorO
 export abstract class InvestorOpportunitiesService {
   static async create(
     clerkId: string,
-    body: InvestorOpportunitiesModel.CreateInvestorOpportunityBody,
+    body: InvestorOpportunitiesModel.CreateInvestorOpportunityBody
   ): Promise<InvestorOpportunitiesModel.InvestorOpportunityItem> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -49,20 +49,22 @@ export abstract class InvestorOpportunitiesService {
         isActive: body.isActive ?? true,
       };
 
-      const [row] = await db
-        .insert(investorOpportunities)
-        .values(values)
-        .returning();
+      const [row] = await db.insert(investorOpportunities).values(values).returning();
 
       return mapRow(row);
     } catch (error: any) {
       logger.error("Error creating investor opportunity:", error);
       if (error?.status) throw error;
-      throw httpError(500, "[CREATE_INVESTOR_OPPORTUNITY_ERROR] Failed to create investor opportunity");
+      throw httpError(
+        500,
+        "[CREATE_INVESTOR_OPPORTUNITY_ERROR] Failed to create investor opportunity"
+      );
     }
   }
 
-  static async list(clerkId: string): Promise<InvestorOpportunitiesModel.ListInvestorOpportunitiesResponse> {
+  static async list(
+    clerkId: string
+  ): Promise<InvestorOpportunitiesModel.ListInvestorOpportunitiesResponse> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
 
@@ -79,13 +81,16 @@ export abstract class InvestorOpportunitiesService {
     } catch (error: any) {
       logger.error("Error listing investor opportunities:", error);
       if (error?.status) throw error;
-      throw httpError(500, "[LIST_INVESTOR_OPPORTUNITIES_ERROR] Failed to list investor opportunities");
+      throw httpError(
+        500,
+        "[LIST_INVESTOR_OPPORTUNITIES_ERROR] Failed to list investor opportunities"
+      );
     }
   }
 
   static async getById(
     clerkId: string,
-    id: string,
+    id: string
   ): Promise<InvestorOpportunitiesModel.InvestorOpportunityItem> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -95,7 +100,8 @@ export abstract class InvestorOpportunitiesService {
         .from(investorOpportunities)
         .where(and(eq(investorOpportunities.id, id), isNull(investorOpportunities.deletedAt)))
         .limit(1);
-      if (!row) throw httpError(404, "[INVESTOR_OPPORTUNITY_NOT_FOUND] Investor opportunity not found");
+      if (!row)
+        throw httpError(404, "[INVESTOR_OPPORTUNITY_NOT_FOUND] Investor opportunity not found");
       return mapRow(row);
     } catch (error: any) {
       logger.error("Error getting investor opportunity:", error);
@@ -107,7 +113,7 @@ export abstract class InvestorOpportunitiesService {
   static async update(
     clerkId: string,
     id: string,
-    body: InvestorOpportunitiesModel.EditInvestorOpportunityBody,
+    body: InvestorOpportunitiesModel.EditInvestorOpportunityBody
   ): Promise<InvestorOpportunitiesModel.InvestorOpportunityItem> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -116,7 +122,8 @@ export abstract class InvestorOpportunitiesService {
         .select({ id: investorOpportunities.id })
         .from(investorOpportunities)
         .where(and(eq(investorOpportunities.id, id), isNull(investorOpportunities.deletedAt)));
-      if (!existing) throw httpError(404, "[INVESTOR_OPPORTUNITY_NOT_FOUND] Investor opportunity not found");
+      if (!existing)
+        throw httpError(404, "[INVESTOR_OPPORTUNITY_NOT_FOUND] Investor opportunity not found");
 
       const [row] = await db
         .update(investorOpportunities)
@@ -138,14 +145,14 @@ export abstract class InvestorOpportunitiesService {
     } catch (error: any) {
       logger.error("Error updating investor opportunity:", error);
       if (error?.status) throw error;
-      throw httpError(500, "[UPDATE_INVESTOR_OPPORTUNITY_ERROR] Failed to update investor opportunity");
+      throw httpError(
+        500,
+        "[UPDATE_INVESTOR_OPPORTUNITY_ERROR] Failed to update investor opportunity"
+      );
     }
   }
 
-  static async remove(
-    clerkId: string,
-    id: string,
-  ): Promise<{ success: boolean; message: string }> {
+  static async remove(clerkId: string, id: string): Promise<{ success: boolean; message: string }> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
 
@@ -153,7 +160,8 @@ export abstract class InvestorOpportunitiesService {
         .select({ id: investorOpportunities.id })
         .from(investorOpportunities)
         .where(and(eq(investorOpportunities.id, id), isNull(investorOpportunities.deletedAt)));
-      if (!existing) throw httpError(404, "[INVESTOR_OPPORTUNITY_NOT_FOUND] Investor opportunity not found");
+      if (!existing)
+        throw httpError(404, "[INVESTOR_OPPORTUNITY_NOT_FOUND] Investor opportunity not found");
 
       await db
         .update(investorOpportunities)
@@ -164,7 +172,10 @@ export abstract class InvestorOpportunitiesService {
     } catch (error: any) {
       logger.error("Error deleting investor opportunity:", error);
       if (error?.status) throw error;
-      throw httpError(500, "[DELETE_INVESTOR_OPPORTUNITY_ERROR] Failed to delete investor opportunity");
+      throw httpError(
+        500,
+        "[DELETE_INVESTOR_OPPORTUNITY_ERROR] Failed to delete investor opportunity"
+      );
     }
   }
 
@@ -173,7 +184,7 @@ export abstract class InvestorOpportunitiesService {
   // ------------------------------------------------------------
   static async bookmark(
     clerkId: string,
-    id: string,
+    id: string
   ): Promise<{ success: boolean; message: string }> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -188,7 +199,8 @@ export abstract class InvestorOpportunitiesService {
         .from(investorOpportunities)
         .where(and(eq(investorOpportunities.id, id), isNull(investorOpportunities.deletedAt)))
         .limit(1);
-      if (!existing) throw httpError(404, "[INVESTOR_OPPORTUNITY_NOT_FOUND] Investor opportunity not found");
+      if (!existing)
+        throw httpError(404, "[INVESTOR_OPPORTUNITY_NOT_FOUND] Investor opportunity not found");
 
       // Insert bookmark (idempotent via unique index)
       await db
@@ -206,7 +218,7 @@ export abstract class InvestorOpportunitiesService {
 
   static async unbookmark(
     clerkId: string,
-    id: string,
+    id: string
   ): Promise<{ success: boolean; message: string }> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -216,7 +228,12 @@ export abstract class InvestorOpportunitiesService {
 
       await db
         .delete(investorOpportunityBookmarks)
-        .where(and(eq(investorOpportunityBookmarks.userId, user.id), eq(investorOpportunityBookmarks.opportunityId, id)));
+        .where(
+          and(
+            eq(investorOpportunityBookmarks.userId, user.id),
+            eq(investorOpportunityBookmarks.opportunityId, id)
+          )
+        );
 
       return { success: true, message: "Unbookmarked successfully" };
     } catch (error: any) {
@@ -227,7 +244,7 @@ export abstract class InvestorOpportunitiesService {
   }
 
   static async listBookmarks(
-    clerkId: string,
+    clerkId: string
   ): Promise<InvestorOpportunitiesModel.ListBookmarkedInvestorOpportunitiesResponse> {
     try {
       if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
@@ -241,23 +258,37 @@ export abstract class InvestorOpportunitiesService {
         .from(investorOpportunities)
         .innerJoin(
           investorOpportunityBookmarks,
-          eq(investorOpportunityBookmarks.opportunityId, investorOpportunities.id),
+          eq(investorOpportunityBookmarks.opportunityId, investorOpportunities.id)
         )
         .where(
           and(
             eq(investorOpportunityBookmarks.userId, user.id),
-            isNull(investorOpportunities.deletedAt),
-          ),
+            isNull(investorOpportunities.deletedAt)
+          )
         );
 
       // rows is array of { investor_opportunities: ..., investor_opportunity_bookmarks: ... }
-      const items = rows.map((r: any) => mapRow(r.investor_opportunities ?? r.investorOpportunities ?? r.investor_opportunities ?? r.investorOpportunities));
+      const items = rows.map((r: any) =>
+        mapRow(
+          r.investor_opportunities ??
+            r.investorOpportunities ??
+            r.investor_opportunities ??
+            r.investorOpportunities
+        )
+      );
 
-      return { success: true, message: "Bookmarked investor opportunities retrieved successfully", data: items };
+      return {
+        success: true,
+        message: "Bookmarked investor opportunities retrieved successfully",
+        data: items,
+      };
     } catch (error: any) {
       logger.error("Error listing bookmarked investor opportunities:", error);
       if (error?.status) throw error;
-      throw httpError(500, "[LIST_BOOKMARKS_ERROR] Failed to list bookmarked investor opportunities");
+      throw httpError(
+        500,
+        "[LIST_BOOKMARKS_ERROR] Failed to list bookmarked investor opportunities"
+      );
     }
   }
 }

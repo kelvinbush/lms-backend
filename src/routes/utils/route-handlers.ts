@@ -1,5 +1,5 @@
-import type { FastifyReply, FastifyRequest } from "fastify";
 import { getAuth } from "@clerk/fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { logger } from "../../utils/logger";
 
 export interface RouteHandlerOptions {

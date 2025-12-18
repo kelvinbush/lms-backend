@@ -1,12 +1,16 @@
-import { pgTable, text, timestamp, varchar, index } from "drizzle-orm/pg-core";
-import { users } from "./users";
 import { createId } from "@paralleldrive/cuid2";
+import { index, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { users } from "./users";
 
 export const personalDocuments = pgTable(
   "personal_documents",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
-    userId: varchar("user_id", { length: 24 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
+    userId: varchar("user_id", { length: 24 })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     docType: varchar("doc_type", { length: 50 }),
     docUrl: text("doc_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -21,23 +25,20 @@ export const personalDocuments = pgTable(
       idxPersonalDocsCreatedAt: index("idx_personal_docs_created_at").on(table.createdAt),
       idxPersonalDocsUserDeleted: index("idx_personal_docs_user_deleted").on(
         table.userId,
-        table.deletedAt,
+        table.deletedAt
       ),
       idxPersonalDocsUserCreated: index("idx_personal_docs_user_created").on(
         table.userId,
-        table.createdAt,
+        table.createdAt
       ),
-      
+
       // Additional performance indexes for common query patterns
-      idxPersonalDocsUserType: index("idx_personal_docs_user_type").on(
-        table.userId,
-        table.docType
-      ),
+      idxPersonalDocsUserType: index("idx_personal_docs_user_type").on(table.userId, table.docType),
       idxPersonalDocsUserTypeDeleted: index("idx_personal_docs_user_type_deleted").on(
         table.userId,
         table.docType,
         table.deletedAt
       ),
     };
-  },
+  }
 );

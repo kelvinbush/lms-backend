@@ -8,4 +8,3 @@ export function httpError(status: number, message: string) {
   err.status = status;
   return err;
 }
-

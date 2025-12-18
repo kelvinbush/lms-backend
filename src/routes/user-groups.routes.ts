@@ -1,10 +1,10 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getAuth } from "@clerk/fastify";
-import { UserGroupsService } from "../modules/user-groups/user-groups.service";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { UserGroupsModel } from "../modules/user-groups/user-groups.model";
+import { UserGroupsService } from "../modules/user-groups/user-groups.service";
 import { UserModel } from "../modules/user/user.model";
-import { logger } from "../utils/logger";
 import { requireRole } from "../utils/authz";
+import { logger } from "../utils/logger";
 
 export async function userGroupsRoutes(fastify: FastifyInstance) {
   // CREATE group
@@ -31,7 +31,7 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
         }
         const result = await UserGroupsService.create(
           userId,
-          request.body as UserGroupsModel.CreateGroupBody,
+          request.body as UserGroupsModel.CreateGroupBody
         );
         return reply.send(result);
       } catch (error: any) {
@@ -46,7 +46,7 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to create user group", code: "CREATE_USER_GROUP_FAILED" });
       }
-    },
+    }
   );
 
   // LIST group members
@@ -54,7 +54,12 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
     "/:id/members",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         querystring: {
           type: "object",
           additionalProperties: false,
@@ -79,11 +84,12 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
         // Enable response caching for this request (medium TTL)
         (request as any).cacheOptions = {
           ...((request.server as any).responseCache?.cacheOptions?.medium ?? { ttl: 300 }),
-          tags: [
-            `user_group:${id}:members`,
-          ],
+          tags: [`user_group:${id}:members`],
         };
-        const result = await UserGroupsService.listMembers(id, request.query as UserGroupsModel.ListGroupMembersQuery);
+        const result = await UserGroupsService.listMembers(
+          id,
+          request.query as UserGroupsModel.ListGroupMembersQuery
+        );
         return reply.send(result);
       } catch (error: any) {
         logger.error("Error listing group members:", error);
@@ -97,7 +103,7 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to list group members", code: "LIST_GROUP_MEMBERS_FAILED" });
       }
-    },
+    }
   );
 
   // SEARCH businesses for group assignment
@@ -105,7 +111,12 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
     "/:id/businesses/search",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         querystring: {
           type: "object",
           additionalProperties: false,
@@ -125,9 +136,9 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
         },
         tags: ["user-groups"],
       },
-      preValidation: async (request: FastifyRequest, reply: FastifyReply) => {
+      preValidation: async (request: FastifyRequest, _reply: FastifyReply) => {
         // Normalize duplicate query parameters (arrays) to their first value
-        if (request.query && typeof request.query === 'object') {
+        if (request.query && typeof request.query === "object") {
           const query = request.query as Record<string, any>;
           for (const key in query) {
             if (Array.isArray(query[key])) {
@@ -156,9 +167,12 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
         }
         return reply
           .code(500)
-          .send({ error: "Failed to search businesses", code: "SEARCH_BUSINESSES_FOR_GROUP_FAILED" });
+          .send({
+            error: "Failed to search businesses",
+            code: "SEARCH_BUSINESSES_FOR_GROUP_FAILED",
+          });
       }
-    },
+    }
   );
 
   // ASSIGN businesses to group
@@ -166,7 +180,12 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
     "/:id/businesses",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         body: UserGroupsModel.AssignBusinessesToGroupBodySchema,
         response: {
           200: UserGroupsModel.AssignBusinessesToGroupResponseSchema,
@@ -196,9 +215,12 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
         }
         return reply
           .code(500)
-          .send({ error: "Failed to assign businesses", code: "ASSIGN_BUSINESSES_TO_GROUP_FAILED" });
+          .send({
+            error: "Failed to assign businesses",
+            code: "ASSIGN_BUSINESSES_TO_GROUP_FAILED",
+          });
       }
-    },
+    }
   );
 
   // REMOVE business from group
@@ -244,7 +266,7 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to remove business", code: "REMOVE_BUSINESS_FROM_GROUP_FAILED" });
       }
-    },
+    }
   );
 
   // LIST groups
@@ -277,7 +299,7 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to list user groups", code: "LIST_USER_GROUPS_FAILED" });
       }
-    },
+    }
   );
 
   // GET by ID
@@ -285,7 +307,12 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
     "/:id",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         response: {
           200: UserGroupsModel.GroupItemSchema,
           400: UserModel.ErrorResponseSchema,
@@ -313,7 +340,7 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to get user group", code: "GET_USER_GROUP_FAILED" });
       }
-    },
+    }
   );
 
   // UPDATE
@@ -321,7 +348,12 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
     "/:id",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         body: UserGroupsModel.EditGroupBodySchema,
         response: {
           200: UserGroupsModel.GroupItemSchema,
@@ -343,7 +375,7 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
         const result = await UserGroupsService.update(
           userId,
           id,
-          request.body as UserGroupsModel.EditGroupBody,
+          request.body as UserGroupsModel.EditGroupBody
         );
         return reply.send(result);
       } catch (error: any) {
@@ -358,7 +390,7 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to update user group", code: "UPDATE_USER_GROUP_FAILED" });
       }
-    },
+    }
   );
 
   // DELETE (soft)
@@ -366,7 +398,12 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
     "/:id",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         response: {
           200: UserModel.BasicSuccessResponseSchema,
           400: UserModel.ErrorResponseSchema,
@@ -398,6 +435,6 @@ export async function userGroupsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to delete user group", code: "DELETE_USER_GROUP_FAILED" });
       }
-    },
+    }
   );
 }

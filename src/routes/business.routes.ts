@@ -1,5 +1,5 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { clerkClient, getAuth } from "@clerk/fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { BusinessModel } from "../modules/business/business.model";
 import { Business } from "../modules/business/business.service";
 import { UserModel } from "../modules/user/user.model";
@@ -31,14 +31,12 @@ export async function businessRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
 
         const id = await Business.register(
           userId,
-          request.body as BusinessModel.RegisterBusinessInput,
+          request.body as BusinessModel.RegisterBusinessInput
         );
 
         if (id) {
@@ -47,10 +45,7 @@ export async function businessRoutes(fastify: FastifyInstance) {
               publicMetadata: { onBoardingStage: 0, isPhoneVerified: true },
             });
           } catch (e) {
-            logger.error(
-              "Failed to update Clerk publicMetadata.isPhoneVerified:",
-              e,
-            );
+            logger.error("Failed to update Clerk publicMetadata.isPhoneVerified:", e);
             // Do not fail the request if metadata update fails; client already verified OTP
           }
         }
@@ -69,7 +64,7 @@ export async function businessRoutes(fastify: FastifyInstance) {
           code: "BUSINESS_REGISTER_FAILED",
         });
       }
-    },
+    }
   );
 
   // PUT /business/:id — requires auth
@@ -98,16 +93,14 @@ export async function businessRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
 
         const { id } = (request.params as any) || {};
         const result = await Business.edit(
           userId,
           id,
-          request.body as BusinessModel.EditBusinessBody,
+          request.body as BusinessModel.EditBusinessBody
         );
 
         return reply.send(result);
@@ -124,7 +117,7 @@ export async function businessRoutes(fastify: FastifyInstance) {
           code: "BUSINESS_EDIT_FAILED",
         });
       }
-    },
+    }
   );
 
   // GET /business — requires auth
@@ -146,9 +139,7 @@ export async function businessRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
 
         const result = await Business.listByUser(userId);
@@ -166,6 +157,6 @@ export async function businessRoutes(fastify: FastifyInstance) {
           code: "GET_BUSINESSES_FAILED",
         });
       }
-    },
+    }
   );
 }

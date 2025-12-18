@@ -1,10 +1,12 @@
-import { pgTable, varchar, text, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import { index, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 export const userGroups = pgTable(
   "user_groups",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     name: varchar("name", { length: 150 }).notNull(),
     slug: varchar("slug", { length: 150 }).notNull(),
     description: text("description"),
@@ -19,5 +21,5 @@ export const userGroups = pgTable(
       idxCreatedAt: index("idx_user_groups_created_at").on(table.createdAt),
       idxDeletedAt: index("idx_user_groups_deleted_at").on(table.deletedAt),
     };
-  },
+  }
 );

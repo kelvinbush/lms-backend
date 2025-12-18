@@ -1,10 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getAuth } from "@clerk/fastify";
-import { OrganizationsService } from "../modules/organizations/organizations.service";
 import { OrganizationsModel } from "../modules/organizations/organizations.model";
+import { OrganizationsService } from "../modules/organizations/organizations.service";
 import { UserModel } from "../modules/user/user.model";
-import { logger } from "../utils/logger";
 import { requireRole } from "../utils/authz";
+import { logger } from "../utils/logger";
 
 export async function organizationsRoutes(fastify: FastifyInstance) {
   // LIST organizations (public read)
@@ -46,7 +45,7 @@ export async function organizationsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to list organizations", code: "LIST_ORGANIZATIONS_FAILED" });
       }
-    },
+    }
   );
 
   // GET organization by ID (public read)
@@ -54,7 +53,12 @@ export async function organizationsRoutes(fastify: FastifyInstance) {
     "/:id",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         response: {
           200: OrganizationsModel.OrganizationItemSchema,
           400: UserModel.ErrorResponseSchema,
@@ -81,7 +85,7 @@ export async function organizationsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to get organization", code: "GET_ORGANIZATION_FAILED" });
       }
-    },
+    }
   );
 
   // CREATE organization (admin/super-admin/member only)
@@ -120,7 +124,7 @@ export async function organizationsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to create organization", code: "CREATE_ORGANIZATION_FAILED" });
       }
-    },
+    }
   );
 
   // UPDATE organization (admin/super-admin/member only)
@@ -128,7 +132,12 @@ export async function organizationsRoutes(fastify: FastifyInstance) {
     "/:id",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         body: OrganizationsModel.UpdateOrganizationBodySchema,
         response: {
           200: OrganizationsModel.OrganizationItemSchema,
@@ -163,7 +172,7 @@ export async function organizationsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to update organization", code: "UPDATE_ORGANIZATION_FAILED" });
       }
-    },
+    }
   );
 
   // DELETE organization (admin/super-admin/member only)
@@ -171,7 +180,12 @@ export async function organizationsRoutes(fastify: FastifyInstance) {
     "/:id",
     {
       schema: {
-        params: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false },
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
         response: {
           200: UserModel.BasicSuccessResponseSchema,
           400: UserModel.ErrorResponseSchema,
@@ -201,6 +215,6 @@ export async function organizationsRoutes(fastify: FastifyInstance) {
           .code(500)
           .send({ error: "Failed to delete organization", code: "DELETE_ORGANIZATION_FAILED" });
       }
-    },
+    }
   );
 }

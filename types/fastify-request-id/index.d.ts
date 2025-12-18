@@ -1,5 +1,5 @@
-declare module 'fastify-request-id' {
-  import type { FastifyPluginCallback } from 'fastify';
+declare module "fastify-request-id" {
+  import type { FastifyPluginCallback } from "fastify";
   interface RequestIdPluginOptions {
     generator?: () => string;
     headerName?: string;

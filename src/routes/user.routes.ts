@@ -1,11 +1,11 @@
+import { clerkClient, getAuth } from "@clerk/fastify";
 /**
  * User routes for Fastify (flattened)
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { clerkClient, getAuth } from "@clerk/fastify";
-import { logger } from "../utils/logger";
-import { User } from "../modules/user/user.service";
 import { UserModel } from "../modules/user/user.model";
+import { User } from "../modules/user/user.service";
+import { logger } from "../utils/logger";
 
 export async function userRoutes(fastify: FastifyInstance) {
   // POST /user/send-phone-otp — requires auth
@@ -28,9 +28,7 @@ export async function userRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
         const result = await User.sendPhoneVerificationOtp(userId);
         return reply.send(result);
@@ -42,11 +40,9 @@ export async function userRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({ error: "Failed to send OTP", code: "OTP_SEND_FAILED" });
+        return reply.code(500).send({ error: "Failed to send OTP", code: "OTP_SEND_FAILED" });
       }
-    },
+    }
   );
 
   // POST /user/verify-phone-otp — requires auth
@@ -69,15 +65,11 @@ export async function userRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
         const { otp } = (request.body as any) || {};
         if (!otp) {
-          return reply
-            .code(400)
-            .send({ error: "OTP is required", code: "INVALID_INPUT" });
+          return reply.code(400).send({ error: "OTP is required", code: "INVALID_INPUT" });
         }
         const result = await User.verifyPhoneOtp(userId, otp);
 
@@ -88,10 +80,7 @@ export async function userRoutes(fastify: FastifyInstance) {
               publicMetadata: { isPhoneVerified: true },
             });
           } catch (e) {
-            logger.error(
-              "Failed to update Clerk publicMetadata.isPhoneVerified:",
-              e,
-            );
+            logger.error("Failed to update Clerk publicMetadata.isPhoneVerified:", e);
             // Do not fail the request if metadata update fails; client already verified OTP
           }
         }
@@ -110,7 +99,7 @@ export async function userRoutes(fastify: FastifyInstance) {
           code: "OTP_VERIFICATION_FAILED",
         });
       }
-    },
+    }
   );
 
   // GET /user/resend-phone-otp — requires auth
@@ -132,9 +121,7 @@ export async function userRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
         const result = await User.resendPhoneVerificationOtp(userId);
         return reply.send(result);
@@ -146,11 +133,9 @@ export async function userRoutes(fastify: FastifyInstance) {
             code: String(error.message).split("] ")[0].replace("[", ""),
           });
         }
-        return reply
-          .code(500)
-          .send({ error: "Failed to resend OTP", code: "OTP_RESEND_FAILED" });
+        return reply.code(500).send({ error: "Failed to resend OTP", code: "OTP_RESEND_FAILED" });
       }
-    },
+    }
   );
 
   // POST /user/edit-phone — requires auth
@@ -173,9 +158,7 @@ export async function userRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
 
         const { phoneNumber } = (request.body as any) || {};
@@ -196,7 +179,7 @@ export async function userRoutes(fastify: FastifyInstance) {
           code: "PHONE_UPDATE_FAILED",
         });
       }
-    },
+    }
   );
 
   // POST /user/update-docs — update user fields and attach personal documents
@@ -219,26 +202,21 @@ export async function userRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
 
         const result = await User.updateUserAndDocuments(
           userId,
-          request.body as UserModel.UpdateUserAndDocumentsBody,
+          request.body as UserModel.UpdateUserAndDocumentsBody
         );
 
-         if (result.success) {
+        if (result.success) {
           try {
             await clerkClient.users.updateUser(userId, {
               publicMetadata: { onBoardingStage: 1, isPhoneVerified: true },
             });
           } catch (e) {
-            logger.error(
-              "Failed to update Clerk publicMetadata.isPhoneVerified:",
-              e,
-            );
+            logger.error("Failed to update Clerk publicMetadata.isPhoneVerified:", e);
           }
         }
 
@@ -256,7 +234,7 @@ export async function userRoutes(fastify: FastifyInstance) {
           code: "UPDATE_USER_DOCS_FAILED",
         });
       }
-    },
+    }
   );
 
   // PUT /user/edit-profile — requires auth
@@ -279,11 +257,12 @@ export async function userRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
-        const result = await User.editProfile(userId, request.body as UserModel.EditUserProfileBody);
+        const result = await User.editProfile(
+          userId,
+          request.body as UserModel.EditUserProfileBody
+        );
         return reply.send(result);
       } catch (error: any) {
         logger.error("Error editing profile:", error);
@@ -299,7 +278,7 @@ export async function userRoutes(fastify: FastifyInstance) {
         });
       }
     }
-  )
+  );
 
   // GET /user — requires auth
   fastify.get(
@@ -320,9 +299,7 @@ export async function userRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = getAuth(request);
         if (!userId) {
-          return reply
-            .code(401)
-            .send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
         const result = await User.getUserProfile(userId);
         return reply.send(result);
@@ -340,5 +317,5 @@ export async function userRoutes(fastify: FastifyInstance) {
         });
       }
     }
-  )
+  );
 }

@@ -1,5 +1,5 @@
-import puppeteer from 'puppeteer';
-import { logger } from '../utils/logger';
+import puppeteer from "puppeteer";
+import { logger } from "../utils/logger";
 
 export interface LoanOfferLetterData {
   offerNumber: string;
@@ -25,27 +25,27 @@ export class PDFGeneratorService {
     try {
       browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
-      
+
       const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-      
+      await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+
       const pdfBuffer = await page.pdf({
-        format: 'A4',
+        format: "A4",
         printBackground: true,
         margin: {
-          top: '20mm',
-          right: '20mm',
-          bottom: '20mm',
-          left: '20mm'
-        }
+          top: "20mm",
+          right: "20mm",
+          bottom: "20mm",
+          left: "20mm",
+        },
       });
-      
+
       return Buffer.from(pdfBuffer);
     } catch (error) {
-      logger.error('Error generating PDF:', error);
-      throw new Error('Failed to generate PDF');
+      logger.error("Error generating PDF:", error);
+      throw new Error("Failed to generate PDF");
     } finally {
       if (browser) {
         await browser.close();
@@ -203,14 +203,18 @@ export class PDFGeneratorService {
           </div>
         </div>
 
-        ${(data.requiresGuarantor || data.requiresCollateral || data.specialConditions) ? `
+        ${
+          data.requiresGuarantor || data.requiresCollateral || data.specialConditions
+            ? `
           <div class="conditions-section">
             <div class="conditions-title">Additional Requirements & Conditions</div>
-            ${data.requiresGuarantor ? '<div class="condition-item">A guarantor is required for this loan</div>' : ''}
-            ${data.requiresCollateral ? '<div class="condition-item">Collateral is required for this loan</div>' : ''}
-            ${data.specialConditions ? `<div class="condition-item">${data.specialConditions}</div>` : ''}
+            ${data.requiresGuarantor ? '<div class="condition-item">A guarantor is required for this loan</div>' : ""}
+            ${data.requiresCollateral ? '<div class="condition-item">Collateral is required for this loan</div>' : ""}
+            ${data.specialConditions ? `<div class="condition-item">${data.specialConditions}</div>` : ""}
           </div>
-        ` : ''}
+        `
+            : ""
+        }
 
         <p>To proceed with this offer, please review and sign this document to accept the terms and conditions.</p>
 
@@ -249,12 +253,12 @@ export class PDFGeneratorService {
     try {
       const htmlContent = this.generateOfferLetterHTML(data);
       const pdfBuffer = await this.generatePDFFromHTML(htmlContent);
-      
+
       logger.info(`Generated PDF for offer letter: ${data.offerNumber}`);
       return pdfBuffer;
     } catch (error) {
-      logger.error('Error generating offer letter PDF:', error);
-      throw new Error('Failed to generate offer letter PDF');
+      logger.error("Error generating offer letter PDF:", error);
+      throw new Error("Failed to generate offer letter PDF");
     }
   }
 }

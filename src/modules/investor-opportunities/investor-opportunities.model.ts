@@ -1,5 +1,3 @@
-import { investorOpportunities } from "../../db/schema/investorOpportunities";
-
 export namespace InvestorOpportunitiesModel {
   export interface CreateInvestorOpportunityBody {
     name: string;
@@ -23,7 +21,9 @@ export namespace InvestorOpportunitiesModel {
     isActive?: boolean;
   }
 
-  export interface InvestorOpportunityIdParams { id: string }
+  export interface InvestorOpportunityIdParams {
+    id: string;
+  }
 
   export interface InvestorOpportunityItem {
     id: string;

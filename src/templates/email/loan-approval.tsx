@@ -1,11 +1,5 @@
-import {
-  Button,
-  Section,
-  Text,
-  Link,
-} from '@react-email/components';
-import * as React from 'react';
-import { BaseTemplate } from './base-template';
+import { Button, Link, Section, Text } from "@react-email/components";
+import { BaseTemplate } from "./base-template";
 
 interface LoanApprovalProps {
   firstName: string;
@@ -31,7 +25,7 @@ export const LoanApprovalEmail = ({
   termMonths,
   monthlyPayment,
   nextSteps,
-  loginUrl = '#',
+  loginUrl = "#",
   supportEmail,
   supportPhone,
   termsUrl,
@@ -50,31 +44,29 @@ export const LoanApprovalEmail = ({
       unsubscribeUrl={unsubscribeUrl}
     >
       <Text style={paragraph}>
-        We're thrilled to inform you that your loan application has been approved! 
-        You're one step closer to achieving your business goals.
+        We're thrilled to inform you that your loan application has been approved! You're one step
+        closer to achieving your business goals.
       </Text>
 
       <Section style={celebrationBox}>
-        <Text style={celebrationText}>
-          🎉 Congratulations on your loan approval! 🎉
-        </Text>
+        <Text style={celebrationText}>🎉 Congratulations on your loan approval! 🎉</Text>
       </Section>
 
       <Section style={loanDetailsBox}>
         <Text style={detailsTitle}>Loan Details:</Text>
-        
+
         <Text style={detailsLabel}>Application ID:</Text>
         <Text style={detailsValue}>{loanApplicationId}</Text>
-        
+
         <Text style={detailsLabel}>Approved Amount:</Text>
         <Text style={detailsValue}>{loanAmount}</Text>
-        
+
         <Text style={detailsLabel}>Interest Rate:</Text>
         <Text style={detailsValue}>{interestRate}</Text>
-        
+
         <Text style={detailsLabel}>Term:</Text>
         <Text style={detailsValue}>{termMonths} months</Text>
-        
+
         <Text style={detailsLabel}>Monthly Payment:</Text>
         <Text style={detailsValue}>{monthlyPayment}</Text>
       </Section>
@@ -97,24 +89,25 @@ export const LoanApprovalEmail = ({
       <Section style={importantBox}>
         <Text style={importantTitle}>Important Information:</Text>
         <Text style={importantText}>
-          • Please review your loan agreement carefully<br />
-          • Keep track of your payment schedule<br />
-          • Contact us immediately if you have any questions<br />
-          • Your loan will be disbursed after final documentation
+          • Please review your loan agreement carefully
+          <br />• Keep track of your payment schedule
+          <br />• Contact us immediately if you have any questions
+          <br />• Your loan will be disbursed after final documentation
         </Text>
       </Section>
 
       <Text style={paragraph}>
-        We're excited to be part of your business journey. If you have any questions 
-        about your loan or need assistance, please don't hesitate to contact us at{' '}
+        We're excited to be part of your business journey. If you have any questions about your loan
+        or need assistance, please don't hesitate to contact us at{" "}
         <Link href={`mailto:${supportEmail}`} style={link}>
           {supportEmail}
-        </Link>{' '}
+        </Link>{" "}
         or {supportPhone}.
       </Text>
 
       <Text style={signature}>
-        With ambition and impact,<br />
+        With ambition and impact,
+        <br />
         The Melanin Kapital Team
       </Text>
     </BaseTemplate>
@@ -123,122 +116,122 @@ export const LoanApprovalEmail = ({
 
 // Styles
 const paragraph = {
-  margin: '0 0 20px 0',
-  padding: '0',
-  lineHeight: '1.5',
+  margin: "0 0 20px 0",
+  padding: "0",
+  lineHeight: "1.5",
 };
 
 const celebrationBox = {
-  backgroundColor: '#d4edda',
-  border: '1px solid #c3e6cb',
-  borderRadius: '8px',
-  padding: '20px',
-  margin: '20px 0',
-  textAlign: 'center' as const,
+  backgroundColor: "#d4edda",
+  border: "1px solid #c3e6cb",
+  borderRadius: "8px",
+  padding: "20px",
+  margin: "20px 0",
+  textAlign: "center" as const,
 };
 
 const celebrationText = {
-  margin: '0',
-  color: '#155724',
-  fontSize: '18px',
-  fontWeight: '600',
+  margin: "0",
+  color: "#155724",
+  fontSize: "18px",
+  fontWeight: "600",
 };
 
 const loanDetailsBox = {
-  backgroundColor: '#f8f9fa',
-  border: '1px solid #e9ecef',
-  borderRadius: '8px',
-  padding: '20px',
-  margin: '20px 0',
+  backgroundColor: "#f8f9fa",
+  border: "1px solid #e9ecef",
+  borderRadius: "8px",
+  padding: "20px",
+  margin: "20px 0",
 };
 
 const detailsTitle = {
-  fontWeight: '600',
-  margin: '0 0 15px 0',
-  color: '#151F28',
-  fontSize: '16px',
+  fontWeight: "600",
+  margin: "0 0 15px 0",
+  color: "#151F28",
+  fontSize: "16px",
 };
 
 const detailsLabel = {
-  fontWeight: '600',
-  margin: '0 0 5px 0',
-  color: '#151F28',
-  fontSize: '14px',
+  fontWeight: "600",
+  margin: "0 0 5px 0",
+  color: "#151F28",
+  fontSize: "14px",
 };
 
 const detailsValue = {
-  margin: '0 0 15px 0',
-  color: '#6c757d',
-  fontSize: '14px',
+  margin: "0 0 15px 0",
+  color: "#6c757d",
+  fontSize: "14px",
 };
 
 const nextStepsBox = {
-  backgroundColor: '#e3f2fd',
-  border: '1px solid #bbdefb',
-  borderRadius: '8px',
-  padding: '20px',
-  margin: '20px 0',
+  backgroundColor: "#e3f2fd",
+  border: "1px solid #bbdefb",
+  borderRadius: "8px",
+  padding: "20px",
+  margin: "20px 0",
 };
 
 const nextStepsTitle = {
-  fontWeight: '600',
-  margin: '0 0 15px 0',
-  color: '#1565c0',
-  fontSize: '16px',
+  fontWeight: "600",
+  margin: "0 0 15px 0",
+  color: "#1565c0",
+  fontSize: "16px",
 };
 
 const nextStepText = {
-  margin: '0 0 8px 0',
-  color: '#1565c0',
-  fontSize: '14px',
-  lineHeight: '1.5',
+  margin: "0 0 8px 0",
+  color: "#1565c0",
+  fontSize: "14px",
+  lineHeight: "1.5",
 };
 
 const buttonSection = {
-  textAlign: 'center' as const,
-  margin: '30px 0',
+  textAlign: "center" as const,
+  margin: "30px 0",
 };
 
 const button = {
-  backgroundColor: '#151F28',
-  color: 'white',
-  padding: '12px 24px',
-  borderRadius: '5px',
-  textDecoration: 'none',
-  fontWeight: 'bold',
-  display: 'inline-block',
-  border: 'none',
-  cursor: 'pointer',
+  backgroundColor: "#151F28",
+  color: "white",
+  padding: "12px 24px",
+  borderRadius: "5px",
+  textDecoration: "none",
+  fontWeight: "bold",
+  display: "inline-block",
+  border: "none",
+  cursor: "pointer",
 };
 
 const importantBox = {
-  backgroundColor: '#fff3cd',
-  border: '1px solid #ffeaa7',
-  borderRadius: '8px',
-  padding: '20px',
-  margin: '20px 0',
+  backgroundColor: "#fff3cd",
+  border: "1px solid #ffeaa7",
+  borderRadius: "8px",
+  padding: "20px",
+  margin: "20px 0",
 };
 
 const importantTitle = {
-  fontWeight: '600',
-  margin: '0 0 10px 0',
-  color: '#856404',
+  fontWeight: "600",
+  margin: "0 0 10px 0",
+  color: "#856404",
 };
 
 const importantText = {
-  margin: '0',
-  color: '#856404',
-  fontSize: '14px',
-  lineHeight: '1.5',
+  margin: "0",
+  color: "#856404",
+  fontSize: "14px",
+  lineHeight: "1.5",
 };
 
 const link = {
-  color: '#01337F',
-  textDecoration: 'none',
+  color: "#01337F",
+  textDecoration: "none",
 };
 
 const signature = {
-  margin: '20px 0 0 0',
-  fontStyle: 'italic',
-  color: '#6c757d',
+  margin: "20px 0 0 0",
+  fontStyle: "italic",
+  color: "#6c757d",
 };

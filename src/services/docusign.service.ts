@@ -2,10 +2,11 @@ import { logger } from "../utils/logger";
 
 // DocuSign API configuration - Demo environment
 const DOCUSIGN_API_BASE_URL = process.env.DOCUSIGN_BASE_URL || "https://demo.docusign.net/restapi";
-const DOCUSIGN_AUTH_BASE_URL = process.env.DOCUSIGN_AUTH_BASE_URL || "https://account-d.docusign.com/oauth/token";
+const DOCUSIGN_AUTH_BASE_URL =
+  process.env.DOCUSIGN_AUTH_BASE_URL || "https://account-d.docusign.com/oauth/token";
 const DOCUSIGN_INTEGRATION_KEY = process.env.DOCUSIGN_INTEGRATION_KEY;
 const DOCUSIGN_USER_ID = process.env.DOCUSIGN_USER_ID;
-const DOCUSIGN_PRIVATE_KEY = process.env.DOCUSIGN_PRIVATE_KEY?.replace(/\\n/g, '\n'); // Handle multiline private key
+const DOCUSIGN_PRIVATE_KEY = process.env.DOCUSIGN_PRIVATE_KEY?.replace(/\\n/g, "\n"); // Handle multiline private key
 const DOCUSIGN_ACCOUNT_ID = process.env.DOCUSIGN_ACCOUNT_ID;
 
 // DocuSign API interfaces
@@ -219,12 +220,12 @@ class DocuSignService {
     try {
       // Use the correct DocuSign auth endpoint
       const tokenResponse = await fetch(DOCUSIGN_AUTH_BASE_URL, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
         body: new URLSearchParams({
-          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+          grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
           assertion: this.generateJWT(),
         }),
       });
@@ -237,7 +238,7 @@ class DocuSignService {
 
       const tokenData = await tokenResponse.json();
       this.accessToken = tokenData.access_token;
-      this.tokenExpiry = new Date(Date.now() + (tokenData.expires_in * 1000) - 60000); // 1 minute buffer
+      this.tokenExpiry = new Date(Date.now() + tokenData.expires_in * 1000 - 60000); // 1 minute buffer
 
       return this.accessToken || "";
     } catch (error) {
@@ -250,18 +251,18 @@ class DocuSignService {
    * Generate JWT for DocuSign authentication
    */
   private generateJWT(): string {
-    const jwt = require('jsonwebtoken');
-    
+    const jwt = require("jsonwebtoken");
+
     const payload = {
       iss: DOCUSIGN_INTEGRATION_KEY,
       sub: DOCUSIGN_USER_ID,
       aud: "account-d.docusign.com",
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
-      scope: "signature impersonation"
+      scope: "signature impersonation",
     };
 
-    return jwt.sign(payload, DOCUSIGN_PRIVATE_KEY, { algorithm: 'RS256' });
+    return jwt.sign(payload, DOCUSIGN_PRIVATE_KEY, { algorithm: "RS256" });
   }
 
   /**
@@ -270,11 +271,14 @@ class DocuSignService {
   async getAccountId(): Promise<string> {
     try {
       const accessToken = await this.getAccessToken();
-      const response = await fetch(`${DOCUSIGN_AUTH_BASE_URL.replace('/oauth/token', '/oauth/userinfo')}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
+      const response = await fetch(
+        `${DOCUSIGN_AUTH_BASE_URL.replace("/oauth/token", "/oauth/userinfo")}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to get user info: ${response.statusText}`);
@@ -282,15 +286,15 @@ class DocuSignService {
 
       const userInfo = await response.json();
       logger.info("DocuSign userinfo response:", JSON.stringify(userInfo, null, 2));
-      
+
       if (userInfo.accounts && userInfo.accounts.length > 0) {
         const account = userInfo.accounts[0];
         // Store the base URI for use in API calls
         this.baseUri = `${account.base_uri}/restapi`;
         return account.account_id;
       }
-        logger.warn("No accounts found in userinfo response, using environment variable");
-        return DOCUSIGN_ACCOUNT_ID || "";
+      logger.warn("No accounts found in userinfo response, using environment variable");
+      return DOCUSIGN_ACCOUNT_ID || "";
     } catch (error) {
       logger.error("Error getting DocuSign account ID:", error);
       throw new Error("Failed to get DocuSign account ID");
@@ -303,7 +307,7 @@ class DocuSignService {
   async createEnvelope(request: CreateEnvelopeRequest): Promise<DocuSignEnvelope> {
     try {
       const accessToken = await this.getAccessToken();
-      
+
       // Get account ID and base URI dynamically
       const accountId = await this.getAccountId();
       const apiBaseUrl = this.baseUri || DOCUSIGN_API_BASE_URL;
@@ -311,12 +315,12 @@ class DocuSignService {
       logger.info("Creating DocuSign envelope at:", envelopeUrl);
       logger.info("Using account ID:", accountId);
       logger.info("Using base URI:", apiBaseUrl);
-      
+
       const response = await fetch(envelopeUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(request),
       });
@@ -328,7 +332,7 @@ class DocuSignService {
 
       const envelope = await response.json();
       logger.info("DocuSign envelope created successfully:", envelope.envelopeId);
-      
+
       return envelope;
     } catch (error) {
       logger.error("Error creating DocuSign envelope:", error);
@@ -342,14 +346,17 @@ class DocuSignService {
   async getEnvelopeStatus(envelopeId: string): Promise<DocuSignEnvelope> {
     try {
       const accessToken = await this.getAccessToken();
-      
-      const response = await fetch(`${DOCUSIGN_API_BASE_URL}/v2.1/accounts/${DOCUSIGN_ACCOUNT_ID}/envelopes/${envelopeId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+
+      const response = await fetch(
+        `${DOCUSIGN_API_BASE_URL}/v2.1/accounts/${DOCUSIGN_ACCOUNT_ID}/envelopes/${envelopeId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to get envelope status: ${response.statusText}`);
@@ -368,14 +375,17 @@ class DocuSignService {
   async getEnvelopeRecipients(envelopeId: string): Promise<{ signers: DocuSignRecipient[] }> {
     try {
       const accessToken = await this.getAccessToken();
-      
-      const response = await fetch(`${DOCUSIGN_API_BASE_URL}/v2.1/accounts/${DOCUSIGN_ACCOUNT_ID}/envelopes/${envelopeId}/recipients`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+
+      const response = await fetch(
+        `${DOCUSIGN_API_BASE_URL}/v2.1/accounts/${DOCUSIGN_ACCOUNT_ID}/envelopes/${envelopeId}/recipients`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to get envelope recipients: ${response.statusText}`);
@@ -394,18 +404,21 @@ class DocuSignService {
   async voidEnvelope(envelopeId: string, reason: string): Promise<void> {
     try {
       const accessToken = await this.getAccessToken();
-      
-      const response = await fetch(`${DOCUSIGN_API_BASE_URL}/v2.1/accounts/${DOCUSIGN_ACCOUNT_ID}/envelopes/${envelopeId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: 'voided',
-          voidedReason: reason,
-        }),
-      });
+
+      const response = await fetch(
+        `${DOCUSIGN_API_BASE_URL}/v2.1/accounts/${DOCUSIGN_ACCOUNT_ID}/envelopes/${envelopeId}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: "voided",
+            voidedReason: reason,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to void envelope: ${response.statusText}`);
@@ -426,17 +439,20 @@ class DocuSignService {
       const accessToken = await this.getAccessToken();
       const accountId = await this.getAccountId();
       const apiBaseUrl = this.baseUri || DOCUSIGN_API_BASE_URL;
-      
-      const response = await fetch(`${apiBaseUrl}/v2.1/accounts/${accountId}/envelopes/${envelopeId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: 'sent'
-        }),
-      });
+
+      const response = await fetch(
+        `${apiBaseUrl}/v2.1/accounts/${accountId}/envelopes/${envelopeId}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: "sent",
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -456,23 +472,26 @@ class DocuSignService {
   async getSigningUrl(envelopeId: string, recipientId: string, returnUrl: string): Promise<string> {
     try {
       const accessToken = await this.getAccessToken();
-      
+
       const accountId = await this.getAccountId();
       const apiBaseUrl = this.baseUri || DOCUSIGN_API_BASE_URL;
-      const response = await fetch(`${apiBaseUrl}/v2.1/accounts/${accountId}/envelopes/${envelopeId}/views/recipient`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          authenticationMethod: 'none',
-          email: '',
-          userName: '',
-          recipientId: recipientId || "",
-          returnUrl: returnUrl,
-        }),
-      });
+      const response = await fetch(
+        `${apiBaseUrl}/v2.1/accounts/${accountId}/envelopes/${envelopeId}/views/recipient`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            authenticationMethod: "none",
+            email: "",
+            userName: "",
+            recipientId: recipientId || "",
+            returnUrl: returnUrl,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to get signing URL: ${response.statusText}`);
@@ -496,48 +515,48 @@ class DocuSignService {
       // 2. Real DocuSign format: event.data.envelopeId
       let envelopeId: string;
       let status: string;
-      
+
       if (event.data?.envelopeSummary) {
         envelopeId = event.data.envelopeSummary.envelopeId;
         status = event.data.envelopeSummary.status;
       } else if (event.data?.envelopeId) {
         envelopeId = event.data.envelopeId;
-        status = 'unknown'; // Real DocuSign webhooks don't include status in this format
+        status = "unknown"; // Real DocuSign webhooks don't include status in this format
       } else {
         logger.error("Cannot extract envelope information from webhook event:", event);
         return;
       }
-      
+
       logger.info(`Processing DocuSign webhook for envelope ${envelopeId} with status: ${status}`);
-      
+
       // Here you would update your database based on the webhook event
       // For example, update the offer letter status in your database
-      
+
       switch (status) {
-        case 'sent':
+        case "sent":
           logger.info(`Envelope ${envelopeId} has been sent`);
           break;
-        case 'delivered':
+        case "delivered":
           logger.info(`Envelope ${envelopeId} has been delivered`);
           break;
-        case 'completed':
+        case "completed":
           logger.info(`Envelope ${envelopeId} has been completed (signed)`);
           break;
-        case 'declined':
+        case "declined":
           logger.info(`Envelope ${envelopeId} has been declined`);
           break;
-        case 'voided':
+        case "voided":
           logger.info(`Envelope ${envelopeId} has been voided`);
           break;
-        case 'unknown':
+        case "unknown":
           // For real DocuSign webhooks, determine status from event type
-          if (event.event === 'envelope-delivered') {
+          if (event.event === "envelope-delivered") {
             logger.info(`Envelope ${envelopeId} has been delivered`);
-          } else if (event.event === 'envelope-completed') {
+          } else if (event.event === "envelope-completed") {
             logger.info(`Envelope ${envelopeId} has been completed (signed)`);
-          } else if (event.event === 'envelope-declined') {
+          } else if (event.event === "envelope-declined") {
             logger.info(`Envelope ${envelopeId} has been declined`);
-          } else if (event.event === 'envelope-voided') {
+          } else if (event.event === "envelope-voided") {
             logger.info(`Envelope ${envelopeId} has been voided`);
           } else {
             logger.info(`Envelope ${envelopeId} received event: ${event.event}`);
@@ -560,12 +579,15 @@ class DocuSignService {
       const accessToken = await this.getAccessToken();
       const accountId = await this.getAccountId();
       const apiBaseUrl = this.baseUri || DOCUSIGN_API_BASE_URL;
-      
-      const response = await fetch(`${apiBaseUrl}/v2.1/accounts/${accountId}/envelopes/${envelopeId}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
+
+      const response = await fetch(
+        `${apiBaseUrl}/v2.1/accounts/${accountId}/envelopes/${envelopeId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         const errorText = await response.text();

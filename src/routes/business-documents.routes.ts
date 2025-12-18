@@ -1,10 +1,10 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getAuth } from "@clerk/fastify";
-import { logger } from "../utils/logger";
-import { BusinessDocuments } from "../modules/business-documents/business-documents.service";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { BusinessDocumentsModel } from "../modules/business-documents/business-documents.model";
-import { UserModel } from "../modules/user/user.model";
+import { BusinessDocuments } from "../modules/business-documents/business-documents.service";
 import { CachingService } from "../modules/caching/caching.service";
+import { UserModel } from "../modules/user/user.model";
+import { logger } from "../utils/logger";
 
 export async function businessDocumentsRoutes(fastify: FastifyInstance) {
   // POST /business/:id/documents — upsert one or many business documents
@@ -40,18 +40,15 @@ export async function businessDocumentsRoutes(fastify: FastifyInstance) {
           const firstItemKeys = firstItem ? Object.keys(firstItem) : undefined;
           const receivedDocType = isArray ? firstItem?.docType : body?.docType;
           const contentType = (request.headers["content-type"] as string) || undefined;
-          logger.info(
-            "Incoming business documents upsert request body",
-            {
-              kind: "business-docs.upsert.request",
-              contentType,
-              rawBodyType: typeof body,
-              isArray,
-              keys,
-              firstItemKeys,
-              receivedDocType,
-            },
-          );
+          logger.info("Incoming business documents upsert request body", {
+            kind: "business-docs.upsert.request",
+            contentType,
+            rawBodyType: typeof body,
+            isArray,
+            keys,
+            firstItemKeys,
+            receivedDocType,
+          });
         } catch (e) {
           logger.warn("Failed to log business-docs upsert request body", { err: e });
         }
@@ -60,17 +57,20 @@ export async function businessDocumentsRoutes(fastify: FastifyInstance) {
         const result = await BusinessDocuments.upsert(
           userId,
           id,
-          normalizedBody as BusinessDocumentsModel.AddDocumentsBody,
+          normalizedBody as BusinessDocumentsModel.AddDocumentsBody
         );
-        
+
         // Invalidate business documents cache for this business
         try {
           await CachingService.invalidatePattern(`business_documents:${id}:*`);
           logger.debug(`Cache invalidated for business documents of business ${id}`);
         } catch (cacheError) {
-          logger.error(`Error invalidating cache for business documents of business ${id}:`, cacheError);
+          logger.error(
+            `Error invalidating cache for business documents of business ${id}:`,
+            cacheError
+          );
         }
-        
+
         return reply.send(result);
       } catch (error: any) {
         logger.error("Error upserting business documents:", error);
@@ -82,9 +82,12 @@ export async function businessDocumentsRoutes(fastify: FastifyInstance) {
         }
         return reply
           .code(500)
-          .send({ error: "Failed to upsert business documents", code: "UPSERT_BUSINESS_DOCUMENTS_FAILED" });
+          .send({
+            error: "Failed to upsert business documents",
+            code: "UPSERT_BUSINESS_DOCUMENTS_FAILED",
+          });
       }
-    },
+    }
   );
 
   // GET /business/:id/documents — list all active business documents
@@ -122,8 +125,11 @@ export async function businessDocumentsRoutes(fastify: FastifyInstance) {
         }
         return reply
           .code(500)
-          .send({ error: "Failed to list business documents", code: "LIST_BUSINESS_DOCUMENTS_FAILED" });
+          .send({
+            error: "Failed to list business documents",
+            code: "LIST_BUSINESS_DOCUMENTS_FAILED",
+          });
       }
-    },
+    }
   );
 }

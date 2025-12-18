@@ -1,5 +1,5 @@
-import { pgTable, text, timestamp, varchar, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import { index, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 /**
  * Organizations table
@@ -8,7 +8,9 @@ import { createId } from "@paralleldrive/cuid2";
 export const organizations = pgTable(
   "organizations",
   {
-    id: varchar("id", { length: 24 }).$defaultFn(() => createId()).primaryKey(),
+    id: varchar("id", { length: 24 })
+      .$defaultFn(() => createId())
+      .primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -21,5 +23,5 @@ export const organizations = pgTable(
       idxOrganizationsCreatedAt: index("idx_organizations_created_at").on(table.createdAt),
       idxOrganizationsDeletedAt: index("idx_organizations_deleted_at").on(table.deletedAt),
     };
-  },
+  }
 );
