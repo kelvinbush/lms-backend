@@ -7,16 +7,18 @@ import type { FastifyInstance } from "fastify";
 import fastifyPlugin from "fastify-plugin";
 
 export const corsPlugin = fastifyPlugin(async (fastify: FastifyInstance) => {
-  const appUrl = process.env.APPS_URL_CORS;
+  const appUrl = process.env.APP_URL;
+  const adminUrl = process.env.ADMIN_URL;
   const nodeEnv = process.env.NODE_ENV || "development";
 
-  // Build origin checker: support comma-separated APP_URL list
-  const allowedOrigins = appUrl
-    ? appUrl
-        .split(",")
-        .map((o) => o.trim())
-        .filter(Boolean)
-    : [];
+  // Build origin checker: combine APP_URL and ADMIN_URL
+  const allowedOrigins: string[] = [];
+  if (appUrl) {
+    allowedOrigins.push(appUrl.trim());
+  }
+  if (adminUrl) {
+    allowedOrigins.push(adminUrl.trim());
+  }
 
   await fastify.register(fastifyCors, {
     origin: (origin, cb) => {
