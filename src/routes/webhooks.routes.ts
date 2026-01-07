@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ClerkWebhookService } from "../services/clerk-webhook.service";
-import { DocuSignWebhookService } from "../services/docusign-webhook.service";
 import { type DocuSignWebhookEvent, docuSignService } from "../services/docusign.service";
 import { logger } from "../utils/logger";
 import { verifyClerkWebhook } from "../utils/webhook.utils";
@@ -46,7 +45,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
       await docuSignService.processWebhookEvent(event as DocuSignWebhookEvent);
 
       // Update offer letter and loan application status based on DocuSign event
-      await DocuSignWebhookService.handleStatusUpdate(event as DocuSignWebhookEvent);
+      await docuSignService.processWebhookEvent(event as DocuSignWebhookEvent);
 
       reply.code(200).send({ success: true });
     } catch (error) {

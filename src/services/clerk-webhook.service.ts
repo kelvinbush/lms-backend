@@ -141,7 +141,7 @@ export class ClerkWebhookService {
         }
 
         // Fetch user for subsequent operations
-        user = await User.findByEmail(userDataResult.userData?.email);
+        user = await User.findByEmail(userDataResult.userData!.email);
       }
 
       if (!user) {
