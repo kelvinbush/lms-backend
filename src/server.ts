@@ -31,6 +31,7 @@ import { userGroupsRoutes } from "./routes/user-groups.routes";
 import { userRoutes } from "./routes/user.routes";
 import { errorHandler } from "./utils/error-handler";
 import { logger } from "./utils/logger";
+import { webhookRoutes } from "./routes/webhooks.routes";
 
 config();
 
@@ -78,6 +79,7 @@ export async function registerPlugins(fastify: FastifyInstance): Promise<void> {
   await fastify.register(userGroupsRoutes, { prefix: "/user-groups" });
   await fastify.register(organizationsRoutes, { prefix: "/organizations" });
   await fastify.register(loanFeesRoutes, { prefix: "/loan-fees" });
+  await fastify.register(webhookRoutes, { prefix: "/webhooks" });
 
   fastify.get("/", async () => {
     return { message: "Hello from Fastify!" };
