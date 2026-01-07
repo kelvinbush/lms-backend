@@ -7,7 +7,7 @@ import { LoanApplicationsModel } from "../modules/loan-applications/loan-applica
 import { LoanApplicationsService } from "../modules/loan-applications/loan-applications.service";
 import { LoanApplicationTimelineService } from "../modules/loan-applications/loan-applications-timeline.service";
 import { UserModel } from "../modules/user/user.model";
-import { isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
+import { isAdminOrMember, isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
 
 export async function loanApplicationsRoutes(fastify: FastifyInstance) {
@@ -428,6 +428,66 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // GET my loan application timeline (for entrepreneurs)
+  // Accessible to: entrepreneurs (can only see timeline for their own applications)
+  fastify.get(
+    "/my-applications/:id/timeline",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: LoanApplicationsModel.TimelineResponseSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require authentication
+        const user = await requireAuth(request);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        // Verify user is an entrepreneur (not admin)
+        if (isAdminOrMember(user)) {
+          return reply.code(403).send({
+            error: "This endpoint is for entrepreneurs only. Admins should use /:id/timeline",
+            code: "FORBIDDEN",
+          });
+        }
+
+        const { id } = (request.params as any) || {};
+        // Pass clerkId for authorization check - service will verify user owns the application
+        const result = await LoanApplicationTimelineService.getTimeline(id, userId);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting loan application timeline:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get loan application timeline",
+          code: "GET_TIMELINE_FAILED",
+        });
+      }
+    }
+  );
+
   // PUT update loan application status
   fastify.put(
     "/:id/status",
@@ -659,6 +719,143 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to get loan application",
           code: "GET_LOAN_APPLICATION_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST cancel my loan application (for entrepreneurs)
+  // Accessible to: entrepreneurs (can only cancel their own applications)
+  fastify.post(
+    "/my-applications/:id/cancel",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: LoanApplicationsModel.CancelLoanApplicationBodySchema,
+        response: {
+          200: LoanApplicationsModel.LoanApplicationDetailSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require authentication
+        const user = await requireAuth(request);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        // Verify user is an entrepreneur (not admin)
+        if (isAdminOrMember(user)) {
+          return reply.code(403).send({
+            error: "This endpoint is for entrepreneurs only. Admins should use /:id/cancel",
+            code: "FORBIDDEN",
+          });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = (request.body as LoanApplicationsModel.CancelLoanApplicationBody) || {};
+        const reason = body.reason;
+
+        // Cancel the application (isAdminOrMember = false for entrepreneurs)
+        const result = await LoanApplicationsService.cancel(
+          userId,
+          id,
+          reason,
+          false,
+          request
+        );
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error cancelling loan application:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to cancel loan application",
+          code: "CANCEL_LOAN_APPLICATION_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST cancel loan application (for admins/members)
+  // Accessible to: admins/members (can cancel any application)
+  fastify.post(
+    "/:id/cancel",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: LoanApplicationsModel.CancelLoanApplicationBodySchema,
+        response: {
+          200: LoanApplicationsModel.LoanApplicationDetailSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require authentication
+        const user = await requireAuth(request);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = (request.body as LoanApplicationsModel.CancelLoanApplicationBody) || {};
+        const reason = body.reason;
+
+        // Check if user is admin/member or entrepreneur
+        const isAdminOrMemberUser = isAdminOrMember(user);
+
+        // Cancel the application
+        const result = await LoanApplicationsService.cancel(
+          userId,
+          id,
+          reason,
+          isAdminOrMemberUser,
+          request
+        );
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error cancelling loan application:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to cancel loan application",
+          code: "CANCEL_LOAN_APPLICATION_FAILED",
         });
       }
     }

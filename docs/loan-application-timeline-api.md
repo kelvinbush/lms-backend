@@ -4,9 +4,19 @@
 
 The Loan Application Timeline API provides a complete audit trail of events for loan applications. This endpoint is accessible to both administrators and entrepreneurs (for their own applications).
 
-## Endpoint
+## Endpoints
+
+### 1. Get Timeline (General)
 
 **GET** `/loan-applications/:id/timeline`
+
+Accessible to both admins/members and entrepreneurs.
+
+### 2. Get My Timeline (Entrepreneurs)
+
+**GET** `/loan-applications/my-applications/:id/timeline`
+
+Dedicated endpoint for entrepreneurs to view their own application timelines.
 
 ### Authentication
 
@@ -18,8 +28,10 @@ Authorization: Bearer <clerk_session_token>
 
 ### Authorization
 
-- **Admins/Members**: Can view timeline for any loan application
+- **Admins/Members**: Can view timeline for any loan application (use `/loan-applications/:id/timeline`)
 - **Entrepreneurs**: Can view timeline only for their own loan applications (where they are the entrepreneur)
+  - Can use either `/loan-applications/:id/timeline` or `/loan-applications/my-applications/:id/timeline`
+  - Both routes enforce the same authorization (entrepreneurs can only see their own)
 
 ### Path Parameters
 

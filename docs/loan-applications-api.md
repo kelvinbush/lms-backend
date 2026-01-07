@@ -576,6 +576,163 @@ Returns the updated loan application detail (same format as `GET /loan-applicati
 
 ---
 
+## 7. Cancel Loan Application
+
+### 7.1 Cancel My Loan Application (Entrepreneurs)
+
+**POST** `/loan-applications/my-applications/:id/cancel`
+
+Cancels a loan application that is in a pending status. Only accessible to entrepreneurs for their own applications.
+
+**Accessible to**: Entrepreneurs (can only cancel their own applications)
+
+#### Path Parameters
+
+```typescript
+{
+  id: string;  // Loan application ID
+}
+```
+
+#### Request Body
+
+```typescript
+{
+  reason?: string;  // Optional - Reason for cancellation (max 500 characters)
+}
+```
+
+#### Response (200 OK)
+
+Returns the updated loan application detail (same format as `GET /loan-applications/:id`).
+
+#### Business Logic
+
+- **Status Validation**: 
+  - Only applications in pending statuses can be cancelled
+  - Pending statuses: `kyc_kyb_verification`, `eligibility_check`, `credit_analysis`, `head_of_credit_review`, `internal_approval_ceo`, `committee_decision`, `sme_offer_approval`, `document_generation`, `signing_execution`, `awaiting_disbursement`
+  - Cannot cancel applications that are already in terminal states (`approved`, `rejected`, `disbursed`, `cancelled`)
+  - Cannot cancel an application that is already cancelled
+
+- **Authorization**: 
+  - Entrepreneurs can only cancel their own applications
+  - The application's `entrepreneurId` must match the authenticated user's ID
+
+- **Automatic Updates**:
+  - Sets status to `cancelled`
+  - Sets `cancelledAt` timestamp
+  - Clears `rejectionReason` if it exists
+  - Updates `lastUpdatedBy` and `lastUpdatedAt`
+
+- **Audit Trail**: Automatically logs the cancellation to the audit trail with:
+  - Event type: `cancelled`
+  - Title and description (includes reason if provided)
+  - Previous and new status
+  - User who performed the cancellation
+  - Timestamp
+  - Request metadata (IP address, user agent)
+
+#### Example Request
+
+```json
+{
+  "reason": "Found a better loan product elsewhere"
+}
+```
+
+#### Error Responses
+
+- `400 Bad Request`: 
+  - Application is already cancelled
+  - Application is in a terminal state (cannot be cancelled)
+  - Application status is not in pending stages
+- `401 Unauthorized`: Missing or invalid authentication token
+- `403 Forbidden`: User is not the entrepreneur for this application
+- `404 Not Found`: Loan application not found
+- `500 Internal Server Error`: Server error
+
+---
+
+### 7.2 Cancel Loan Application (Admins/Members)
+
+**POST** `/loan-applications/:id/cancel`
+
+Cancels a loan application that is in a pending status. Accessible to admins/members for any application.
+
+**Accessible to**: Admins/Members (can cancel any application)
+
+#### Path Parameters
+
+```typescript
+{
+  id: string;  // Loan application ID
+}
+```
+
+#### Request Body
+
+```typescript
+{
+  reason?: string;  // Optional - Reason for cancellation (max 500 characters)
+}
+```
+
+#### Response (200 OK)
+
+Returns the updated loan application detail (same format as `GET /loan-applications/:id`).
+
+#### Business Logic
+
+- **Status Validation**: 
+  - Only applications in pending statuses can be cancelled
+  - Pending statuses: `kyc_kyb_verification`, `eligibility_check`, `credit_analysis`, `head_of_credit_review`, `internal_approval_ceo`, `committee_decision`, `sme_offer_approval`, `document_generation`, `signing_execution`, `awaiting_disbursement`
+  - Cannot cancel applications that are already in terminal states (`approved`, `rejected`, `disbursed`, `cancelled`)
+  - Cannot cancel an application that is already cancelled
+
+- **Authorization**: 
+  - Admins/Members can cancel any application
+
+- **Automatic Updates**:
+  - Sets status to `cancelled`
+  - Sets `cancelledAt` timestamp
+  - Clears `rejectionReason` if it exists
+  - Updates `lastUpdatedBy` and `lastUpdatedAt`
+
+- **Audit Trail**: Automatically logs the cancellation to the audit trail with:
+  - Event type: `cancelled`
+  - Title and description (includes reason if provided)
+  - Previous and new status
+  - User who performed the cancellation
+  - Timestamp
+  - Request metadata (IP address, user agent)
+
+#### Example Request
+
+```json
+{
+  "reason": "Applicant requested cancellation"
+}
+```
+
+#### Error Responses
+
+- `400 Bad Request`: 
+  - Application is already cancelled
+  - Application is in a terminal state (cannot be cancelled)
+  - Application status is not in pending stages
+- `401 Unauthorized`: Missing or invalid authentication token
+- `404 Not Found`: Loan application not found
+- `500 Internal Server Error`: Server error
+
+#### Notes
+
+- Both endpoints (`/my-applications/:id/cancel` for entrepreneurs and `/:id/cancel` for admins) have the same business logic for status validation
+- Cancellations are automatically logged to the audit trail
+- The timeline endpoint (`GET /loan-applications/:id/timeline`) will show the cancellation event
+- Once cancelled, an application cannot be uncancelled or changed to another status
+
+---
+
 ## Loan Application Status Values
 
 ```typescript
@@ -615,6 +772,7 @@ All error responses follow this format:
 
 - **Authorization**: 
   - Create endpoint is accessible to both admins/members and entrepreneurs
+  - Cancel endpoint is accessible to both admins/members and entrepreneurs (entrepreneurs can only cancel their own)
   - Other endpoints (list, get, stats, timeline, update status) require `member` role (admin/super-admin/member)
   - Entrepreneurs can access timeline for their own applications
 - All timestamps are in ISO 8601 format

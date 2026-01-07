@@ -478,6 +478,19 @@ export namespace LoanApplicationsModel {
     required: ["status"],
   } as const;
 
+  // Cancel loan application request body
+  export interface CancelLoanApplicationBody {
+    reason?: string; // Optional reason for cancellation
+  }
+
+  export const CancelLoanApplicationBodySchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      reason: { type: "string", maxLength: 500 },
+    },
+  } as const;
+
   // External user (entrepreneur) simplified models
   export interface ExternalLoanApplicationListItem {
     id: string;

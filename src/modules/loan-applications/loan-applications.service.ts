@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
+import type { FastifyRequest } from "fastify";
 import { db } from "../../db";
 import {
   businessProfiles,
@@ -8,7 +9,7 @@ import {
   users,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { isEntrepreneur } from "../../utils/authz";
+import { isAdminOrMember, isEntrepreneur } from "../../utils/authz";
 import {
   generateLoanId,
   mapCreateLoanApplicationResponse,
@@ -1009,6 +1010,157 @@ export abstract class LoanApplicationsService {
       logger.error("Error getting loan application for entrepreneur:", error);
       if (error?.status) throw error;
       throw httpError(500, "[GET_LOAN_APPLICATION_ERROR] Failed to get loan application");
+    }
+  }
+
+  /**
+   * Cancel a loan application
+   * Only allows canceling applications in pending stages
+   * Entrepreneurs can only cancel their own applications
+   * Admins can cancel any application
+   *
+   * @description Cancels a loan application that is in a pending status.
+   * Terminal states (approved, rejected, disbursed, cancelled) cannot be cancelled.
+   *
+   * @param clerkId - The Clerk ID of the authenticated user
+   * @param applicationId - The loan application ID to cancel
+   * @param reason - Optional reason for cancellation
+   * @param isAdmin - Whether the user is an admin/member (true) or entrepreneur (false)
+   * @param request - Optional FastifyRequest for extracting metadata
+   * @returns Updated loan application detail
+   *
+   * @throws {400} If application is already in a terminal state
+   * @throws {403} If entrepreneur tries to cancel another user's application
+   * @throws {404} If loan application is not found
+   * @throws {500} If cancellation fails
+   */
+  static async cancel(
+    clerkId: string,
+    applicationId: string,
+    reason?: string,
+    isAdminOrMember: boolean = false,
+    request?: FastifyRequest
+  ): Promise<LoanApplicationsModel.LoanApplicationDetail> {
+    try {
+      // Get the authenticated user
+      const user = await db.query.users.findFirst({
+        where: eq(users.clerkId, clerkId),
+        columns: { id: true },
+      });
+
+      if (!user) {
+        throw httpError(401, "[UNAUTHORIZED] User not found");
+      }
+
+      // Get the loan application
+      const [application] = await db
+        .select()
+        .from(loanApplications)
+        .where(and(eq(loanApplications.id, applicationId), isNull(loanApplications.deletedAt)))
+        .limit(1);
+
+      if (!application) {
+        throw httpError(404, "[LOAN_APPLICATION_NOT_FOUND] Loan application not found");
+      }
+
+      // For entrepreneurs: verify they own the application
+      if (!isAdminOrMember && application.entrepreneurId !== user.id) {
+        throw httpError(
+          403,
+          "[FORBIDDEN] You do not have permission to cancel this loan application"
+        );
+      }
+
+      // Define pending statuses (can be cancelled)
+      const pendingStatuses = [
+        "kyc_kyb_verification",
+        "eligibility_check",
+        "credit_analysis",
+        "head_of_credit_review",
+        "internal_approval_ceo",
+        "committee_decision",
+        "sme_offer_approval",
+        "document_generation",
+        "signing_execution",
+        "awaiting_disbursement",
+      ];
+
+      // Define terminal states (cannot be cancelled)
+      const terminalStates = ["approved", "rejected", "disbursed", "cancelled"];
+
+      // Check if application is already cancelled
+      if (application.status === "cancelled") {
+        throw httpError(400, "[ALREADY_CANCELLED] Loan application is already cancelled");
+      }
+
+      // Check if application is in a terminal state (cannot be cancelled)
+      if (terminalStates.includes(application.status)) {
+        throw httpError(
+          400,
+          `[CANNOT_CANCEL] Cannot cancel loan application in terminal state: ${application.status}. Only pending applications can be cancelled.`
+        );
+      }
+
+      // Verify application is in a pending state
+      if (!pendingStatuses.includes(application.status)) {
+        throw httpError(
+          400,
+          `[INVALID_STATUS] Loan application status "${application.status}" cannot be cancelled. Only pending applications can be cancelled.`
+        );
+      }
+
+      // Prepare update data
+      const now = new Date();
+      const updateData: any = {
+        status: "cancelled" as any,
+        cancelledAt: now,
+        lastUpdatedBy: user.id,
+        lastUpdatedAt: now,
+        updatedAt: now,
+      };
+
+      // Clear rejection reason if it exists (since we're cancelling, not rejecting)
+      if (application.rejectionReason) {
+        updateData.rejectionReason = null;
+      }
+
+      // Update the application
+      await db
+        .update(loanApplications)
+        .set(updateData)
+        .where(eq(loanApplications.id, applicationId));
+
+      // Log audit event
+      const eventTitle = LoanApplicationAuditService.getEventTitle("cancelled");
+      const eventDescription = reason
+        ? `${eventTitle}. Reason: ${reason}`
+        : eventTitle;
+
+      const requestMetadata = request
+        ? LoanApplicationAuditService.extractRequestMetadata(request)
+        : {};
+
+      await LoanApplicationAuditService.logEvent({
+        loanApplicationId: applicationId,
+        clerkId,
+        eventType: "cancelled",
+        title: eventTitle,
+        description: eventDescription,
+        status: "cancelled",
+        previousStatus: application.status,
+        newStatus: "cancelled",
+        details: {
+          reason: reason || null,
+        },
+        ...requestMetadata,
+      });
+
+      // Return updated application detail
+      return await LoanApplicationsService.getById(applicationId);
+    } catch (error: any) {
+      logger.error("Error cancelling loan application:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[CANCEL_LOAN_APPLICATION_ERROR] Failed to cancel loan application");
     }
   }
 }
