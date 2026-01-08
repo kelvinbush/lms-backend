@@ -8,6 +8,7 @@ import { businessVideoLinks } from "./businessVideoLinks";
 import { investorOpportunities } from "./investorOpportunities";
 import { investorOpportunityBookmarks } from "./investorOpportunityBookmarks";
 import { loanApplicationAuditTrail } from "./loanApplicationAuditTrail";
+import { loanApplicationDocumentVerifications } from "./loanApplicationDocumentVerifications";
 import { loanApplications } from "./loanApplications";
 import { loanProducts } from "./loanProducts";
 import { personalDocuments } from "./personalDocuments";
@@ -32,11 +33,16 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   loanApplicationAuditEntries: many(loanApplicationAuditTrail),
 }));
 
-export const personalDocumentsRelations = relations(personalDocuments, ({ one }) => ({
+export const personalDocumentsRelations = relations(personalDocuments, ({ one, many }) => ({
   user: one(users, {
     fields: [personalDocuments.userId],
     references: [users.id],
   }),
+  verifiedForLoanApplication: one(loanApplications, {
+    fields: [personalDocuments.verifiedForLoanApplicationId],
+    references: [loanApplications.id],
+  }),
+  verifications: many(loanApplicationDocumentVerifications),
 }));
 
 export const businessProfilesRelations = relations(businessProfiles, ({ one, many }) => ({
@@ -52,11 +58,16 @@ export const businessProfilesRelations = relations(businessProfiles, ({ one, man
   loanApplications: many(loanApplications),
 }));
 
-export const businessDocumentsRelations = relations(businessDocuments, ({ one }) => ({
+export const businessDocumentsRelations = relations(businessDocuments, ({ one, many }) => ({
   business: one(businessProfiles, {
     fields: [businessDocuments.businessId],
     references: [businessProfiles.id],
   }),
+  verifiedForLoanApplication: one(loanApplications, {
+    fields: [businessDocuments.verifiedForLoanApplicationId],
+    references: [loanApplications.id],
+  }),
+  verifications: many(loanApplicationDocumentVerifications),
 }));
 
 export const investorOpportunitiesRelations = relations(investorOpportunities, ({ many }) => ({
@@ -167,6 +178,8 @@ export const loanApplicationsRelations = relations(loanApplications, ({ one, man
   }),
   // Audit trail entries for this loan application
   auditTrail: many(loanApplicationAuditTrail),
+  // Document verifications for this loan application
+  documentVerifications: many(loanApplicationDocumentVerifications),
 }));
 
 // Loan Application Audit Trail Relations
@@ -179,6 +192,21 @@ export const loanApplicationAuditTrailRelations = relations(
     }),
     performedBy: one(users, {
       fields: [loanApplicationAuditTrail.performedById],
+      references: [users.id],
+    }),
+  })
+);
+
+// Loan Application Document Verifications Relations
+export const loanApplicationDocumentVerificationsRelations = relations(
+  loanApplicationDocumentVerifications,
+  ({ one }) => ({
+    loanApplication: one(loanApplications, {
+      fields: [loanApplicationDocumentVerifications.loanApplicationId],
+      references: [loanApplications.id],
+    }),
+    verifiedBy: one(users, {
+      fields: [loanApplicationDocumentVerifications.verifiedBy],
       references: [users.id],
     }),
   })

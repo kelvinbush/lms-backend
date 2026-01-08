@@ -1,9 +1,17 @@
 import { createId } from "@paralleldrive/cuid2";
-import { index, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { businessProfiles } from "./businessProfiles";
-
-// Define a Postgres enum for known business document types to enforce integrity
-import { boolean, integer, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
+import { loanApplications } from "./loanApplications";
 
 export const businessDocumentTypeEnum = pgEnum("business_document_type", [
   // Core entity and incorporation docs
@@ -53,6 +61,11 @@ export const businessDocuments = pgTable(
     docBankName: varchar("doc_bank_name", { length: 100 }),
     // For year-based documents (e.g., audited financial statements, annual bank statements)
     docYear: integer("doc_year"),
+    // Verification fields
+    isVerified: boolean("is_verified").default(false).notNull(),
+    verifiedForLoanApplicationId: varchar("verified_for_loan_application_id", { length: 24 })
+      .references(() => loanApplications.id, { onDelete: "set null" }),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -89,6 +102,12 @@ export const businessDocuments = pgTable(
         table.businessId,
         table.docType,
         table.deletedAt
+      ),
+
+      // Verification indexes
+      idxBusinessDocsVerified: index("idx_business_docs_verified").on(
+        table.isVerified,
+        table.verifiedForLoanApplicationId
       ),
     };
   }

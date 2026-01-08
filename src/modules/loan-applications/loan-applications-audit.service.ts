@@ -155,6 +155,9 @@ export abstract class LoanApplicationAuditService {
       awaiting_disbursement: "Awaiting disbursement",
       disbursed: "Loan disbursed",
       status_changed: LoanApplicationAuditService.getStatusChangedTitle(status),
+      document_verified_approved: "Document verified and approved",
+      document_verified_rejected: "Document verification rejected",
+      kyc_kyb_completed: "KYC/KYB verification completed",
     };
 
     return titles[eventType];

@@ -121,6 +121,23 @@ export abstract class BusinessDocuments {
           });
 
           if (existing) {
+            // Check if document is locked (verified)
+            const fullDoc = await tx.query.businessDocuments.findFirst({
+              where: eq(businessDocuments.id, existing.id),
+              columns: {
+                id: true,
+                isVerified: true,
+                lockedAt: true,
+              },
+            });
+
+            if (fullDoc?.isVerified && fullDoc?.lockedAt) {
+              throw httpError(
+                400,
+                `[DOCUMENT_LOCKED] Document of type '${d.docType}' is verified and locked. Cannot update. Please upload a new document.`
+              );
+            }
+
             // Note: Audit trail logging skipped for standalone business document updates
             // Business documents are logged when they're part of a loan application workflow
 

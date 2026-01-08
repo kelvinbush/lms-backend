@@ -61,7 +61,26 @@ export abstract class Documents {
 
         // Perform updates per type
         for (const d of toUpdate) {
-          const _existingDoc = existing.find((e) => e.docType === d.docType);
+          const existingDoc = existing.find((e) => e.docType === d.docType);
+
+          // Check if document is locked (verified)
+          if (existingDoc) {
+            const fullDoc = await tx.query.personalDocuments.findFirst({
+              where: eq(personalDocuments.id, existingDoc.id),
+              columns: {
+                id: true,
+                isVerified: true,
+                lockedAt: true,
+              },
+            });
+
+            if (fullDoc?.isVerified && fullDoc?.lockedAt) {
+              throw httpError(
+                400,
+                `[DOCUMENT_LOCKED] Document of type '${d.docType}' is verified and locked. Cannot update. Please upload a new document.`
+              );
+            }
+          }
 
           // Note: Audit trail logging for standalone document uploads is skipped
           // as it requires a loanApplicationId. Document uploads are logged when

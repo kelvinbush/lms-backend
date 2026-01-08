@@ -22,6 +22,7 @@ import { buildBaseWhereConditions, buildSearchConditions } from "./loan-applicat
 import { calculateStatsWithChanges } from "./loan-applications.stats";
 import { validateLoanApplicationCreation } from "./loan-applications.validators";
 import { LoanApplicationAuditService } from "./loan-applications-audit.service";
+import { KycKybVerificationService } from "../kyc-kyb-verification/kyc-kyb-verification.service";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -682,6 +683,19 @@ export abstract class LoanApplicationsService {
           },
           ...requestMetadata,
         });
+      }
+
+      // Auto-create verification records when status changes to kyc_kyb_verification
+      if (newStatus === "kyc_kyb_verification") {
+        // This is non-blocking - errors are logged but don't fail the status update
+        KycKybVerificationService.createVerificationRecordsForLoanApplication(applicationId).catch(
+          (error) => {
+            logger.error(
+              `Failed to auto-create verification records for loan application ${applicationId}:`,
+              error
+            );
+          }
+        );
       }
 
       // Return updated application detail

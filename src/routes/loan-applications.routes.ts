@@ -6,6 +6,8 @@ import { loanApplications } from "../db/schema";
 import { LoanApplicationsModel } from "../modules/loan-applications/loan-applications.model";
 import { LoanApplicationsService } from "../modules/loan-applications/loan-applications.service";
 import { LoanApplicationTimelineService } from "../modules/loan-applications/loan-applications-timeline.service";
+import { KycKybVerificationModel } from "../modules/kyc-kyb-verification/kyc-kyb-verification.model";
+import { KycKybVerificationService } from "../modules/kyc-kyb-verification/kyc-kyb-verification.service";
 import { UserModel } from "../modules/user/user.model";
 import { isAdminOrMember, isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
@@ -856,6 +858,378 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to cancel loan application",
           code: "CANCEL_LOAN_APPLICATION_FAILED",
+        });
+      }
+    }
+  );
+
+  // ========== KYC/KYB VERIFICATION ENDPOINTS ==========
+
+  // GET /loan-applications/:id/kyc-kyb-documents
+  // Get all documents with verification status for a loan application
+  // Accessible to: admins/members only
+  fastify.get(
+    "/:id/kyc-kyb-documents",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              personalDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docType: { type: "string" },
+                    docUrl: { type: "string" },
+                    docYear: { type: "number" },
+                    docBankName: { type: "string" },
+                    createdAt: { type: "string" },
+                    verificationStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+                    verifiedBy: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        firstName: { type: "string", nullable: true },
+                        lastName: { type: "string", nullable: true },
+                        email: { type: "string" },
+                      },
+                    },
+                    verifiedAt: { type: "string" },
+                    rejectionReason: { type: "string" },
+                    notes: { type: "string" },
+                    lockedAt: { type: "string" },
+                  },
+                },
+              },
+              businessDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docType: { type: "string" },
+                    docUrl: { type: "string" },
+                    docYear: { type: "number" },
+                    docBankName: { type: "string" },
+                    createdAt: { type: "string" },
+                    verificationStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+                    verifiedBy: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        firstName: { type: "string", nullable: true },
+                        lastName: { type: "string", nullable: true },
+                        email: { type: "string" },
+                      },
+                    },
+                    verifiedAt: { type: "string" },
+                    rejectionReason: { type: "string" },
+                    notes: { type: "string" },
+                    lockedAt: { type: "string" },
+                  },
+                },
+              },
+              summary: {
+                type: "object",
+                properties: {
+                  total: { type: "number" },
+                  pending: { type: "number" },
+                  approved: { type: "number" },
+                  rejected: { type: "number" },
+                },
+              },
+            },
+            required: ["personalDocuments", "businessDocuments", "summary"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "kyc-kyb-verification"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, ["admin", "member"]);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const result = await KycKybVerificationService.getDocumentsForVerification(id);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting KYC/KYB documents:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get KYC/KYB documents",
+          code: "GET_KYC_KYB_DOCUMENTS_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/documents/:documentId/verify
+  // Verify a single document (approve or reject)
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/documents/:documentId/verify",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: {
+            id: { type: "string", minLength: 1 },
+            documentId: { type: "string", minLength: 1 },
+          },
+          required: ["id", "documentId"],
+          additionalProperties: false,
+        },
+        querystring: {
+          type: "object",
+          properties: {
+            documentType: { type: "string", enum: ["personal", "business"] },
+          },
+          required: ["documentType"],
+          additionalProperties: false,
+        },
+        body: KycKybVerificationModel.VerifyDocumentBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              documentId: { type: "string" },
+              documentType: { type: "string", enum: ["personal", "business"] },
+              verificationStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+              verifiedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+              },
+              verifiedAt: { type: "string" },
+              rejectionReason: { type: "string" },
+              notes: { type: "string" },
+              lockedAt: { type: "string" },
+            },
+            required: ["documentId", "documentType", "verificationStatus", "verifiedBy", "verifiedAt", "lockedAt"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "kyc-kyb-verification"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, ["admin", "member"]);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id, documentId } = (request.params as any) || {};
+        const { documentType } = (request.query as any) || {};
+        const body = request.body as KycKybVerificationModel.VerifyDocumentBody;
+
+        if (!documentType || (documentType !== "personal" && documentType !== "business")) {
+          return reply.code(400).send({
+            error: "documentType query parameter is required and must be 'personal' or 'business'",
+            code: "MISSING_DOCUMENT_TYPE",
+          });
+        }
+
+        const result = await KycKybVerificationService.verifyDocument(
+          id,
+          documentId,
+          documentType as "personal" | "business",
+          userId,
+          body
+        );
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error verifying document:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to verify document",
+          code: "VERIFY_DOCUMENT_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/kyc-kyb/bulk-verify
+  // Bulk verify multiple documents
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/kyc-kyb/bulk-verify",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: KycKybVerificationModel.BulkVerifyDocumentsBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              successful: { type: "number" },
+              failed: { type: "number" },
+              results: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    documentId: { type: "string" },
+                    success: { type: "boolean" },
+                    error: { type: "string" },
+                  },
+                  required: ["documentId", "success"],
+                },
+              },
+            },
+            required: ["successful", "failed", "results"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "kyc-kyb-verification"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, ["admin", "member"]);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as KycKybVerificationModel.BulkVerifyDocumentsBody;
+
+        const result = await KycKybVerificationService.bulkVerifyDocuments(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error bulk verifying documents:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to bulk verify documents",
+          code: "BULK_VERIFY_DOCUMENTS_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/kyc-kyb/complete
+  // Complete KYC/KYB verification step
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/kyc-kyb/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              completedAt: { type: "string" },
+              completedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+              },
+            },
+            required: ["loanApplicationId", "status", "completedAt", "completedBy"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "kyc-kyb-verification"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, ["admin", "member"]);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const result = await KycKybVerificationService.completeKycKybVerification(id, userId);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing KYC/KYB verification:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete KYC/KYB verification",
+          code: "COMPLETE_KYC_KYB_FAILED",
         });
       }
     }

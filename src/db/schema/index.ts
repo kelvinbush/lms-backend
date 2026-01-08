@@ -20,3 +20,4 @@ export * from "./loanFees";
 export * from "./loanProductsUserGroups";
 export * from "./loanProductsLoanFees";
 export * from "./loanApplicationAuditTrail";
+export * from "./loanApplicationDocumentVerifications";

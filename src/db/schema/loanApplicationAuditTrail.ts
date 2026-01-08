@@ -13,6 +13,9 @@ export const loanApplicationAuditEventTypeEnum = pgEnum("loan_application_audit_
   "awaiting_disbursement",
   "disbursed",
   "status_changed", // Generic status change for other statuses
+  "document_verified_approved", // KYC/KYB document verification approved
+  "document_verified_rejected", // KYC/KYB document verification rejected
+  "kyc_kyb_completed", // KYC/KYB verification step completed
 ]);
 
 /**
