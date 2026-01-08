@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../db";
-import { personalDocuments, smeOnboardingProgress, users } from "../../db/schema";
+import { businessProfiles, personalDocuments, smeOnboardingProgress, users } from "../../db/schema";
 import { logger } from "../../utils/logger";
 import type { AdminSMEModel } from "./admin-sme.model";
 import { httpError } from "./admin-sme.utils";
