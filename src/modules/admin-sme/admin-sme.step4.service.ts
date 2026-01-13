@@ -1,6 +1,11 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../db";
-import { personalDocuments, smeOnboardingProgress, users } from "../../db/schema";
+import {
+  businessProfiles,
+  personalDocuments,
+  smeOnboardingProgress,
+  users,
+} from "../../db/schema";
 import { logger } from "../../utils/logger";
 import type { AdminSMEModel } from "./admin-sme.model";
 import { httpError } from "./admin-sme.utils";
@@ -15,7 +20,7 @@ export abstract class AdminSMEStep4Service {
    */
   static async savePersonalDocuments(
     userId: string,
-    payload: AdminSMEModel.Step4PersonalDocumentsBody
+    payload: AdminSMEModel.Step4PersonalDocumentsBody,
   ): Promise<AdminSMEModel.OnboardingStateResponse> {
     try {
       // Normalize to array and dedupe by docType (last one wins)
@@ -30,122 +35,126 @@ export abstract class AdminSMEStep4Service {
       }));
 
       // Execute in transaction - all queries inside for consistency and performance
-      const { updatedUser, progressResult } = await db.transaction(async (tx) => {
-        // Verify user exists and get it
-        const user = await tx.query.users.findFirst({
-          where: eq(users.id, userId),
-        });
+      const { updatedUser, progressResult } = await db.transaction(
+        async (tx) => {
+          // Verify user exists and get it
+          const user = await tx.query.users.findFirst({
+            where: eq(users.id, userId),
+          });
 
-        if (!user) {
-          throw httpError(404, "[USER_NOT_FOUND] User not found");
-        }
+          if (!user) {
+            throw httpError(404, "[USER_NOT_FOUND] User not found");
+          }
 
-        // Get existing progress to compute completed steps
-        const existingProgress = await tx.query.smeOnboardingProgress.findFirst({
-          where: eq(smeOnboardingProgress.userId, userId),
-        });
+          // Get existing progress to compute completed steps
+          const existingProgress =
+            await tx.query.smeOnboardingProgress.findFirst({
+              where: eq(smeOnboardingProgress.userId, userId),
+            });
 
-        const completedSteps = (existingProgress?.completedSteps as number[]) ?? [];
-        if (!completedSteps.includes(4)) {
-          completedSteps.push(4);
-        }
+          const completedSteps =
+            (existingProgress?.completedSteps as number[]) ?? [];
+          if (!completedSteps.includes(4)) {
+            completedSteps.push(4);
+          }
 
-        // Find existing active documents for these types
-        const existing = await tx.query.personalDocuments.findMany({
-          where: and(
-            eq(personalDocuments.userId, user.id),
-            inArray(
-              personalDocuments.docType,
-              upserts.map((d) => d.docType)
+          // Find existing active documents for these types
+          const existing = await tx.query.personalDocuments.findMany({
+            where: and(
+              eq(personalDocuments.userId, user.id),
+              inArray(
+                personalDocuments.docType,
+                upserts.map((d) => d.docType),
+              ),
+              isNull(personalDocuments.deletedAt),
             ),
-            isNull(personalDocuments.deletedAt)
-          ),
-          columns: { id: true, docType: true, docUrl: true },
-        });
+            columns: { id: true, docType: true, docUrl: true },
+          });
 
-        const existingTypes = new Set(existing.map((e) => e.docType));
-        const toUpdate = upserts.filter((d) => existingTypes.has(d.docType));
-        const toInsert = upserts.filter((d) => !existingTypes.has(d.docType));
+          const existingTypes = new Set(existing.map((e) => e.docType));
+          const toUpdate = upserts.filter((d) => existingTypes.has(d.docType));
+          const toInsert = upserts.filter((d) => !existingTypes.has(d.docType));
 
-        // Prepare parallel operations
-        const parallelOps: Promise<any>[] = [];
+          // Prepare parallel operations
+          const parallelOps: Promise<any>[] = [];
 
-        // Perform updates per type
-        for (const d of toUpdate) {
-          parallelOps.push(
-            tx
-              .update(personalDocuments)
-              .set({ docUrl: d.docUrl, updatedAt: new Date() })
-              .where(
-                and(
-                  eq(personalDocuments.userId, user.id),
-                  eq(personalDocuments.docType, d.docType),
-                  isNull(personalDocuments.deletedAt)
-                )
-              )
-          );
-        }
+          // Perform updates per type
+          for (const d of toUpdate) {
+            parallelOps.push(
+              tx
+                .update(personalDocuments)
+                .set({ docUrl: d.docUrl, updatedAt: new Date() })
+                .where(
+                  and(
+                    eq(personalDocuments.userId, user.id),
+                    eq(personalDocuments.docType, d.docType),
+                    isNull(personalDocuments.deletedAt),
+                  ),
+                ),
+            );
+          }
 
-        // Perform bulk insert for new types
-        if (toInsert.length > 0) {
-          parallelOps.push(
-            tx.insert(personalDocuments).values(
-              toInsert.map((d) => ({
-                userId: user.id,
-                docType: d.docType,
-                docUrl: d.docUrl,
-              }))
-            )
-          );
-        }
+          // Perform bulk insert for new types
+          if (toInsert.length > 0) {
+            parallelOps.push(
+              tx.insert(personalDocuments).values(
+                toInsert.map((d) => ({
+                  userId: user.id,
+                  docType: d.docType,
+                  docUrl: d.docUrl,
+                })),
+              ),
+            );
+          }
 
-        // Update onboarding progress - return the result
-        const progressPromise = existingProgress
-          ? tx
-              .update(smeOnboardingProgress)
-              .set({
-                currentStep: 4,
-                completedSteps: completedSteps as any,
-                lastSavedAt: new Date(),
-                updatedAt: new Date(),
-              } as any)
-              .where(eq(smeOnboardingProgress.userId, userId))
-              .returning()
-              .then(([result]) => result)
-          : tx
-              .insert(smeOnboardingProgress)
-              .values({
-                userId: userId,
-                currentStep: 4,
-                completedSteps: [4] as any,
-                lastSavedAt: new Date(),
-              } as any)
-              .returning()
-              .then(([result]) => result);
+          // Update onboarding progress - return the result
+          const progressPromise = existingProgress
+            ? tx
+                .update(smeOnboardingProgress)
+                .set({
+                  currentStep: 4,
+                  completedSteps: completedSteps as any,
+                  lastSavedAt: new Date(),
+                  updatedAt: new Date(),
+                } as any)
+                .where(eq(smeOnboardingProgress.userId, userId))
+                .returning()
+                .then(([result]) => result)
+            : tx
+                .insert(smeOnboardingProgress)
+                .values({
+                  userId: userId,
+                  currentStep: 4,
+                  completedSteps: [4] as any,
+                  lastSavedAt: new Date(),
+                } as any)
+                .returning()
+                .then(([result]) => result);
 
-        // Update user onboarding step and ID fields - return the result
-        const userUpdatePromise = tx
-          .update(users)
-          .set({
-            onboardingStep: 4,
-            idNumber: payload.idNumber ?? null,
-            taxNumber: payload.taxNumber ?? null,
-            idType: payload.idType ?? null,
-            updatedAt: new Date(),
-          } as any)
-          .where(eq(users.id, userId))
-          .returning()
-          .then(([result]) => result);
+          // Update user onboarding step and ID fields - return the result
+          const userUpdatePromise = tx
+            .update(users)
+            .set({
+              onboardingStep: 4,
+              idNumber: payload.idNumber ?? null,
+              taxNumber: payload.taxNumber ?? null,
+              idType: payload.idType ?? null,
+              updatedAt: new Date(),
+            } as any)
+            .where(eq(users.id, userId))
+            .returning()
+            .then(([result]) => result);
 
-        // Execute all operations in parallel
-        const [progressResult, updatedUser] = await Promise.all([
-          progressPromise,
-          userUpdatePromise,
-          ...parallelOps,
-        ]);
+          // Execute all operations in parallel
+          const [progressResult, updatedUser] = await Promise.all([
+            progressPromise,
+            userUpdatePromise,
+            ...parallelOps,
+          ]);
 
-        return { updatedUser, progressResult };
-      });
+          return { updatedUser, progressResult };
+        },
+      );
 
       logger.info("[AdminSME Step4] Step 4 saved", {
         userId,
@@ -185,7 +194,9 @@ export abstract class AdminSMEStep4Service {
                 ? Number(business.avgYearlyTurnover)
                 : null,
               previousLoans: business.borrowingHistory ?? null,
-              loanAmount: business.amountBorrowed ? Number(business.amountBorrowed) : null,
+              loanAmount: business.amountBorrowed
+                ? Number(business.amountBorrowed)
+                : null,
               defaultCurrency: business.currency ?? null,
               recentLoanStatus: business.loanStatus ?? null,
               defaultReason: business.defaultReason ?? null,

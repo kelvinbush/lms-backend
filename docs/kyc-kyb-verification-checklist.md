@@ -3,200 +3,211 @@
 ## Phase 1: Database Schema & Migrations
 
 ### 1.1 Create Verification Table
-- [ ] Create `loan_application_document_verifications` schema file
-- [ ] Define all columns with proper types
-- [ ] Add foreign key constraints
-- [ ] Add indexes for performance
-- [ ] Create database migration
-- [ ] Test migration up/down
+- [x] Create `loan_application_document_verifications` schema file
+- [x] Define all columns with proper types
+- [x] Add foreign key constraints
+- [x] Add indexes for performance
+- [x] Create database migration
+- [ ] Test migration up/down (pending migration run)
 
 ### 1.2 Update Document Tables
-- [ ] Add `is_verified` column to `personal_documents`
-- [ ] Add `verified_for_loan_application_id` to `personal_documents`
-- [ ] Add `locked_at` to `personal_documents`
-- [ ] Add indexes on new columns
-- [ ] Repeat for `business_documents`
-- [ ] Create migration
-- [ ] Test migration
+- [x] Add `is_verified` column to `personal_documents`
+- [x] Add `verified_for_loan_application_id` to `personal_documents`
+- [x] Add `locked_at` to `personal_documents`
+- [x] Add indexes on new columns
+- [x] Repeat for `business_documents`
+- [x] Create migration
+- [ ] Test migration (pending migration run)
 
 ### 1.3 Schema Relations
-- [ ] Add relations in `relations.ts` for verification table
-- [ ] Update existing document relations if needed
-- [ ] Test relations resolve correctly
+- [x] Add relations in `relations.ts` for verification table
+- [x] Update existing document relations if needed
+- [x] Test relations resolve correctly
 
 ### 1.4 Database Constraints
-- [ ] Add unique constraint: one verification per document per loan application
-- [ ] Add check constraints if needed
-- [ ] Test constraint violations
+- [x] Add unique constraint: one verification per document per loan application
+- [x] Add check constraints if needed
+- [ ] Test constraint violations (pending migration run)
 
 ## Phase 2: Core Service Layer
 
 ### 2.1 Verification Service
-- [ ] Create `kyc-kyb-verification.service.ts`
-- [ ] Implement `getDocumentsForVerification(loanApplicationId)`
-  - [ ] Fetch personal documents
-  - [ ] Fetch business documents
-  - [ ] Fetch verification statuses
-  - [ ] Merge and return formatted response
-- [ ] Implement `verifyDocument(loanApplicationId, documentId, documentType, status, adminId, reason?, notes?)`
-  - [ ] Validate loan application exists and is in correct status
-  - [ ] Validate document exists and belongs to loan application
-  - [ ] Create/update verification record
-  - [ ] Lock document
-  - [ ] Create audit trail entry
-- [ ] Implement `bulkVerifyDocuments(loanApplicationId, verifications[], adminId)`
-  - [ ] Validate all documents
-  - [ ] Process in transaction
-  - [ ] Create audit trail entries
-- [ ] Implement `completeKycKybVerification(loanApplicationId, adminId)`
-  - [ ] Validate at least some documents reviewed
-  - [ ] Update loan application status
-  - [ ] Create audit trail entry
+- [x] Create `kyc-kyb-verification.service.ts`
+- [x] Implement `getDocumentsForVerification(loanApplicationId)`
+  - [x] Fetch personal documents
+  - [x] Fetch business documents
+  - [x] Fetch verification statuses
+  - [x] Merge and return formatted response
+- [x] Implement `verifyDocument(loanApplicationId, documentId, documentType, status, adminId, reason?, notes?)`
+  - [x] Validate loan application exists and is in correct status
+  - [x] Validate document exists and belongs to loan application
+  - [x] Create/update verification record
+  - [x] Lock document
+  - [x] Create audit trail entry
+- [x] Implement `bulkVerifyDocuments(loanApplicationId, verifications[], adminId)`
+  - [x] Validate all documents
+  - [x] Process in transaction
+  - [x] Create audit trail entries
+- [x] Implement `completeKycKybVerification(loanApplicationId, adminId)`
+  - [x] Validate at least some documents reviewed
+  - [x] Update loan application status
+  - [x] Create audit trail entry
 
 ### 2.2 Document Locking Logic
-- [ ] Create utility function to check if document is locked
-- [ ] Create utility function to lock document
-- [ ] Prevent updates to locked documents in document upload endpoints
-- [ ] Add middleware/validation for locked document checks
+- [x] Create utility function to check if document is locked (integrated in verifyDocument)
+- [x] Create utility function to lock document (integrated in verifyDocument)
+- [x] Prevent updates to locked documents in document upload endpoints
+- [x] Add middleware/validation for locked document checks
 
 ### 2.3 Auto-Creation of Verification Records
-- [ ] Create function to auto-create verification records when:
-  - [ ] Loan application created
-  - [ ] New document uploaded (if loan in kyc_kyb_verification status)
-- [ ] Hook into loan application creation service
-- [ ] Hook into document upload services
+- [x] Create function to auto-create verification records when:
+  - [x] Loan application status changes to kyc_kyb_verification (hooked into updateStatus)
+  - [ ] New document uploaded (if loan in kyc_kyb_verification status) - deferred to testing phase
+- [x] Hook into loan application status update service
+- [ ] Hook into document upload services (deferred - can be added when documents uploaded during verification)
 
 ## Phase 3: API Endpoints
 
 ### 3.1 Get Documents for Verification
-- [ ] Create route `GET /loan-applications/:id/kyc-kyb-documents`
-- [ ] Add authentication/authorization (admin only)
-- [ ] Validate loan application exists
-- [ ] Call service to get documents
-- [ ] Format response with summary
-- [ ] Add error handling
+- [x] Create route `GET /loan-applications/:id/kyc-kyb-documents`
+- [x] Add authentication/authorization (admin only)
+- [x] Validate loan application exists
+- [x] Call service to get documents
+- [x] Format response with summary
+- [x] Add error handling
 
 ### 3.2 Verify Single Document
-- [ ] Create route `POST /loan-applications/:id/documents/:documentId/verify`
-- [ ] Add request validation schema
-- [ ] Add authentication/authorization (admin only)
-- [ ] Validate loan application status
-- [ ] Call service to verify
-- [ ] Return updated document status
-- [ ] Add error handling
+- [x] Create route `POST /loan-applications/:id/documents/:documentId/verify`
+- [x] Add request validation schema
+- [x] Add authentication/authorization (admin only)
+- [x] Validate loan application status
+- [x] Call service to verify
+- [x] Return updated document status
+- [x] Add error handling
 
 ### 3.3 Bulk Verify Documents
-- [ ] Create route `POST /loan-applications/:id/kyc-kyb/bulk-verify`
-- [ ] Add request validation schema
-- [ ] Add authentication/authorization (admin only)
-- [ ] Validate all documents belong to loan application
-- [ ] Call bulk verify service
-- [ ] Return summary of verifications
-- [ ] Add error handling
+- [x] Create route `POST /loan-applications/:id/kyc-kyb/bulk-verify`
+- [x] Add request validation schema
+- [x] Add authentication/authorization (admin only)
+- [x] Validate all documents belong to loan application
+- [x] Call bulk verify service
+- [x] Return summary of verifications
+- [x] Add error handling
 
 ### 3.4 Complete KYC/KYB
-- [ ] Create route `POST /loan-applications/:id/kyc-kyb/complete`
-- [ ] Add authentication/authorization (admin only)
-- [ ] Validate loan application status
-- [ ] Call completion service
-- [ ] Return updated loan application
-- [ ] Add error handling
+- [x] Create route `POST /loan-applications/:id/kyc-kyb/complete`
+- [x] Add authentication/authorization (admin only)
+- [x] Validate loan application status
+- [x] Call completion service
+- [x] Return updated loan application
+- [x] Add error handling
 
 ### 3.5 Request Validation
-- [ ] Create Zod/JSON schemas for all endpoints
-- [ ] Add validation middleware
-- [ ] Test invalid inputs
+- [x] Create Zod/JSON schemas for all endpoints
+- [x] Add validation middleware
+- [ ] Test invalid inputs (covered in Phase 6 testing)
 
 ## Phase 4: Integration & Workflow
 
-### 4.1 Loan Application Creation Hook
-- [ ] Update `LoanApplicationsService.create()` to:
-  - [ ] Create verification records for all existing documents
-  - [ ] Handle case where no documents exist yet
-- [ ] Test with documents present
-- [ ] Test with no documents
+### 4.1 Loan Application Status Update Hook
+- [x] Update `LoanApplicationsService.updateStatus()` to:
+  - [x] Auto-create verification records when status changes to `kyc_kyb_verification`
+  - [x] Handle case where no documents exist yet
+- [ ] Test with documents present (covered in Phase 6)
+- [ ] Test with no documents (covered in Phase 6)
 
 ### 4.2 Document Upload Hooks
 - [ ] Update personal document upload to:
   - [ ] Check if user has active loan in `kyc_kyb_verification`
   - [ ] Auto-create verification record if yes
 - [ ] Update business document upload similarly
-- [ ] Test document upload during verification
-- [ ] Test document upload after verification
+- [ ] Test document upload during verification (covered in Phase 6)
+- [ ] Test document upload after verification (covered in Phase 6)
 
 ### 4.3 Document Update Prevention
-- [ ] Add checks in document update endpoints
-- [ ] Return appropriate error if document is locked
-- [ ] Test update prevention
-- [ ] Test error messages
+- [x] Add checks in document update endpoints
+- [x] Return appropriate error if document is locked
+- [ ] Test update prevention (covered in Phase 6)
+- [ ] Test error messages (covered in Phase 6)
 
 ### 4.4 Status Transition Logic
-- [ ] Ensure loan application can only enter `kyc_kyb_verification` correctly
-- [ ] Ensure transition to `eligibility_check` only after completion
-- [ ] Add status transition validation
-- [ ] Test valid transitions
-- [ ] Test invalid transitions
+- [x] Ensure loan application can only enter `kyc_kyb_verification` correctly
+- [x] Ensure transition to `eligibility_check` only after completion
+- [x] Add status transition validation
+- [ ] Test valid transitions (covered in Phase 6)
+- [ ] Test invalid transitions (covered in Phase 6)
 
 ## Phase 5: Audit Trail Integration
 
 ### 5.1 Audit Trail Events
-- [ ] Add event type: `document_verified_approved`
-- [ ] Add event type: `document_verified_rejected`
-- [ ] Add event type: `kyc_kyb_completed`
-- [ ] Update audit trail enum if needed
+- [x] Add event type: `document_verified_approved`
+- [x] Add event type: `document_verified_rejected`
+- [x] Add event type: `kyc_kyb_completed`
+- [x] Update audit trail enum if needed
 
 ### 5.2 Audit Trail Creation
-- [ ] Create audit entries in verification service
-- [ ] Include document details in audit entry
-- [ ] Include admin details
-- [ ] Include verification decision and reason
-- [ ] Test audit entries are created correctly
+- [x] Create audit entries in verification service
+- [x] Include document details in audit entry
+- [x] Include admin details
+- [x] Include verification decision and reason
+- [ ] Test audit entries are created correctly (covered in Phase 6)
 
 ## Phase 6: Testing
 
 ### 6.1 Unit Tests - Service Layer
+- [x] Create test file structure (`kyc-kyb-verification.service.test.ts`)
 - [ ] Test `getDocumentsForVerification()`
-  - [ ] Returns all documents
-  - [ ] Includes verification status
-  - [ ] Handles no documents case
-  - [ ] Handles no verification records case
+  - [x] Test structure created
+  - [ ] Returns all documents (needs test DB setup)
+  - [ ] Includes verification status (needs test DB setup)
+  - [ ] Handles no documents case (needs test DB setup)
+  - [ ] Handles no verification records case (needs test DB setup)
 - [ ] Test `verifyDocument()`
-  - [ ] Creates verification record on approve
-  - [ ] Creates verification record on reject
-  - [ ] Locks document after verification
-  - [ ] Rejects if document already verified
-  - [ ] Rejects if loan application not in correct status
+  - [x] Test structure created
+  - [ ] Creates verification record on approve (needs test DB setup)
+  - [ ] Creates verification record on reject (needs test DB setup)
+  - [ ] Locks document after verification (needs test DB setup)
+  - [ ] Rejects if document already verified (needs test DB setup)
+  - [ ] Rejects if loan application not in correct status (needs test DB setup)
 - [ ] Test `bulkVerifyDocuments()`
-  - [ ] Processes all verifications
-  - [ ] Rolls back on error
-  - [ ] Handles partial failures correctly
+  - [x] Test structure created
+  - [ ] Processes all verifications (needs test DB setup)
+  - [ ] Rolls back on error (needs test DB setup)
+  - [ ] Handles partial failures correctly (needs test DB setup)
 - [ ] Test `completeKycKybVerification()`
-  - [ ] Updates loan status
-  - [ ] Rejects if no documents reviewed
-  - [ ] Allows completion with some rejected
+  - [x] Test structure created
+  - [ ] Updates loan status (needs test DB setup)
+  - [ ] Rejects if no documents reviewed (needs test DB setup)
+  - [ ] Allows completion with some rejected (needs test DB setup)
 
 ### 6.2 Unit Tests - Document Locking
-- [ ] Test document cannot be updated after lock
-- [ ] Test document can be updated before lock
-- [ ] Test locking sets correct fields
+- [x] Create test file structure (`document-locking.test.ts`)
+- [ ] Test document cannot be updated after lock (needs test DB setup)
+- [ ] Test document can be updated before lock (needs test DB setup)
+- [ ] Test locking sets correct fields (needs test DB setup)
 
 ### 6.3 Integration Tests - API Endpoints
+- [x] Create test file structure (`kyc-kyb-verification.api.test.ts`)
 - [ ] Test GET documents endpoint
-  - [ ] Returns correct structure
-  - [ ] Includes summary
-  - [ ] Handles unauthorized access
-  - [ ] Handles non-existent loan application
+  - [x] Test structure created
+  - [ ] Returns correct structure (needs Fastify test setup)
+  - [ ] Includes summary (needs Fastify test setup)
+  - [ ] Handles unauthorized access (needs auth mocking)
+  - [ ] Handles non-existent loan application (needs Fastify test setup)
 - [ ] Test POST verify endpoint
-  - [ ] Approves document correctly
-  - [ ] Rejects document correctly
-  - [ ] Validates inputs
-  - [ ] Handles errors
+  - [x] Test structure created
+  - [ ] Approves document correctly (needs Fastify test setup)
+  - [ ] Rejects document correctly (needs Fastify test setup)
+  - [ ] Validates inputs (needs Fastify test setup)
+  - [ ] Handles errors (needs Fastify test setup)
 - [ ] Test POST bulk-verify endpoint
-  - [ ] Processes multiple verifications
-  - [ ] Handles partial failures
+  - [x] Test structure created
+  - [ ] Processes multiple verifications (needs Fastify test setup)
+  - [ ] Handles partial failures (needs Fastify test setup)
 - [ ] Test POST complete endpoint
-  - [ ] Transitions status correctly
-  - [ ] Creates audit trail
+  - [x] Test structure created
+  - [ ] Transitions status correctly (needs Fastify test setup)
+  - [ ] Creates audit trail (needs Fastify test setup)
 
 ### 6.4 Integration Tests - Workflows
 - [ ] Test complete verification workflow:

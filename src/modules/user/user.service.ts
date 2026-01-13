@@ -212,7 +212,7 @@ export abstract class User {
         .where(eq(users.id, user.id));
 
       // update clerk unsafe metadata phone number
-      await clerkClient.users.updateUserMetadata(user.clerkId, {
+      await clerkClient.users.updateUserMetadata(user.clerkId || "", {
         unsafeMetadata: {
           phoneNumber,
         },
