@@ -4,13 +4,11 @@ import {
   businessDocuments,
   loanApplications,
   personalDocuments,
-  users,
-} from "../../db/schema";
-import {
   loanApplicationDocumentVerifications,
+  users,
   type DocumentType,
   type DocumentVerificationStatus,
-} from "../../db/schema/loanApplicationDocumentVerifications";
+} from "../../db/schema";
 import { logger } from "../../utils/logger";
 import { LoanApplicationAuditService } from "../loan-applications/loan-applications-audit.service";
 import type { KycKybVerificationModel } from "./kyc-kyb-verification.model";
