@@ -962,7 +962,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         // Require admin/member role
-        await requireRole(request, ["admin", "member"]);
+        await requireRole(request, "member");
         const { userId } = getAuth(request);
         if (!userId) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
@@ -1048,7 +1048,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         // Require admin/member role
-        await requireRole(request, ["admin", "member"]);
+        await requireRole(request, "member");
         const { userId } = getAuth(request);
         if (!userId) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
@@ -1137,7 +1137,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         // Require admin/member role
-        await requireRole(request, ["admin", "member"]);
+        await requireRole(request, "member");
         const { userId } = getAuth(request);
         if (!userId) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
@@ -1178,6 +1178,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
           required: ["id"],
           additionalProperties: false,
         },
+        body: LoanApplicationsModel.CompleteKycKybRequestBodySchema,
         response: {
           200: {
             type: "object",
@@ -1209,14 +1210,19 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         // Require admin/member role
-        await requireRole(request, ["admin", "member"]);
+        await requireRole(request, "member");
         const { userId } = getAuth(request);
         if (!userId) {
           return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
         }
 
         const { id } = (request.params as any) || {};
-        const result = await KycKybVerificationService.completeKycKybVerification(id, userId);
+        const body = (request.body as LoanApplicationsModel.CompleteKycKybRequestBody) || undefined;
+        const result = await KycKybVerificationService.completeKycKybVerification(
+          id,
+          userId,
+          body?.nextApprover
+        );
 
         return reply.send(result);
       } catch (error: any) {

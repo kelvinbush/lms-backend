@@ -5,6 +5,31 @@ export namespace LoanApplicationsModel {
   export const LoanApplicationStatusEnum = loanApplicationStatusEnum.enumValues;
   export type LoanApplicationStatus = (typeof loanApplications.$inferSelect)["status"];
 
+  export interface NextStageApprover {
+    nextApproverEmail: string;
+    nextApproverName?: string;
+  }
+
+  export interface CompleteKycKybRequestBody {
+    nextApprover?: NextStageApprover;
+  }
+
+  export const CompleteKycKybRequestBodySchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      nextApprover: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          nextApproverEmail: { type: "string", format: "email" },
+          nextApproverName: { type: "string", minLength: 1, maxLength: 120 },
+        },
+        required: ["nextApproverEmail"],
+      },
+    },
+  } as const;
+
   // Create loan application input
   export interface CreateLoanApplicationBody {
     businessId?: string; // Optional - Auto-set for entrepreneurs, required for admins

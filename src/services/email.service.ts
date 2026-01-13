@@ -8,6 +8,7 @@ import ResetPasswordTemplate from "../templates/email/reset-password-template";
 import SMEInviteTemplate from "../templates/email/sme-invite-template";
 import VerificationCodeTemplate from "../templates/email/verification-code-template";
 import WelcomeEmailTemplate from "../templates/email/welcome-email-template";
+import LoanStageReviewNotificationEmail from "../templates/email/loan-stage-review-notification";
 import { logger } from "../utils/logger";
 
 config({
@@ -30,6 +31,21 @@ export interface EmailData {
   subject: string;
   html: string;
   from?: string;
+}
+
+export interface LoanStageReviewNotificationEmailData {
+  to: string;
+  approverName?: string;
+  stageName: string;
+  companyName: string;
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone?: string | null;
+  loanType: string;
+  loanRequested: string;
+  preferredTenure: string;
+  useOfFunds: string;
+  loginUrl: string;
 }
 
 export interface VerificationEmailData {
@@ -301,6 +317,50 @@ export class EmailService {
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       logger.error("Error sending SME invitation email:", error);
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
+  async sendLoanStageReviewNotificationEmail(params: LoanStageReviewNotificationEmailData): Promise<{
+    success: boolean;
+    messageId?: string;
+    error?: string;
+  }> {
+    try {
+      const html = await render(
+        LoanStageReviewNotificationEmail({
+          approverName: params.approverName,
+          stageName: params.stageName,
+          companyName: params.companyName,
+          applicantName: params.applicantName,
+          applicantEmail: params.applicantEmail,
+          applicantPhone: params.applicantPhone,
+          loanType: params.loanType,
+          loanRequested: params.loanRequested,
+          preferredTenure: params.preferredTenure,
+          useOfFunds: params.useOfFunds,
+          loginUrl: params.loginUrl,
+        })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || "Melanin Kapital <nore@melaninkapital.com>",
+        to: [params.to],
+        subject: `Loan Review Required: ${params.stageName}`,
+        html,
+      });
+
+      if (result.error) {
+        logger.error("Failed to send loan stage review notification email:", result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`Loan stage review notification email sent to ${params.to}`, {
+        messageId: result.data?.id,
+      });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error("Error sending loan stage review notification email:", error);
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }

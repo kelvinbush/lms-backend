@@ -100,6 +100,12 @@ export namespace KycKybVerificationModel {
     };
   }
 
+  // Complete KYC/KYB verification request body
+  export interface CompleteKycKybVerificationBody {
+    nextApproverEmail: string;
+    nextApproverName?: string;
+  }
+
   // JSON Schemas for API validation
   export const VerifyDocumentBodySchema = {
     type: "object",

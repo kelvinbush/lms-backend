@@ -6,17 +6,50 @@ import {
   personalDocuments,
   loanApplicationDocumentVerifications,
   users,
+  businessProfiles,
+  loanProducts,
   type DocumentType,
   type DocumentVerificationStatus,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
 import { LoanApplicationAuditService } from "../loan-applications/loan-applications-audit.service";
 import type { KycKybVerificationModel } from "./kyc-kyb-verification.model";
+import { emailService } from "../../services/email.service";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
   err.status = status;
   return err;
+}
+
+function formatFullName(firstName?: string | null, lastName?: string | null): string {
+  const parts = [firstName, lastName].filter((part) => !!part && part.trim().length > 0) as string[];
+  if (parts.length === 0) return "Valued Applicant";
+  return parts.join(" ");
+}
+
+function formatCurrency(amount: any, currency?: string | null): string {
+  const num = Number(amount ?? 0);
+  const safeCurrency = (currency || "USD").toUpperCase();
+  if (!Number.isFinite(num)) {
+    return `${safeCurrency} ${amount ?? "0"}`;
+  }
+
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: safeCurrency,
+      maximumFractionDigits: 2,
+    }).format(num);
+  } catch (error) {
+    logger.warn("Failed to format currency, falling back to raw amount", { amount, currency });
+    return `${safeCurrency} ${num.toFixed(2)}`;
+  }
+}
+
+function formatTenure(period: number, termUnit: string): string {
+  const displayUnit = termUnit.replace(/_/g, " ");
+  return `${period} ${displayUnit}`;
 }
 
 /**
@@ -579,7 +612,8 @@ export abstract class KycKybVerificationService {
    */
   static async completeKycKybVerification(
     loanApplicationId: string,
-    clerkId: string
+    clerkId: string,
+    nextApprover?: KycKybVerificationModel.CompleteKycKybVerificationBody
   ): Promise<KycKybVerificationModel.CompleteKycKybResponse> {
     try {
       // Get loan application
@@ -663,6 +697,72 @@ export abstract class KycKybVerificationService {
           totalDocuments: verifications.length,
         },
       });
+
+      if (nextApprover?.nextApproverEmail) {
+        const stageDisplayName = "Eligibility Check";
+        const adminPortalUrl = (process.env.ADMIN_URL || process.env.APP_URL || "#").replace(
+          /\/$/,
+          ""
+        );
+
+        try {
+          const [business, entrepreneur, loanProduct] = await Promise.all([
+            db.query.businessProfiles.findFirst({
+              where: and(
+                eq(businessProfiles.id, loanApp.businessId),
+                isNull(businessProfiles.deletedAt)
+              ),
+              columns: {
+                name: true,
+              },
+            }),
+            db.query.users.findFirst({
+              where: and(eq(users.id, loanApp.entrepreneurId), isNull(users.deletedAt)),
+              columns: {
+                firstName: true,
+                lastName: true,
+                email: true,
+                phoneNumber: true,
+              },
+            }),
+            db.query.loanProducts.findFirst({
+              where: and(eq(loanProducts.id, loanApp.loanProductId), isNull(loanProducts.deletedAt)),
+              columns: {
+                name: true,
+                termUnit: true,
+              },
+            }),
+          ]);
+
+          const applicantName = formatFullName(
+            entrepreneur?.firstName || "",
+            entrepreneur?.lastName || ""
+          );
+
+          const formattedAmount = formatCurrency(loanApp.fundingAmount, loanApp.fundingCurrency);
+          const preferredTenure = formatTenure(
+            loanApp.repaymentPeriod,
+            loanProduct?.termUnit || "months"
+          );
+
+          await emailService.sendLoanStageReviewNotificationEmail({
+            to: nextApprover.nextApproverEmail,
+            approverName: nextApprover.nextApproverName,
+            stageName: stageDisplayName,
+            companyName: business?.name || "Unknown Company",
+            applicantName,
+            applicantEmail: entrepreneur?.email || "N/A",
+            applicantPhone: entrepreneur?.phoneNumber || null,
+            loanType: loanProduct?.name || "Loan Product",
+            loanRequested: formattedAmount,
+            preferredTenure,
+            useOfFunds: loanApp.intendedUseOfFunds || "Not provided",
+            loginUrl: `${adminPortalUrl}/login`,
+          });
+        } catch (error) {
+          logger.error("Failed to send loan stage review notification email", error);
+        }
+      }
 
       return {
         loanApplicationId,
