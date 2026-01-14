@@ -10,6 +10,7 @@ import { investorOpportunityBookmarks } from "./investorOpportunityBookmarks";
 import { loanApplicationAuditTrail } from "./loanApplicationAuditTrail";
 import { loanApplicationDocumentVerifications } from "./loanApplicationDocumentVerifications";
 import { loanApplications } from "./loanApplications";
+import { loanDocuments } from "./loanDocuments";
 import { loanProducts } from "./loanProducts";
 import { personalDocuments } from "./personalDocuments";
 import { smeOnboardingProgress } from "./smeOnboardingProgress";
@@ -31,6 +32,10 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   updatedLoanApplications: many(loanApplications, { relationName: "updater" }),
   // Loan application audit trail entries performed by the user
   loanApplicationAuditEntries: many(loanApplicationAuditTrail),
+  // Loan applications where user completed eligibility assessment
+  eligibilityAssessedLoanApplications: many(loanApplications, { relationName: "eligibility_assessor" }),
+  // Loan documents uploaded by the user
+  uploadedLoanDocuments: many(loanDocuments),
 }));
 
 export const personalDocumentsRelations = relations(personalDocuments, ({ one }) => ({
@@ -178,6 +183,14 @@ export const loanApplicationsRelations = relations(loanApplications, ({ one, man
   auditTrail: many(loanApplicationAuditTrail),
   // Document verifications for this loan application
   documentVerifications: many(loanApplicationDocumentVerifications),
+  // Loan documents for this loan application
+  loanDocuments: many(loanDocuments),
+  // Eligibility assessment completed by
+  eligibilityAssessmentCompletedByUser: one(users, {
+    fields: [loanApplications.eligibilityAssessmentCompletedBy],
+    references: [users.id],
+    relationName: "eligibility_assessor",
+  }),
 }));
 
 // Loan Application Audit Trail Relations
@@ -209,3 +222,15 @@ export const loanApplicationDocumentVerificationsRelations = relations(
     }),
   })
 );
+
+// Loan Documents Relations
+export const loanDocumentsRelations = relations(loanDocuments, ({ one }) => ({
+  loanApplication: one(loanApplications, {
+    fields: [loanDocuments.loanApplicationId],
+    references: [loanApplications.id],
+  }),
+  uploadedByUser: one(users, {
+    fields: [loanDocuments.uploadedBy],
+    references: [users.id],
+  }),
+}));

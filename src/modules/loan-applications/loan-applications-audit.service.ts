@@ -158,6 +158,7 @@ export abstract class LoanApplicationAuditService {
       document_verified_approved: "Document verified and approved",
       document_verified_rejected: "Document verification rejected",
       kyc_kyb_completed: "KYC/KYB verification completed",
+      eligibility_assessment_completed: "Eligibility assessment completed",
     };
 
     return titles[eventType];

@@ -23,6 +23,7 @@ import { calculateStatsWithChanges } from "./loan-applications.stats";
 import { validateLoanApplicationCreation } from "./loan-applications.validators";
 import { LoanApplicationAuditService } from "./loan-applications-audit.service";
 import { KycKybVerificationService } from "../kyc-kyb-verification/kyc-kyb-verification.service";
+import { emailService } from "../../services/email.service";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -696,6 +697,37 @@ export abstract class LoanApplicationsService {
             );
           }
         );
+      }
+
+      // Send rejection email to applicant if status is rejected
+      if (newStatus === "rejected" && rejectionReason) {
+        // This is non-blocking - errors are logged but don't fail the status update
+        (async () => {
+          try {
+            const entrepreneur = await db.query.users.findFirst({
+              where: and(eq(users.id, current.entrepreneurId), isNull(users.deletedAt)),
+              columns: {
+                email: true,
+                firstName: true,
+              },
+            });
+
+            if (entrepreneur?.email) {
+              const appUrl = process.env.APP_URL || "#";
+              await emailService.sendLoanRejectionEmail({
+                to: entrepreneur.email,
+                firstName: entrepreneur.firstName || undefined,
+                rejectionReason,
+                loginUrl: `${appUrl}/login`,
+              });
+            }
+          } catch (error) {
+            logger.error(
+              `Failed to send rejection email for loan application ${applicationId}:`,
+              error
+            );
+          }
+        })();
       }
 
       // Return updated application detail

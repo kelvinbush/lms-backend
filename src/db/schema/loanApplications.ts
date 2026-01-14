@@ -96,6 +96,15 @@ export const loanApplications = pgTable(
     // Rejection reason (if applicable)
     rejectionReason: text("rejection_reason"),
 
+    // Eligibility assessment (when moving from eligibility_check to credit_analysis)
+    eligibilityAssessmentComment: text("eligibility_assessment_comment"),
+    eligibilityAssessmentCompletedAt: timestamp("eligibility_assessment_completed_at", {
+      withTimezone: true,
+    }),
+    eligibilityAssessmentCompletedBy: varchar("eligibility_assessment_completed_by", {
+      length: 24,
+    }).references(() => users.id, { onDelete: "set null" }),
+
     // Audit tracking
     createdBy: varchar("created_by", { length: 24 })
       .notNull()

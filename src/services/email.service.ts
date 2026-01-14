@@ -9,6 +9,7 @@ import SMEInviteTemplate from "../templates/email/sme-invite-template";
 import VerificationCodeTemplate from "../templates/email/verification-code-template";
 import WelcomeEmailTemplate from "../templates/email/welcome-email-template";
 import LoanStageReviewNotificationEmail from "../templates/email/loan-stage-review-notification";
+import LoanRejectionEmail from "../templates/email/loan-rejection";
 import { logger } from "../utils/logger";
 
 config({
@@ -52,6 +53,15 @@ export interface VerificationEmailData {
   firstName?: string;
   email: string;
   code: string;
+}
+
+export interface LoanRejectionEmailData {
+  to: string;
+  firstName?: string;
+  rejectionReason: string;
+  loginUrl?: string;
+  supportEmail?: string;
+  supportPhone?: string;
 }
 
 export class EmailService {
@@ -361,6 +371,44 @@ export class EmailService {
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       logger.error("Error sending loan stage review notification email:", error);
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
+  async sendLoanRejectionEmail(params: LoanRejectionEmailData): Promise<{
+    success: boolean;
+    messageId?: string;
+    error?: string;
+  }> {
+    try {
+      const html = await render(
+        LoanRejectionEmail({
+          firstName: params.firstName,
+          rejectionReason: params.rejectionReason,
+          loginUrl: params.loginUrl || process.env.APP_URL || "#",
+          supportEmail: params.supportEmail || "credit@melaninkapital.com",
+          supportPhone: params.supportPhone || "+254 703 680 991",
+        })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || "Melanin Kapital <nore@melaninkapital.com>",
+        to: [params.to],
+        subject: "Loan Application Decision - Melanin Kapital",
+        html,
+      });
+
+      if (result.error) {
+        logger.error("Failed to send loan rejection email:", result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`Loan rejection email sent to ${params.to}`, {
+        messageId: result.data?.id,
+      });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error("Error sending loan rejection email:", error);
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }

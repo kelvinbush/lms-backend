@@ -379,6 +379,50 @@ All dates use ISO 8601 format:
 - `dateFrom/dateTo`: Query filters (inclusive)
 - Timeline events: Event timestamps
 
+### 8. Complete Eligibility Assessment
+
+**Endpoint**: `POST /:id/eligibility-assessment/complete`
+
+**Authorization**: Admin/Member
+
+**Request Body**:
+```typescript
+interface CompleteEligibilityAssessmentBody {
+  comment: string; // Required - assessment comments
+  supportingDocuments?: Array<{
+    docUrl: string; // Required - document URL
+    docName?: string; // Optional - document name (max 255 chars)
+    notes?: string; // Optional - document notes (max 2000 chars)
+  }>;
+  nextApprover?: {
+    nextApproverEmail: string; // Required - next approver email
+    nextApproverName?: string; // Optional - next approver name (max 255 chars)
+  };
+}
+```
+
+**Response**:
+```typescript
+interface CompleteEligibilityAssessmentResponse {
+  loanApplicationId: string;
+  status: "credit_analysis"; // Always moves to credit_analysis
+  completedAt: string;
+  completedBy: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  };
+  eligibilityAssessmentComment: string;
+  supportingDocuments: Array<{
+    id: string;
+    docUrl: string;
+    docName?: string;
+    notes?: string;
+  }>;
+}
+```
+
 ## Pagination
 
 List endpoints support cursor-based pagination:
