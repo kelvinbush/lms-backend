@@ -112,10 +112,25 @@ export namespace KycKybVerificationModel {
     required: ["status"],
     properties: {
       status: { type: "string", enum: ["approved", "rejected"] },
-      rejectionReason: { type: "string", minLength: 1, maxLength: 1000 },
+      rejectionReason: { type: "string", maxLength: 1000 },
       notes: { type: "string", maxLength: 2000 },
     },
     additionalProperties: false,
+    allOf: [
+      // If status is "rejected", rejectionReason is required and must have minLength: 1
+      {
+        if: {
+          properties: { status: { const: "rejected" } },
+          required: ["status"],
+        },
+        then: {
+          required: ["rejectionReason"],
+          properties: {
+            rejectionReason: { type: "string", minLength: 1, maxLength: 1000 },
+          },
+        },
+      },
+    ],
   } as const;
 
   export const BulkVerifyDocumentsBodySchema = {
@@ -133,10 +148,25 @@ export namespace KycKybVerificationModel {
             documentId: { type: "string", minLength: 1 },
             documentType: { type: "string", enum: ["personal", "business"] },
             status: { type: "string", enum: ["approved", "rejected"] },
-            rejectionReason: { type: "string", minLength: 1, maxLength: 1000 },
+            rejectionReason: { type: "string", maxLength: 1000 },
             notes: { type: "string", maxLength: 2000 },
           },
           additionalProperties: false,
+          allOf: [
+            // If status is "rejected", rejectionReason is required and must have minLength: 1
+            {
+              if: {
+                properties: { status: { const: "rejected" } },
+                required: ["status"],
+              },
+              then: {
+                required: ["rejectionReason"],
+                properties: {
+                  rejectionReason: { type: "string", minLength: 1, maxLength: 1000 },
+                },
+              },
+            },
+          ],
         },
       },
     },

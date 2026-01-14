@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   businessDocuments,
@@ -604,6 +604,7 @@ export abstract class KycKybVerificationService {
    *
    * @param loanApplicationId - The loan application ID
    * @param clerkId - Clerk ID of the admin completing verification
+   * @param nextApprover - Next approver details
    * @returns Updated loan application details
    *
    * @throws {400} If validation fails or no documents reviewed
@@ -616,12 +617,23 @@ export abstract class KycKybVerificationService {
     nextApprover?: KycKybVerificationModel.CompleteKycKybVerificationBody
   ): Promise<KycKybVerificationModel.CompleteKycKybResponse> {
     try {
-      // Get loan application
+      // Get loan application with only required columns
       const loanApp = await db.query.loanApplications.findFirst({
         where: and(
           eq(loanApplications.id, loanApplicationId),
           isNull(loanApplications.deletedAt)
         ),
+        columns: {
+          id: true,
+          status: true,
+          businessId: true,
+          entrepreneurId: true,
+          loanProductId: true,
+          fundingAmount: true,
+          fundingCurrency: true,
+          repaymentPeriod: true,
+          intendedUseOfFunds: true,
+        },
       });
 
       if (!loanApp) {
@@ -635,19 +647,18 @@ export abstract class KycKybVerificationService {
         );
       }
 
-      // Check that at least some documents have been reviewed
-      const verifications = await db
+      // Check that at least some documents have been reviewed - use SQL COUNT for efficiency
+      const [{ reviewedCount, totalCount }] = await db
         .select({
-          verificationStatus: loanApplicationDocumentVerifications.verificationStatus,
+          reviewedCount: sql<number>`COUNT(*) FILTER (WHERE ${loanApplicationDocumentVerifications.verificationStatus} IN ('approved', 'rejected'))`,
+          totalCount: count(),
         })
         .from(loanApplicationDocumentVerifications)
         .where(eq(loanApplicationDocumentVerifications.loanApplicationId, loanApplicationId));
 
-      const reviewedCount = verifications.filter(
-        (v) => v.verificationStatus === "approved" || v.verificationStatus === "rejected"
-      ).length;
+      const reviewedCountNum = Number(reviewedCount || 0);
 
-      if (reviewedCount === 0) {
+      if (reviewedCountNum === 0) {
         throw httpError(
           400,
           "[NO_DOCUMENTS_REVIEWED] At least one document must be reviewed before completing KYC/KYB verification"
@@ -688,13 +699,13 @@ export abstract class KycKybVerificationService {
         clerkId,
         eventType: "kyc_kyb_completed",
         title: LoanApplicationAuditService.getEventTitle("kyc_kyb_completed"),
-        description: `KYC/KYB verification completed. Reviewed ${reviewedCount} document(s).`,
+        description: `KYC/KYB verification completed. Reviewed ${reviewedCountNum} document(s).`,
         status: "eligibility_check",
         previousStatus: "kyc_kyb_verification",
         newStatus: "eligibility_check",
         details: {
-          reviewedDocuments: reviewedCount,
-          totalDocuments: verifications.length,
+          reviewedDocuments: reviewedCountNum,
+          totalDocuments: Number(totalCount || 0),
         },
       });
 
