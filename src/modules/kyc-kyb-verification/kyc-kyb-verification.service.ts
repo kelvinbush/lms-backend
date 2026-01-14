@@ -1,4 +1,4 @@
-import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   businessDocuments,
@@ -167,7 +167,7 @@ export abstract class KycKybVerificationService {
                 email: users.email,
               })
               .from(users)
-              .where(sql`${users.id} = ANY(${verifiedByUserIds})`)
+              .where(inArray(users.id, verifiedByUserIds))
           : [];
 
       const verifiedByMap = new Map(verifiedByUsers.map((u) => [u.id, u]));
