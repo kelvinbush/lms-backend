@@ -36,6 +36,10 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   eligibilityAssessedLoanApplications: many(loanApplications, { relationName: "eligibility_assessor" }),
   // Loan applications where user completed credit assessment
   creditAssessedLoanApplications: many(loanApplications, { relationName: "credit_assessor" }),
+  // Loan applications where user completed head of credit review
+  headOfCreditReviewAssessedLoanApplications: many(loanApplications, { relationName: "head_of_credit_reviewer" }),
+  // Loan applications where user completed internal approval CEO
+  internalApprovalCeoAssessedLoanApplications: many(loanApplications, { relationName: "internal_approval_ceo_reviewer" }),
   // Loan documents uploaded by the user
   uploadedLoanDocuments: many(loanDocuments),
 }));
@@ -198,6 +202,18 @@ export const loanApplicationsRelations = relations(loanApplications, ({ one, man
     fields: [loanApplications.creditAssessmentCompletedBy],
     references: [users.id],
     relationName: "credit_assessor",
+  }),
+  // Head of credit review completed by
+  headOfCreditReviewCompletedByUser: one(users, {
+    fields: [loanApplications.headOfCreditReviewCompletedBy],
+    references: [users.id],
+    relationName: "head_of_credit_reviewer",
+  }),
+  // Internal approval CEO completed by
+  internalApprovalCeoCompletedByUser: one(users, {
+    fields: [loanApplications.internalApprovalCeoCompletedBy],
+    references: [users.id],
+    relationName: "internal_approval_ceo_reviewer",
   }),
 }));
 

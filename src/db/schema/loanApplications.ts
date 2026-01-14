@@ -114,6 +114,33 @@ export const loanApplications = pgTable(
       length: 24,
     }).references(() => users.id, { onDelete: "set null" }),
 
+    // Head of credit review assessment (when moving from head_of_credit_review to internal_approval_ceo)
+    headOfCreditReviewComment: text("head_of_credit_review_comment"),
+    headOfCreditReviewCompletedAt: timestamp("head_of_credit_review_completed_at", {
+      withTimezone: true,
+    }),
+    headOfCreditReviewCompletedBy: varchar("head_of_credit_review_completed_by", {
+      length: 24,
+    }).references(() => users.id, { onDelete: "set null" }),
+
+    // Internal approval CEO assessment (when moving from internal_approval_ceo to committee_decision)
+    internalApprovalCeoComment: text("internal_approval_ceo_comment"),
+    internalApprovalCeoCompletedAt: timestamp("internal_approval_ceo_completed_at", {
+      withTimezone: true,
+    }),
+    internalApprovalCeoCompletedBy: varchar("internal_approval_ceo_completed_by", {
+      length: 24,
+    }).references(() => users.id, { onDelete: "set null" }),
+
+    // Committee decision (when moving from committee_decision to sme_offer_approval)
+    termSheetUrl: text("term_sheet_url"), // URL to the uploaded term sheet document
+    termSheetUploadedAt: timestamp("term_sheet_uploaded_at", {
+      withTimezone: true,
+    }),
+    termSheetUploadedBy: varchar("term_sheet_uploaded_by", {
+      length: 24,
+    }).references(() => users.id, { onDelete: "set null" }),
+
     // Audit tracking
     createdBy: varchar("created_by", { length: 24 })
       .notNull()

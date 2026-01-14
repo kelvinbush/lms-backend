@@ -10,6 +10,8 @@ import VerificationCodeTemplate from "../templates/email/verification-code-templ
 import WelcomeEmailTemplate from "../templates/email/welcome-email-template";
 import LoanStageReviewNotificationEmail from "../templates/email/loan-stage-review-notification";
 import LoanRejectionEmail from "../templates/email/loan-rejection";
+import DocumentGenerationNotificationEmail from "../templates/email/document-generation-notification";
+import TermSheetApprovalNotificationEmail from "../templates/email/term-sheet-approval-notification";
 import { logger } from "../utils/logger";
 
 config({
@@ -59,6 +61,30 @@ export interface LoanRejectionEmailData {
   to: string;
   firstName?: string;
   rejectionReason: string;
+  loginUrl?: string;
+  supportEmail?: string;
+  supportPhone?: string;
+}
+
+export interface DocumentGenerationNotificationEmailData {
+  to: string;
+  approverName?: string;
+  companyName: string;
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone?: string | null;
+  loanType: string;
+  loanRequested: string;
+  preferredTenure: string;
+  approvedCreditLimit?: string;
+  approvedLoanTenure?: string;
+  useOfFunds: string;
+  loginUrl: string;
+}
+
+export interface TermSheetApprovalNotificationEmailData {
+  to: string;
+  firstName?: string;
   loginUrl?: string;
   supportEmail?: string;
   supportPhone?: string;
@@ -409,6 +435,88 @@ export class EmailService {
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       logger.error("Error sending loan rejection email:", error);
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
+  async sendDocumentGenerationNotificationEmail(params: DocumentGenerationNotificationEmailData): Promise<{
+    success: boolean;
+    messageId?: string;
+    error?: string;
+  }> {
+    try {
+      const html = await render(
+        DocumentGenerationNotificationEmail({
+          approverName: params.approverName,
+          companyName: params.companyName,
+          applicantName: params.applicantName,
+          applicantEmail: params.applicantEmail,
+          applicantPhone: params.applicantPhone,
+          loanType: params.loanType,
+          loanRequested: params.loanRequested,
+          preferredTenure: params.preferredTenure,
+          approvedCreditLimit: params.approvedCreditLimit,
+          approvedLoanTenure: params.approvedLoanTenure,
+          useOfFunds: params.useOfFunds,
+          loginUrl: params.loginUrl,
+        })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || "Melanin Kapital <nore@melaninkapital.com>",
+        to: [params.to],
+        subject: "Loan Request Ready for Document Generation",
+        html,
+      });
+
+      if (result.error) {
+        logger.error("Failed to send document generation notification email:", result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`Document generation notification email sent to ${params.to}`, {
+        messageId: result.data?.id,
+      });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error("Error sending document generation notification email:", error);
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
+  async sendTermSheetApprovalNotificationEmail(params: TermSheetApprovalNotificationEmailData): Promise<{
+    success: boolean;
+    messageId?: string;
+    error?: string;
+  }> {
+    try {
+      const html = await render(
+        TermSheetApprovalNotificationEmail({
+          firstName: params.firstName,
+          loginUrl: params.loginUrl || process.env.APP_URL || "#",
+          supportEmail: params.supportEmail || "credit@melaninkapital.com",
+          supportPhone: params.supportPhone || "+254 703 680 991",
+        })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || "Melanin Kapital <nore@melaninkapital.com>",
+        to: [params.to],
+        subject: "Loan Request Approved - Term Sheet Ready for Review",
+        html,
+      });
+
+      if (result.error) {
+        logger.error("Failed to send term sheet approval notification email:", result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`Term sheet approval notification email sent to ${params.to}`, {
+        messageId: result.data?.id,
+      });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error("Error sending term sheet approval notification email:", error);
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }

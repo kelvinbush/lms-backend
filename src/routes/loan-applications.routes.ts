@@ -12,6 +12,12 @@ import { EligibilityAssessmentModel } from "../modules/eligibility-assessment/el
 import { EligibilityAssessmentService } from "../modules/eligibility-assessment/eligibility-assessment.service";
 import { CreditAssessmentModel } from "../modules/credit-assessment/credit-assessment.model";
 import { CreditAssessmentService } from "../modules/credit-assessment/credit-assessment.service";
+import { HeadOfCreditReviewModel } from "../modules/head-of-credit-review/head-of-credit-review.model";
+import { HeadOfCreditReviewService } from "../modules/head-of-credit-review/head-of-credit-review.service";
+import { InternalApprovalCeoModel } from "../modules/internal-approval-ceo/internal-approval-ceo.model";
+import { InternalApprovalCeoService } from "../modules/internal-approval-ceo/internal-approval-ceo.service";
+import { CommitteeDecisionModel } from "../modules/committee-decision/committee-decision.model";
+import { CommitteeDecisionService } from "../modules/committee-decision/committee-decision.service";
 import { UserModel } from "../modules/user/user.model";
 import { isAdminOrMember, isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
@@ -1428,6 +1434,274 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to complete credit assessment",
           code: "COMPLETE_CREDIT_ASSESSMENT_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/head-of-credit-review/complete
+  // Complete head of credit review step
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/head-of-credit-review/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: HeadOfCreditReviewModel.CompleteHeadOfCreditReviewBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              completedAt: { type: "string" },
+              completedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+              headOfCreditReviewComment: { type: "string" },
+              supportingDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docUrl: { type: "string" },
+                    docName: { type: "string" },
+                    notes: { type: "string" },
+                  },
+                  required: ["id", "docUrl"],
+                },
+              },
+            },
+            required: [
+              "loanApplicationId",
+              "status",
+              "completedAt",
+              "completedBy",
+              "headOfCreditReviewComment",
+              "supportingDocuments",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "head-of-credit-review"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as HeadOfCreditReviewModel.CompleteHeadOfCreditReviewBody;
+        const result = await HeadOfCreditReviewService.completeHeadOfCreditReview(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing head of credit review:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete head of credit review",
+          code: "COMPLETE_HEAD_OF_CREDIT_REVIEW_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/internal-approval-ceo/complete
+  // Complete internal approval CEO step
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/internal-approval-ceo/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: InternalApprovalCeoModel.CompleteInternalApprovalCeoBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              completedAt: { type: "string" },
+              completedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+              internalApprovalCeoComment: { type: "string" },
+              supportingDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docUrl: { type: "string" },
+                    docName: { type: "string" },
+                    notes: { type: "string" },
+                  },
+                  required: ["id", "docUrl"],
+                },
+              },
+            },
+            required: [
+              "loanApplicationId",
+              "status",
+              "completedAt",
+              "completedBy",
+              "internalApprovalCeoComment",
+              "supportingDocuments",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "internal-approval-ceo"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as InternalApprovalCeoModel.CompleteInternalApprovalCeoBody;
+        const result = await InternalApprovalCeoService.completeInternalApprovalCeo(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing internal approval CEO:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete internal approval CEO",
+          code: "COMPLETE_INTERNAL_APPROVAL_CEO_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/committee-decision/complete
+  // Complete committee decision step (upload term sheet)
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/committee-decision/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: CommitteeDecisionModel.CompleteCommitteeDecisionBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              termSheetUrl: { type: "string" },
+              uploadedAt: { type: "string" },
+              uploadedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+            },
+            required: [
+              "loanApplicationId",
+              "status",
+              "termSheetUrl",
+              "uploadedAt",
+              "uploadedBy",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "committee-decision"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as CommitteeDecisionModel.CompleteCommitteeDecisionBody;
+        const result = await CommitteeDecisionService.completeCommitteeDecision(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing committee decision:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete committee decision",
+          code: "COMPLETE_COMMITTEE_DECISION_FAILED",
         });
       }
     }

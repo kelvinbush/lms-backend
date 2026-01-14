@@ -160,6 +160,8 @@ export abstract class LoanApplicationAuditService {
       kyc_kyb_completed: "KYC/KYB verification completed",
       eligibility_assessment_completed: "Eligibility assessment completed",
       credit_assessment_completed: "Credit assessment completed",
+      head_of_credit_review_completed: "Head of credit review completed",
+      internal_approval_ceo_completed: "Internal approval CEO completed",
     };
 
     return titles[eventType];
