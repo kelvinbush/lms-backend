@@ -17,6 +17,7 @@ export const loanApplicationAuditEventTypeEnum = pgEnum("loan_application_audit_
   "document_verified_rejected", // KYC/KYB document verification rejected
   "kyc_kyb_completed", // KYC/KYB verification step completed
   "eligibility_assessment_completed", // Eligibility assessment step completed
+  "credit_assessment_completed", // Credit assessment step completed
 ]);
 
 /**

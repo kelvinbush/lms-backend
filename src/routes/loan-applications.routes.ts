@@ -10,6 +10,8 @@ import { KycKybVerificationModel } from "../modules/kyc-kyb-verification/kyc-kyb
 import { KycKybVerificationService } from "../modules/kyc-kyb-verification/kyc-kyb-verification.service";
 import { EligibilityAssessmentModel } from "../modules/eligibility-assessment/eligibility-assessment.model";
 import { EligibilityAssessmentService } from "../modules/eligibility-assessment/eligibility-assessment.service";
+import { CreditAssessmentModel } from "../modules/credit-assessment/credit-assessment.model";
+import { CreditAssessmentService } from "../modules/credit-assessment/credit-assessment.service";
 import { UserModel } from "../modules/user/user.model";
 import { isAdminOrMember, isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
@@ -1332,6 +1334,100 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to complete eligibility assessment",
           code: "COMPLETE_ELIGIBILITY_ASSESSMENT_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/credit-assessment/complete
+  // Complete credit assessment step
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/credit-assessment/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: CreditAssessmentModel.CompleteCreditAssessmentBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              completedAt: { type: "string" },
+              completedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+              creditAssessmentComment: { type: "string" },
+              supportingDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docUrl: { type: "string" },
+                    docName: { type: "string" },
+                    notes: { type: "string" },
+                  },
+                  required: ["id", "docUrl"],
+                },
+              },
+            },
+            required: [
+              "loanApplicationId",
+              "status",
+              "completedAt",
+              "completedBy",
+              "creditAssessmentComment",
+              "supportingDocuments",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "credit-assessment"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as CreditAssessmentModel.CompleteCreditAssessmentBody;
+        const result = await CreditAssessmentService.completeCreditAssessment(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing credit assessment:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete credit assessment",
+          code: "COMPLETE_CREDIT_ASSESSMENT_FAILED",
         });
       }
     }

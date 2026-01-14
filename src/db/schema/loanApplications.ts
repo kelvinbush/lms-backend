@@ -105,6 +105,15 @@ export const loanApplications = pgTable(
       length: 24,
     }).references(() => users.id, { onDelete: "set null" }),
 
+    // Credit assessment (when moving from credit_analysis to head_of_credit_review)
+    creditAssessmentComment: text("credit_assessment_comment"),
+    creditAssessmentCompletedAt: timestamp("credit_assessment_completed_at", {
+      withTimezone: true,
+    }),
+    creditAssessmentCompletedBy: varchar("credit_assessment_completed_by", {
+      length: 24,
+    }).references(() => users.id, { onDelete: "set null" }),
+
     // Audit tracking
     createdBy: varchar("created_by", { length: 24 })
       .notNull()

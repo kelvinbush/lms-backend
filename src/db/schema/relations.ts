@@ -34,6 +34,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   loanApplicationAuditEntries: many(loanApplicationAuditTrail),
   // Loan applications where user completed eligibility assessment
   eligibilityAssessedLoanApplications: many(loanApplications, { relationName: "eligibility_assessor" }),
+  // Loan applications where user completed credit assessment
+  creditAssessedLoanApplications: many(loanApplications, { relationName: "credit_assessor" }),
   // Loan documents uploaded by the user
   uploadedLoanDocuments: many(loanDocuments),
 }));
@@ -190,6 +192,12 @@ export const loanApplicationsRelations = relations(loanApplications, ({ one, man
     fields: [loanApplications.eligibilityAssessmentCompletedBy],
     references: [users.id],
     relationName: "eligibility_assessor",
+  }),
+  // Credit assessment completed by
+  creditAssessmentCompletedByUser: one(users, {
+    fields: [loanApplications.creditAssessmentCompletedBy],
+    references: [users.id],
+    relationName: "credit_assessor",
   }),
 }));
 
