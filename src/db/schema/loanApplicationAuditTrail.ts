@@ -13,6 +13,13 @@ export const loanApplicationAuditEventTypeEnum = pgEnum("loan_application_audit_
   "awaiting_disbursement",
   "disbursed",
   "status_changed", // Generic status change for other statuses
+  "document_verified_approved", // KYC/KYB document verification approved
+  "document_verified_rejected", // KYC/KYB document verification rejected
+  "kyc_kyb_completed", // KYC/KYB verification step completed
+  "eligibility_assessment_completed", // Eligibility assessment step completed
+  "credit_assessment_completed", // Credit assessment step completed
+  "head_of_credit_review_completed", // Head of credit review step completed
+  "internal_approval_ceo_completed", // Internal approval CEO step completed
 ]);
 
 /**
@@ -32,8 +39,9 @@ export const loanApplicationAuditTrail = pgTable(
     loanApplicationId: varchar("loan_application_id", { length: 24 })
       .notNull()
       .references(() => loanApplications.id, { onDelete: "cascade" }), // Loan application being tracked
-    performedById: varchar("performed_by_id", { length: 24 })
-      .references(() => users.id, { onDelete: "set null" }), // User who performed the action (optional for system events)
+    performedById: varchar("performed_by_id", { length: 24 }).references(() => users.id, {
+      onDelete: "set null",
+    }), // User who performed the action (optional for system events)
 
     // Event details
     eventType: loanApplicationAuditEventTypeEnum("event_type").notNull(),
@@ -74,10 +82,9 @@ export const loanApplicationAuditTrail = pgTable(
         table.loanApplicationId,
         table.eventType
       ),
-      idxLoanApplicationAuditLoanAppCreated: index("idx_loan_application_audit_loan_app_created").on(
-        table.loanApplicationId,
-        table.createdAt
-      ),
+      idxLoanApplicationAuditLoanAppCreated: index(
+        "idx_loan_application_audit_loan_app_created"
+      ).on(table.loanApplicationId, table.createdAt),
     };
   }
 );

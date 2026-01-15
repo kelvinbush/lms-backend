@@ -9,7 +9,7 @@ import {
   users,
 } from "../../db/schema";
 import { logger } from "../../utils/logger";
-import { isAdminOrMember, isEntrepreneur } from "../../utils/authz";
+import { isEntrepreneur } from "../../utils/authz";
 import {
   generateLoanId,
   mapCreateLoanApplicationResponse,
@@ -22,6 +22,8 @@ import { buildBaseWhereConditions, buildSearchConditions } from "./loan-applicat
 import { calculateStatsWithChanges } from "./loan-applications.stats";
 import { validateLoanApplicationCreation } from "./loan-applications.validators";
 import { LoanApplicationAuditService } from "./loan-applications-audit.service";
+import { KycKybVerificationService } from "../kyc-kyb-verification/kyc-kyb-verification.service";
+import { emailService } from "../../services/email.service";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -684,6 +686,50 @@ export abstract class LoanApplicationsService {
         });
       }
 
+      // Auto-create verification records when status changes to kyc_kyb_verification
+      if (newStatus === "kyc_kyb_verification") {
+        // This is non-blocking - errors are logged but don't fail the status update
+        KycKybVerificationService.createVerificationRecordsForLoanApplication(applicationId).catch(
+          (error) => {
+            logger.error(
+              `Failed to auto-create verification records for loan application ${applicationId}:`,
+              error
+            );
+          }
+        );
+      }
+
+      // Send rejection email to applicant if status is rejected
+      if (newStatus === "rejected" && rejectionReason) {
+        // This is non-blocking - errors are logged but don't fail the status update
+        (async () => {
+          try {
+            const entrepreneur = await db.query.users.findFirst({
+              where: and(eq(users.id, current.entrepreneurId), isNull(users.deletedAt)),
+              columns: {
+                email: true,
+                firstName: true,
+              },
+            });
+
+            if (entrepreneur?.email) {
+              const appUrl = process.env.APP_URL || "#";
+              await emailService.sendLoanRejectionEmail({
+                to: entrepreneur.email,
+                firstName: entrepreneur.firstName || undefined,
+                rejectionReason,
+                loginUrl: `${appUrl}/login`,
+              });
+            }
+          } catch (error) {
+            logger.error(
+              `Failed to send rejection email for loan application ${applicationId}:`,
+              error
+            );
+          }
+        })();
+      }
+
       // Return updated application detail
       return await LoanApplicationsService.getById(applicationId);
     } catch (error: any) {
@@ -936,10 +982,7 @@ export abstract class LoanApplicationsService {
 
       // Get loan product for termUnit
       const loanProduct = await db.query.loanProducts.findFirst({
-        where: and(
-          eq(loanProducts.id, application.loanProductId),
-          isNull(loanProducts.deletedAt)
-        ),
+        where: and(eq(loanProducts.id, application.loanProductId), isNull(loanProducts.deletedAt)),
         columns: {
           name: true,
           termUnit: true,
@@ -1038,7 +1081,7 @@ export abstract class LoanApplicationsService {
     clerkId: string,
     applicationId: string,
     reason?: string,
-    isAdminOrMember: boolean = false,
+    isAdminOrMember = false,
     request?: FastifyRequest
   ): Promise<LoanApplicationsModel.LoanApplicationDetail> {
     try {
@@ -1132,9 +1175,7 @@ export abstract class LoanApplicationsService {
 
       // Log audit event
       const eventTitle = LoanApplicationAuditService.getEventTitle("cancelled");
-      const eventDescription = reason
-        ? `${eventTitle}. Reason: ${reason}`
-        : eventTitle;
+      const eventDescription = reason ? `${eventTitle}. Reason: ${reason}` : eventTitle;
 
       const requestMetadata = request
         ? LoanApplicationAuditService.extractRequestMetadata(request)

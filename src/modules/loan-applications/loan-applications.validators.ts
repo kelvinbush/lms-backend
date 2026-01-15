@@ -108,7 +108,7 @@ export function validateFundingAmount(
 
 /**
  * Validate repayment period against loan product constraints
- * 
+ *
  * Note: repaymentPeriod should be provided in the same unit as the loan product's termUnit
  * (e.g., if product termUnit is "days", repaymentPeriod should be in days)
  */

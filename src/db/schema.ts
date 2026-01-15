@@ -21,3 +21,5 @@ export * from "./schema/loanProductsLoanFees";
 export * from "./schema/organizations";
 export * from "./schema/loanProductsUserGroups";
 export * from "./schema/loanApplicationAuditTrail";
+export * from "./schema/loanApplicationDocumentVerifications";
+export * from "./schema/loanDocuments";

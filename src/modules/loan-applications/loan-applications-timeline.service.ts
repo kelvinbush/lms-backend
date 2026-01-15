@@ -1,10 +1,6 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
-import {
-  loanApplicationAuditTrail,
-  loanApplications,
-  users,
-} from "../../db/schema";
+import { loanApplicationAuditTrail, loanApplications, users } from "../../db/schema";
 import { logger } from "../../utils/logger";
 
 function httpError(status: number, message: string) {
@@ -111,9 +107,7 @@ export abstract class LoanApplicationTimelineService {
         .orderBy(asc(loanApplicationAuditTrail.createdAt));
 
       // Also include initial creation event if no submitted event exists
-      const hasSubmittedEvent = auditEntries.some(
-        (entry) => entry.audit.eventType === "submitted"
-      );
+      const hasSubmittedEvent = auditEntries.some((entry) => entry.audit.eventType === "submitted");
 
       const events: TimelineEvent[] = [];
 
@@ -145,7 +139,10 @@ export abstract class LoanApplicationTimelineService {
 
       // Map audit trail entries to timeline events
       for (const entry of auditEntries) {
-        const event = LoanApplicationTimelineService.mapAuditEntryToTimelineEvent(entry.audit, entry.user);
+        const event = LoanApplicationTimelineService.mapAuditEntryToTimelineEvent(
+          entry.audit,
+          entry.user
+        );
         if (event) {
           events.push(event);
         }

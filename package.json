@@ -2,7 +2,9 @@
   "name": "mk-backend",
   "version": "1.0.50",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "dev": "bun --watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -w -p tsconfig.json",
@@ -16,7 +18,8 @@
     "organize-imports": "biome check --write --only=organizeImports .",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test:db:migrate": "bun run test/run-migrations.ts"
   },
   "dependencies": {
     "@clerk/fastify": "^2.4.31",

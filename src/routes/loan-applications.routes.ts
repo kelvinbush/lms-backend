@@ -6,6 +6,18 @@ import { loanApplications } from "../db/schema";
 import { LoanApplicationsModel } from "../modules/loan-applications/loan-applications.model";
 import { LoanApplicationsService } from "../modules/loan-applications/loan-applications.service";
 import { LoanApplicationTimelineService } from "../modules/loan-applications/loan-applications-timeline.service";
+import { KycKybVerificationModel } from "../modules/kyc-kyb-verification/kyc-kyb-verification.model";
+import { KycKybVerificationService } from "../modules/kyc-kyb-verification/kyc-kyb-verification.service";
+import { EligibilityAssessmentModel } from "../modules/eligibility-assessment/eligibility-assessment.model";
+import { EligibilityAssessmentService } from "../modules/eligibility-assessment/eligibility-assessment.service";
+import { CreditAssessmentModel } from "../modules/credit-assessment/credit-assessment.model";
+import { CreditAssessmentService } from "../modules/credit-assessment/credit-assessment.service";
+import { HeadOfCreditReviewModel } from "../modules/head-of-credit-review/head-of-credit-review.model";
+import { HeadOfCreditReviewService } from "../modules/head-of-credit-review/head-of-credit-review.service";
+import { InternalApprovalCeoModel } from "../modules/internal-approval-ceo/internal-approval-ceo.model";
+import { InternalApprovalCeoService } from "../modules/internal-approval-ceo/internal-approval-ceo.service";
+import { CommitteeDecisionModel } from "../modules/committee-decision/committee-decision.model";
+import { CommitteeDecisionService } from "../modules/committee-decision/committee-decision.service";
 import { UserModel } from "../modules/user/user.model";
 import { isAdminOrMember, isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
@@ -331,7 +343,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         }
 
         const { id } = (request.params as any) || {};
-        
+
         // Get the application first to check authorization
         const [application] = await db
           .select()
@@ -519,7 +531,8 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         }
 
         const { id } = (request.params as any) || {};
-        const { status, reason, rejectionReason } = request.body as LoanApplicationsModel.UpdateStatusBody;
+        const { status, reason, rejectionReason } =
+          request.body as LoanApplicationsModel.UpdateStatusBody;
 
         const result = await LoanApplicationsService.updateStatus(
           userId,
@@ -576,7 +589,16 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
                         status: { type: "string" },
                         appliedOn: { type: "string" },
                       },
-                      required: ["id", "loanId", "product", "requestedAmount", "currency", "tenure", "status", "appliedOn"],
+                      required: [
+                        "id",
+                        "loanId",
+                        "product",
+                        "requestedAmount",
+                        "currency",
+                        "tenure",
+                        "status",
+                        "appliedOn",
+                      ],
                     },
                   },
                   pagination: {
@@ -589,7 +611,14 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
                       hasNextPage: { type: "boolean" },
                       hasPreviousPage: { type: "boolean" },
                     },
-                    required: ["currentPage", "totalPages", "totalItems", "itemsPerPage", "hasNextPage", "hasPreviousPage"],
+                    required: [
+                      "currentPage",
+                      "totalPages",
+                      "totalItems",
+                      "itemsPerPage",
+                      "hasNextPage",
+                      "hasPreviousPage",
+                    ],
                   },
                 },
                 required: ["applications", "pagination"],
@@ -683,7 +712,16 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
                   cancelledAt: { type: "string" },
                   rejectionReason: { type: "string" },
                 },
-                required: ["id", "loanId", "product", "requestedAmount", "currency", "tenure", "status", "appliedOn"],
+                required: [
+                  "id",
+                  "loanId",
+                  "product",
+                  "requestedAmount",
+                  "currency",
+                  "tenure",
+                  "status",
+                  "appliedOn",
+                ],
               },
             },
             required: ["success", "message", "data"],
@@ -770,13 +808,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         const reason = body.reason;
 
         // Cancel the application (isAdminOrMember = false for entrepreneurs)
-        const result = await LoanApplicationsService.cancel(
-          userId,
-          id,
-          reason,
-          false,
-          request
-        );
+        const result = await LoanApplicationsService.cancel(userId, id, reason, false, request);
 
         return reply.send(result);
       } catch (error: any) {
@@ -856,6 +888,855 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to cancel loan application",
           code: "CANCEL_LOAN_APPLICATION_FAILED",
+        });
+      }
+    }
+  );
+
+  // ========== KYC/KYB VERIFICATION ENDPOINTS ==========
+
+  // GET /loan-applications/:id/kyc-kyb-documents
+  // Get all documents with verification status for a loan application
+  // Accessible to: admins/members only
+  fastify.get(
+    "/:id/kyc-kyb-documents",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              personalDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docType: { type: "string" },
+                    docUrl: { type: "string" },
+                    docYear: { type: "number" },
+                    docBankName: { type: "string" },
+                    createdAt: { type: "string" },
+                    verificationStatus: {
+                      type: "string",
+                      enum: ["pending", "approved", "rejected"],
+                    },
+                    verifiedBy: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        firstName: { type: "string", nullable: true },
+                        lastName: { type: "string", nullable: true },
+                        email: { type: "string" },
+                      },
+                    },
+                    verifiedAt: { type: "string" },
+                    rejectionReason: { type: "string" },
+                    notes: { type: "string" },
+                    lockedAt: { type: "string" },
+                  },
+                },
+              },
+              businessDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docType: { type: "string" },
+                    docUrl: { type: "string" },
+                    docYear: { type: "number" },
+                    docBankName: { type: "string" },
+                    createdAt: { type: "string" },
+                    verificationStatus: {
+                      type: "string",
+                      enum: ["pending", "approved", "rejected"],
+                    },
+                    verifiedBy: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        firstName: { type: "string", nullable: true },
+                        lastName: { type: "string", nullable: true },
+                        email: { type: "string" },
+                      },
+                    },
+                    verifiedAt: { type: "string" },
+                    rejectionReason: { type: "string" },
+                    notes: { type: "string" },
+                    lockedAt: { type: "string" },
+                  },
+                },
+              },
+              summary: {
+                type: "object",
+                properties: {
+                  total: { type: "number" },
+                  pending: { type: "number" },
+                  approved: { type: "number" },
+                  rejected: { type: "number" },
+                },
+              },
+            },
+            required: ["personalDocuments", "businessDocuments", "summary"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "kyc-kyb-verification"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const result = await KycKybVerificationService.getDocumentsForVerification(id);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting KYC/KYB documents:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get KYC/KYB documents",
+          code: "GET_KYC_KYB_DOCUMENTS_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/documents/:documentId/verify
+  // Verify a single document (approve or reject)
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/documents/:documentId/verify",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: {
+            id: { type: "string", minLength: 1 },
+            documentId: { type: "string", minLength: 1 },
+          },
+          required: ["id", "documentId"],
+          additionalProperties: false,
+        },
+        querystring: {
+          type: "object",
+          properties: {
+            documentType: { type: "string", enum: ["personal", "business"] },
+          },
+          required: ["documentType"],
+          additionalProperties: false,
+        },
+        body: KycKybVerificationModel.VerifyDocumentBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              documentId: { type: "string" },
+              documentType: { type: "string", enum: ["personal", "business"] },
+              verificationStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+              verifiedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+              },
+              verifiedAt: { type: "string" },
+              rejectionReason: { type: "string" },
+              notes: { type: "string" },
+              lockedAt: { type: "string" },
+            },
+            required: [
+              "documentId",
+              "documentType",
+              "verificationStatus",
+              "verifiedBy",
+              "verifiedAt",
+              "lockedAt",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "kyc-kyb-verification"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id, documentId } = (request.params as any) || {};
+        const { documentType } = (request.query as any) || {};
+        const body = request.body as KycKybVerificationModel.VerifyDocumentBody;
+
+        if (!documentType || (documentType !== "personal" && documentType !== "business")) {
+          return reply.code(400).send({
+            error: "documentType query parameter is required and must be 'personal' or 'business'",
+            code: "MISSING_DOCUMENT_TYPE",
+          });
+        }
+
+        const result = await KycKybVerificationService.verifyDocument(
+          id,
+          documentId,
+          documentType as "personal" | "business",
+          userId,
+          body
+        );
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error verifying document:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to verify document",
+          code: "VERIFY_DOCUMENT_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/kyc-kyb/bulk-verify
+  // Bulk verify multiple documents
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/kyc-kyb/bulk-verify",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: KycKybVerificationModel.BulkVerifyDocumentsBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              successful: { type: "number" },
+              failed: { type: "number" },
+              results: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    documentId: { type: "string" },
+                    success: { type: "boolean" },
+                    error: { type: "string" },
+                  },
+                  required: ["documentId", "success"],
+                },
+              },
+            },
+            required: ["successful", "failed", "results"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "kyc-kyb-verification"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as KycKybVerificationModel.BulkVerifyDocumentsBody;
+
+        const result = await KycKybVerificationService.bulkVerifyDocuments(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error bulk verifying documents:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to bulk verify documents",
+          code: "BULK_VERIFY_DOCUMENTS_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/kyc-kyb/complete
+  // Complete KYC/KYB verification step
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/kyc-kyb/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: LoanApplicationsModel.CompleteKycKybRequestBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              completedAt: { type: "string" },
+              completedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+              },
+            },
+            required: ["loanApplicationId", "status", "completedAt", "completedBy"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "kyc-kyb-verification"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = (request.body as LoanApplicationsModel.CompleteKycKybRequestBody) || undefined;
+        const result = await KycKybVerificationService.completeKycKybVerification(
+          id,
+          userId,
+          body?.nextApprover
+        );
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing KYC/KYB verification:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete KYC/KYB verification",
+          code: "COMPLETE_KYC_KYB_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/eligibility-assessment/complete
+  // Complete eligibility assessment step
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/eligibility-assessment/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: EligibilityAssessmentModel.CompleteEligibilityAssessmentBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              completedAt: { type: "string" },
+              completedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+              eligibilityAssessmentComment: { type: "string" },
+              supportingDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docUrl: { type: "string" },
+                    docName: { type: "string" },
+                    notes: { type: "string" },
+                  },
+                  required: ["id", "docUrl"],
+                },
+              },
+            },
+            required: [
+              "loanApplicationId",
+              "status",
+              "completedAt",
+              "completedBy",
+              "eligibilityAssessmentComment",
+              "supportingDocuments",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "eligibility-assessment"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as EligibilityAssessmentModel.CompleteEligibilityAssessmentBody;
+        const result = await EligibilityAssessmentService.completeEligibilityAssessment(
+          id,
+          userId,
+          body
+        );
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing eligibility assessment:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete eligibility assessment",
+          code: "COMPLETE_ELIGIBILITY_ASSESSMENT_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/credit-assessment/complete
+  // Complete credit assessment step
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/credit-assessment/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: CreditAssessmentModel.CompleteCreditAssessmentBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              completedAt: { type: "string" },
+              completedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+              creditAssessmentComment: { type: "string" },
+              supportingDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docUrl: { type: "string" },
+                    docName: { type: "string" },
+                    notes: { type: "string" },
+                  },
+                  required: ["id", "docUrl"],
+                },
+              },
+            },
+            required: [
+              "loanApplicationId",
+              "status",
+              "completedAt",
+              "completedBy",
+              "creditAssessmentComment",
+              "supportingDocuments",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "credit-assessment"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as CreditAssessmentModel.CompleteCreditAssessmentBody;
+        const result = await CreditAssessmentService.completeCreditAssessment(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing credit assessment:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete credit assessment",
+          code: "COMPLETE_CREDIT_ASSESSMENT_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/head-of-credit-review/complete
+  // Complete head of credit review step
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/head-of-credit-review/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: HeadOfCreditReviewModel.CompleteHeadOfCreditReviewBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              completedAt: { type: "string" },
+              completedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+              headOfCreditReviewComment: { type: "string" },
+              supportingDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docUrl: { type: "string" },
+                    docName: { type: "string" },
+                    notes: { type: "string" },
+                  },
+                  required: ["id", "docUrl"],
+                },
+              },
+            },
+            required: [
+              "loanApplicationId",
+              "status",
+              "completedAt",
+              "completedBy",
+              "headOfCreditReviewComment",
+              "supportingDocuments",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "head-of-credit-review"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as HeadOfCreditReviewModel.CompleteHeadOfCreditReviewBody;
+        const result = await HeadOfCreditReviewService.completeHeadOfCreditReview(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing head of credit review:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete head of credit review",
+          code: "COMPLETE_HEAD_OF_CREDIT_REVIEW_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/internal-approval-ceo/complete
+  // Complete internal approval CEO step
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/internal-approval-ceo/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: InternalApprovalCeoModel.CompleteInternalApprovalCeoBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              completedAt: { type: "string" },
+              completedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+              internalApprovalCeoComment: { type: "string" },
+              supportingDocuments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    docUrl: { type: "string" },
+                    docName: { type: "string" },
+                    notes: { type: "string" },
+                  },
+                  required: ["id", "docUrl"],
+                },
+              },
+            },
+            required: [
+              "loanApplicationId",
+              "status",
+              "completedAt",
+              "completedBy",
+              "internalApprovalCeoComment",
+              "supportingDocuments",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "internal-approval-ceo"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as InternalApprovalCeoModel.CompleteInternalApprovalCeoBody;
+        const result = await InternalApprovalCeoService.completeInternalApprovalCeo(
+          id,
+          userId,
+          body
+        );
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing internal approval CEO:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete internal approval CEO",
+          code: "COMPLETE_INTERNAL_APPROVAL_CEO_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/committee-decision/complete
+  // Complete committee decision step (upload term sheet)
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/committee-decision/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: CommitteeDecisionModel.CompleteCommitteeDecisionBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              termSheetUrl: { type: "string" },
+              uploadedAt: { type: "string" },
+              uploadedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+            },
+            required: ["loanApplicationId", "status", "termSheetUrl", "uploadedAt", "uploadedBy"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "committee-decision"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as CommitteeDecisionModel.CompleteCommitteeDecisionBody;
+        const result = await CommitteeDecisionService.completeCommitteeDecision(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing committee decision:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete committee decision",
+          code: "COMPLETE_COMMITTEE_DECISION_FAILED",
         });
       }
     }

@@ -116,9 +116,7 @@ export abstract class LoanApplicationAuditService {
   /**
    * Map loan application status to timeline event type
    */
-  static mapStatusToEventType(
-    status: string
-  ): LoanApplicationAuditEventType | null {
+  static mapStatusToEventType(status: string): LoanApplicationAuditEventType | null {
     const statusMap: Record<string, LoanApplicationAuditEventType> = {
       kyc_kyb_verification: "review_in_progress",
       eligibility_check: "review_in_progress",
@@ -142,10 +140,7 @@ export abstract class LoanApplicationAuditService {
   /**
    * Get event title based on event type and status
    */
-  static getEventTitle(
-    eventType: LoanApplicationAuditEventType,
-    status?: string
-  ): string {
+  static getEventTitle(eventType: LoanApplicationAuditEventType, status?: string): string {
     const titles: Record<LoanApplicationAuditEventType, string> = {
       submitted: "Loan submitted successfully",
       cancelled: "Loan application cancelled",
@@ -155,6 +150,13 @@ export abstract class LoanApplicationAuditService {
       awaiting_disbursement: "Awaiting disbursement",
       disbursed: "Loan disbursed",
       status_changed: LoanApplicationAuditService.getStatusChangedTitle(status),
+      document_verified_approved: "Document verified and approved",
+      document_verified_rejected: "Document verification rejected",
+      kyc_kyb_completed: "KYC/KYB verification completed",
+      eligibility_assessment_completed: "Eligibility assessment completed",
+      credit_assessment_completed: "Credit assessment completed",
+      head_of_credit_review_completed: "Head of credit review completed",
+      internal_approval_ceo_completed: "Internal approval CEO completed",
     };
 
     return titles[eventType];

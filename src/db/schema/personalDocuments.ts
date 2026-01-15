@@ -1,5 +1,6 @@
 import { createId } from "@paralleldrive/cuid2";
-import { index, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { loanApplications } from "./loanApplications";
 import { users } from "./users";
 
 export const personalDocuments = pgTable(
@@ -13,6 +14,12 @@ export const personalDocuments = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     docType: varchar("doc_type", { length: 50 }),
     docUrl: text("doc_url"),
+    // Verification fields
+    isVerified: boolean("is_verified").default(false).notNull(),
+    verifiedForLoanApplicationId: varchar("verified_for_loan_application_id", {
+      length: 24,
+    }).references(() => loanApplications.id, { onDelete: "set null" }),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -38,6 +45,12 @@ export const personalDocuments = pgTable(
         table.userId,
         table.docType,
         table.deletedAt
+      ),
+
+      // Verification indexes
+      idxPersonalDocsVerified: index("idx_personal_docs_verified").on(
+        table.isVerified,
+        table.verifiedForLoanApplicationId
       ),
     };
   }
