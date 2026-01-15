@@ -30,6 +30,45 @@ export namespace LoanApplicationsModel {
     },
   } as const;
 
+  export interface GetLoanDocumentsResponse {
+    termSheetUrl: string | null;
+    documents: Array<{
+      id: string;
+      documentType: string;
+      docUrl: string;
+      docName?: string | null;
+      notes?: string | null;
+      uploadedBy: string;
+      createdAt: string;
+    }>;
+  }
+
+  export const GetLoanDocumentsResponseSchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      termSheetUrl: { type: "string", format: "uri", nullable: true },
+      documents: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            id: { type: "string" },
+            documentType: { type: "string" },
+            docUrl: { type: "string", format: "uri" },
+            docName: { type: "string", nullable: true },
+            notes: { type: "string", nullable: true },
+            uploadedBy: { type: "string" },
+            createdAt: { type: "string" },
+          },
+          required: ["id", "documentType", "docUrl", "uploadedBy", "createdAt"],
+        },
+      },
+    },
+    required: ["termSheetUrl", "documents"],
+  } as const;
+
   // Create loan application input
   export interface CreateLoanApplicationBody {
     businessId?: string; // Optional - Auto-set for entrepreneurs, required for admins

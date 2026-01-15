@@ -4,6 +4,7 @@ import { db } from "../../db";
 import {
   businessProfiles,
   loanApplications,
+  loanDocuments,
   loanProducts,
   organizations,
   users,
@@ -1202,6 +1203,54 @@ export abstract class LoanApplicationsService {
       logger.error("Error cancelling loan application:", error);
       if (error?.status) throw error;
       throw httpError(500, "[CANCEL_LOAN_APPLICATION_ERROR] Failed to cancel loan application");
+    }
+  }
+
+  static async getLoanDocuments(
+    loanApplicationId: string
+  ): Promise<LoanApplicationsModel.GetLoanDocumentsResponse> {
+    try {
+      const loanApp = await db.query.loanApplications.findFirst({
+        where: and(eq(loanApplications.id, loanApplicationId), isNull(loanApplications.deletedAt)),
+        columns: {
+          termSheetUrl: true,
+        },
+      });
+
+      if (!loanApp) {
+        throw httpError(404, "[LOAN_APPLICATION_NOT_FOUND] Loan application not found");
+      }
+
+      const docs = await db.query.loanDocuments.findMany({
+        where: and(eq(loanDocuments.loanApplicationId, loanApplicationId), isNull(loanDocuments.deletedAt)),
+        orderBy: asc(loanDocuments.createdAt),
+        columns: {
+          id: true,
+          documentType: true,
+          docUrl: true,
+          docName: true,
+          notes: true,
+          uploadedBy: true,
+          createdAt: true,
+        },
+      });
+
+      return {
+        termSheetUrl: loanApp.termSheetUrl,
+        documents: docs.map((d) => ({
+          id: d.id,
+          documentType: d.documentType,
+          docUrl: d.docUrl,
+          docName: d.docName ?? null,
+          notes: d.notes ?? null,
+          uploadedBy: d.uploadedBy,
+          createdAt: d.createdAt.toISOString(),
+        })),
+      };
+    } catch (error: any) {
+      logger.error("Error getting loan documents:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[GET_LOAN_DOCUMENTS_ERROR] Failed to fetch loan documents");
     }
   }
 }

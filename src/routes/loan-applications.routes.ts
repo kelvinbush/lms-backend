@@ -389,6 +389,78 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // GET loan application documents (loan documents + term sheet url)
+  // Accessible to: admins/members (can view any) OR entrepreneurs (can only view their own)
+  fastify.get(
+    "/:id/documents",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: LoanApplicationsModel.GetLoanDocumentsResponseSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const user = await requireAuth(request);
+
+        const { id } = (request.params as any) || {};
+
+        const application = await db.query.loanApplications.findFirst({
+          where: and(eq(loanApplications.id, id), isNull(loanApplications.deletedAt)),
+          columns: {
+            entrepreneurId: true,
+          },
+        });
+
+        if (!application) {
+          return reply.code(404).send({
+            error: "Loan application not found",
+            code: "LOAN_APPLICATION_NOT_FOUND",
+          });
+        }
+
+        if (isEntrepreneur(user)) {
+          if (application.entrepreneurId !== user.id) {
+            return reply.code(403).send({
+              error: "You do not have permission to view these documents",
+              code: "FORBIDDEN",
+            });
+          }
+        } else {
+          await requireRole(request, "member");
+        }
+
+        const result = await LoanApplicationsService.getLoanDocuments(id);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting loan application documents:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get loan application documents",
+          code: "GET_LOAN_APPLICATION_DOCUMENTS_FAILED",
+        });
+      }
+    }
+  );
+
   // GET loan application timeline
   // Accessible to: admins/members OR entrepreneurs (for their own applications)
   fastify.get(
