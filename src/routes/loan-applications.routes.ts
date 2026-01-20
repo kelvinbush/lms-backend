@@ -18,6 +18,8 @@ import { InternalApprovalCeoModel } from "../modules/internal-approval-ceo/inter
 import { InternalApprovalCeoService } from "../modules/internal-approval-ceo/internal-approval-ceo.service";
 import { CommitteeDecisionModel } from "../modules/committee-decision/committee-decision.model";
 import { CommitteeDecisionService } from "../modules/committee-decision/committee-decision.service";
+import { DocumentGenerationModel } from "../modules/document-generation/document-generation.model";
+import { DocumentGenerationService } from "../modules/document-generation/document-generation.service";
 import { UserModel } from "../modules/user/user.model";
 import { isAdminOrMember, isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
@@ -1861,6 +1863,93 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to complete committee decision",
           code: "COMPLETE_COMMITTEE_DECISION_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/document-generation/complete
+  // Complete document generation step (upload contract)
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/document-generation/complete",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: DocumentGenerationModel.CompleteDocumentGenerationBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              status: { type: "string" },
+              uploadedAt: { type: "string" },
+              uploadedBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  email: { type: "string" },
+                },
+                required: ["id", "email"],
+              },
+              contract: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  docUrl: { type: "string" },
+                  docName: { type: "string" },
+                  notes: { type: "string" },
+                },
+                required: ["id", "docUrl"],
+              },
+            },
+            required: ["loanApplicationId", "status", "uploadedAt", "uploadedBy", "contract"],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "document-generation"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as DocumentGenerationModel.CompleteDocumentGenerationBody;
+        const result = await DocumentGenerationService.completeDocumentGeneration(
+          id,
+          userId,
+          body
+        );
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error completing document generation (contract upload):", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to complete document generation step",
+          code: "COMPLETE_DOCUMENT_GENERATION_FAILED",
         });
       }
     }

@@ -21,6 +21,7 @@ export const loanApplicationAuditEventTypeEnum = pgEnum("loan_application_audit_
   "head_of_credit_review_completed", // Head of credit review step completed
   "internal_approval_ceo_completed", // Internal approval CEO step completed
   "counter_offer_proposed", // Counter-offer proposed
+  "contract_uploaded", // Loan contract uploaded at document generation stage
 ]);
 
 /**
