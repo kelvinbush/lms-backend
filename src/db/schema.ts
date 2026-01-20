@@ -24,3 +24,4 @@ export * from "./schema/loanApplicationAuditTrail";
 export * from "./schema/loanApplicationDocumentVerifications";
 export * from "./schema/loanDocuments";
 export * from "./schema/loanApplicationVersions";
+export * from "./schema/loanContractSignatories"

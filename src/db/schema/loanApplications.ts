@@ -32,6 +32,17 @@ export const loanApplicationStatusEnum = pgEnum("loan_application_status", [
   "cancelled",
 ]);
 
+// Enum for contract status within the loan application workflow
+export const contractStatusEnum = pgEnum("contract_status", [
+  "contract_uploaded",
+  "contract_sent_for_signing",
+  "contract_in_signing",
+  "contract_partially_signed",
+  "contract_fully_signed",
+  "contract_voided",
+  "contract_expired",
+]);
+
 /**
  * Loan applications table
  *
@@ -88,6 +99,7 @@ export const loanApplications = pgTable(
 
     // Application status and workflow
     status: loanApplicationStatusEnum("status").default("kyc_kyb_verification").notNull(),
+    contractStatus: contractStatusEnum("contract_status"),
 
     // Timeline tracking
     submittedAt: timestamp("submitted_at", { withTimezone: true }),

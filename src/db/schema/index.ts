@@ -23,3 +23,4 @@ export * from "./loanApplicationAuditTrail";
 export * from "./loanApplicationDocumentVerifications";
 export * from "./loanApplicationVersions";
 export * from "./loanDocuments";
+export * from "./loanContractSignatories"

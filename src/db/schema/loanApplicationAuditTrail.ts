@@ -22,6 +22,12 @@ export const loanApplicationAuditEventTypeEnum = pgEnum("loan_application_audit_
   "internal_approval_ceo_completed", // Internal approval CEO step completed
   "counter_offer_proposed", // Counter-offer proposed
   "contract_uploaded", // Loan contract uploaded at document generation stage
+  "contract_sent_for_signing", // Contract sent to signing provider
+  "contract_signer_opened", // Signer opened the contract
+  "contract_signed_by_signer", // Individual signer completed signing
+  "contract_fully_signed", // Contract fully signed by all parties
+  "contract_voided", // Contract voided
+  "contract_expired", // Contract expired before signing completed
 ]);
 
 /**

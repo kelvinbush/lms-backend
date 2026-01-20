@@ -1,9 +1,11 @@
-import { loanApplicationStatusEnum, type loanApplications } from "../../db/schema";
+import { contractStatusEnum, loanApplicationStatusEnum, type loanApplications } from "../../db/schema";
 
 export namespace LoanApplicationsModel {
   // Status values derived from DB enum
   export const LoanApplicationStatusEnum = loanApplicationStatusEnum.enumValues;
   export type LoanApplicationStatus = (typeof loanApplications.$inferSelect)["status"];
+  export const ContractStatusEnum = contractStatusEnum.enumValues;
+  export type ContractStatus = (typeof loanApplications.$inferSelect)["contractStatus"];
 
   export interface NextStageApprover {
     nextApproverEmail: string;
@@ -567,6 +569,50 @@ export namespace LoanApplicationsModel {
       },
     },
     required: ["data"],
+  } as const;
+
+  // Contract timeline
+  export interface ContractTimelineEvent {
+    id: string;
+    type: string;
+    title: string;
+    description?: string;
+    createdAt: string;
+    performedBy?: string;
+    performedById?: string;
+  }
+
+  export interface ContractTimelineResponse {
+    currentStatus: ContractStatus | null;
+    events: ContractTimelineEvent[];
+  }
+
+  export const ContractTimelineResponseSchema = {
+    type: "object",
+    properties: {
+      currentStatus: {
+        type: "string",
+        enum: ContractStatusEnum,
+        nullable: true,
+      },
+      events: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            type: { type: "string" },
+            title: { type: "string" },
+            description: { type: "string" },
+            createdAt: { type: "string" },
+            performedBy: { type: "string" },
+            performedById: { type: "string" },
+          },
+          required: ["id", "type", "title", "createdAt"],
+        },
+      },
+    },
+    required: ["currentStatus", "events"],
   } as const;
 
   // Update status request body

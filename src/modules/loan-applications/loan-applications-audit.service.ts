@@ -159,6 +159,12 @@ export abstract class LoanApplicationAuditService {
       internal_approval_ceo_completed: "Internal approval CEO completed",
       counter_offer_proposed: "Counter-offer proposed",
       contract_uploaded: "Loan contract uploaded",
+      contract_sent_for_signing: "Contract sent for signing",
+      contract_signer_opened: "Contract opened by signer",
+      contract_signed_by_signer: "Contract successfully signed by signer",
+      contract_fully_signed: "Contract fully signed by all parties",
+      contract_voided: "Contract voided",
+      contract_expired: "Contract expired",
     };
 
     return titles[eventType];

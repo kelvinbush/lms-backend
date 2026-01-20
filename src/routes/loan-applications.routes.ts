@@ -6,6 +6,7 @@ import { loanApplications } from "../db/schema";
 import { LoanApplicationsModel } from "../modules/loan-applications/loan-applications.model";
 import { LoanApplicationsService } from "../modules/loan-applications/loan-applications.service";
 import { LoanApplicationTimelineService } from "../modules/loan-applications/loan-applications-timeline.service";
+import { LoanApplicationContractTimelineService } from "../modules/loan-applications/loan-applications-contract-timeline.service";
 import { KycKybVerificationModel } from "../modules/kyc-kyb-verification/kyc-kyb-verification.model";
 import { KycKybVerificationService } from "../modules/kyc-kyb-verification/kyc-kyb-verification.service";
 import { EligibilityAssessmentModel } from "../modules/eligibility-assessment/eligibility-assessment.model";
@@ -514,6 +515,58 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // GET loan application contract timeline
+  // Accessible to: admins/members OR entrepreneurs (for their own applications)
+  fastify.get(
+    "/:id/contract-timeline",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: LoanApplicationsModel.ContractTimelineResponseSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const result = await LoanApplicationContractTimelineService.getContractTimeline(
+          id,
+          userId
+        );
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting loan application contract timeline:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get loan application contract timeline",
+          code: "GET_CONTRACT_TIMELINE_FAILED",
+        });
+      }
+    }
+  );
+
   // GET my loan application timeline (for entrepreneurs)
   // Accessible to: entrepreneurs (can only see timeline for their own applications)
   fastify.get(
@@ -569,6 +622,69 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to get loan application timeline",
           code: "GET_TIMELINE_FAILED",
+        });
+      }
+    }
+  );
+
+  // GET my loan application contract timeline (for entrepreneurs)
+  // Accessible to: entrepreneurs (can only see contract timeline for their own applications)
+  fastify.get(
+    "/my-applications/:id/contract-timeline",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: LoanApplicationsModel.ContractTimelineResponseSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require authentication
+        const user = await requireAuth(request);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        // Verify user is an entrepreneur (not admin)
+        if (isAdminOrMember(user)) {
+          return reply.code(403).send({
+            error:
+              "This endpoint is for entrepreneurs only. Admins should use /:id/contract-timeline",
+            code: "FORBIDDEN",
+          });
+        }
+
+        const { id } = (request.params as any) || {};
+        const result = await LoanApplicationContractTimelineService.getContractTimeline(
+          id,
+          userId
+        );
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting my loan application contract timeline:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get loan application contract timeline",
+          code: "GET_CONTRACT_TIMELINE_FAILED",
         });
       }
     }
@@ -1950,6 +2066,109 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to complete document generation step",
           code: "COMPLETE_DOCUMENT_GENERATION_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/contract-signatories
+  // Set contract signatories (MK + client) and mark contract as sent for signing
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/contract-signatories",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: DocumentGenerationModel.SetContractSignatoriesBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              loanApplicationId: { type: "string" },
+              contractStatus: { type: "string" },
+              totalSignatories: { type: "number" },
+              mkSignatories: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    category: { type: "string", enum: ["mk"] },
+                    fullName: { type: "string" },
+                    email: { type: "string" },
+                    roleTitle: { type: "string" },
+                    signingOrder: { type: "number" },
+                    hasSigned: { type: "boolean" },
+                    signedAt: { type: "string" },
+                  },
+                  required: ["id", "category", "fullName", "email", "hasSigned"],
+                },
+              },
+              clientSignatories: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    category: { type: "string", enum: ["client"] },
+                    fullName: { type: "string" },
+                    email: { type: "string" },
+                    roleTitle: { type: "string" },
+                    signingOrder: { type: "number" },
+                    hasSigned: { type: "boolean" },
+                    signedAt: { type: "string" },
+                  },
+                  required: ["id", "category", "fullName", "email", "hasSigned"],
+                },
+              },
+            },
+            required: [
+              "loanApplicationId",
+              "contractStatus",
+              "totalSignatories",
+              "mkSignatories",
+              "clientSignatories",
+            ],
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "document-generation"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as DocumentGenerationModel.SetContractSignatoriesBody;
+        const result = await DocumentGenerationService.setContractSignatories(id, userId, body);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error setting contract signatories:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to set contract signatories",
+          code: "SET_CONTRACT_SIGNATORIES_FAILED",
         });
       }
     }
