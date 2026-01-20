@@ -9,6 +9,7 @@ import {
 import { logger } from "../../utils/logger";
 import { LoanApplicationAuditService } from "../loan-applications/loan-applications-audit.service";
 import type { DocumentGenerationModel } from "./document-generation.model";
+import { firmaService, type FirmaSignerInput } from "../../services/firma.service";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -254,27 +255,32 @@ export abstract class DocumentGenerationService {
             )
           );
 
+        // Default sequential signing order if not provided:
+        // - All client signatories first (1..clientCount)
+        // - Then MK/company signatories (clientCount+1 .. clientCount+mkCount)
+        const clientCount = body.clientSignatories.length;
+
         const mkValues = body.mkSignatories.map(
-          (s: DocumentGenerationModel.ContractSignatoryInput) => ({
+          (s: DocumentGenerationModel.ContractSignatoryInput, index) => ({
             loanApplicationId,
             contractDocumentId: contractDocument.id,
             category: "mk" as const,
             fullName: s.fullName,
             email: s.email,
             roleTitle: s.roleTitle || null,
-            signingOrder: s.signingOrder ?? null,
+            signingOrder: s.signingOrder ?? clientCount + index + 1,
           })
         );
 
         const clientValues = body.clientSignatories.map(
-          (s: DocumentGenerationModel.ContractSignatoryInput) => ({
+          (s: DocumentGenerationModel.ContractSignatoryInput, index) => ({
             loanApplicationId,
             contractDocumentId: contractDocument.id,
             category: "client" as const,
             fullName: s.fullName,
             email: s.email,
             roleTitle: s.roleTitle || null,
-            signingOrder: s.signingOrder ?? null,
+            signingOrder: s.signingOrder ?? index + 1,
           })
         );
 
@@ -330,6 +336,80 @@ export abstract class DocumentGenerationService {
           ),
         },
       });
+
+      // Call Firma.dev to create a signing request using the per-loan contract.
+      // We treat this as a best-effort side effect: failures are logged but do not
+      // prevent the API from returning successfully, since contractStatus has
+      // already been updated in our own database.
+      (async () => {
+        try {
+          const signers: FirmaSignerInput[] = [
+            // Client signatories (we already default their signingOrder to 1..N)
+            ...result.insertedClient.map((s) => ({
+              name: s.fullName,
+              email: s.email,
+              order: s.signingOrder ?? 1,
+            })),
+            // MK/company signatories (we already default their signingOrder to N+1..)
+            ...result.insertedMk.map((s) => ({
+              name: s.fullName,
+              email: s.email,
+              order: s.signingOrder ?? 1,
+            })),
+          ];
+
+          const signingRequest = await firmaService.createDocumentSigningRequest({
+            name: `Loan contract ${loanApplicationId}`,
+            documentUrl: contractDocument.docUrl,
+            recipients: signers,
+          });
+
+          const signingRequestId =
+            (signingRequest && (signingRequest as any).id) || undefined;
+
+          if (signingRequestId) {
+            // Persist the external signing request ID on the loan application
+            await db
+              .update(loanApplications)
+              .set({
+                firmaSigningRequestId: signingRequestId,
+                lastUpdatedAt: new Date(),
+              })
+              .where(eq(loanApplications.id, loanApplicationId));
+
+            logger.info("[Firma] Signing request created for loan application", {
+              loanApplicationId,
+              signingRequestId,
+            });
+
+            // Immediately send email invites to all recipients via Firma.dev
+            try {
+              await firmaService.sendSigningRequest({
+                signingRequestId,
+                customMessage:
+                  "You have a new loan contract ready for review and signing from Melanin Kapital.",
+              });
+            } catch (sendError: any) {
+              // Log but do not fail the main flow if sending emails fails
+              logger.error("[Firma] Failed to send signing request emails", {
+                loanApplicationId,
+                signingRequestId,
+                errorMessage: sendError?.message || String(sendError),
+              });
+            }
+          } else {
+            logger.warn(
+              "[Firma] Signing request created but no ID returned; emails not sent automatically",
+              { loanApplicationId }
+            );
+          }
+        } catch (error: any) {
+          logger.error("[Firma] Failed to create signing request for loan application", {
+            loanApplicationId,
+            errorMessage: error?.message || String(error),
+          });
+        }
+      })();
 
       return {
         loanApplicationId,

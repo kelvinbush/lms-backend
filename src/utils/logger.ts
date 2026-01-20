@@ -15,6 +15,17 @@ const normalizeLogData = (data: any): object | undefined => {
     return undefined;
   }
 
+  // Special handling for Error objects so message/stack are visible
+  if (data instanceof Error) {
+    return {
+      name: data.name,
+      message: data.message,
+      stack: data.stack,
+      // Include any enumerable custom properties as well
+      ...Object.fromEntries(Object.entries(data)),
+    };
+  }
+
   if (typeof data === "string") {
     return { message: data };
   }
