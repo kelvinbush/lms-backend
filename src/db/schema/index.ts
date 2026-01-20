@@ -21,4 +21,5 @@ export * from "./loanProductsUserGroups";
 export * from "./loanProductsLoanFees";
 export * from "./loanApplicationAuditTrail";
 export * from "./loanApplicationDocumentVerifications";
+export * from "./loanApplicationVersions";
 export * from "./loanDocuments";

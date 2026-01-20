@@ -269,6 +269,23 @@ export namespace LoanApplicationsModel {
       lastName?: string | null;
       email: string;
     };
+    activeVersion?: {
+      id: string;
+      status: "original" | "counter_offer";
+      fundingAmount: number;
+      repaymentPeriod: number;
+      returnType: "interest_based" | "revenue_sharing";
+      interestRate: number;
+      repaymentStructure: "principal_and_interest" | "bullet_repayment";
+      repaymentCycle: "daily" | "weekly" | "bi_weekly" | "monthly" | "quarterly";
+      gracePeriod?: number;
+      firstPaymentDate?: string;
+      customFees?: Array<{
+        name: string;
+        amount: number;
+        type: "flat" | "percentage";
+      }>;
+    };
   }
 
   // JSON Schemas for validation
@@ -430,6 +447,34 @@ export namespace LoanApplicationsModel {
           email: { type: "string" },
         },
         required: ["id", "email"],
+      },
+      activeVersion: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          status: { type: "string", enum: ["original", "counter_offer"] },
+          fundingAmount: { type: "number" },
+          repaymentPeriod: { type: "integer" },
+          returnType: { type: "string", enum: ["interest_based", "revenue_sharing"] },
+          interestRate: { type: "number" },
+          repaymentStructure: { type: "string", enum: ["principal_and_interest", "bullet_repayment"] },
+          repaymentCycle: { type: "string", enum: ["daily", "weekly", "bi_weekly", "monthly", "quarterly"] },
+          gracePeriod: { type: "integer" },
+          firstPaymentDate: { type: "string" },
+          customFees: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                amount: { type: "number" },
+                type: { type: "string", enum: ["flat", "percentage"] },
+              },
+              required: ["name", "amount", "type"],
+            },
+          },
+        },
+        required: ["id", "status", "fundingAmount", "repaymentPeriod", "returnType", "interestRate", "repaymentStructure", "repaymentCycle"],
       },
     },
     required: [
@@ -647,6 +692,64 @@ export namespace LoanApplicationsModel {
       sortBy: {
         type: "string",
         enum: ["newest", "oldest", "ascending", "descending"],
+      },
+    },
+  } as const;
+
+  export interface CreateCounterOfferBody {
+    fundingAmount: number;
+    repaymentPeriod: number;
+    returnType: "interest_based" | "revenue_sharing";
+    interestRate: number;
+    repaymentStructure: "principal_and_interest" | "bullet_repayment";
+    repaymentCycle: "daily" | "weekly" | "bi_weekly" | "monthly" | "quarterly";
+    gracePeriod?: number;
+    firstPaymentDate?: string;
+    customFees?: Array<{
+      name: string;
+      amount: number;
+      type: "flat" | "percentage";
+    }>;
+  }
+
+  export const CreateCounterOfferBodySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "fundingAmount",
+      "repaymentPeriod",
+      "returnType",
+      "interestRate",
+      "repaymentStructure",
+      "repaymentCycle",
+    ],
+    properties: {
+      fundingAmount: { type: "number", minimum: 0 },
+      repaymentPeriod: { type: "integer", minimum: 1 },
+      returnType: { type: "string", enum: ["interest_based", "revenue_sharing"] },
+      interestRate: { type: "number", minimum: 0 },
+      repaymentStructure: {
+        type: "string",
+        enum: ["principal_and_interest", "bullet_repayment"],
+      },
+      repaymentCycle: {
+        type: "string",
+        enum: ["daily", "weekly", "bi_weekly", "monthly", "quarterly"],
+      },
+      gracePeriod: { type: "integer", minimum: 0 },
+      firstPaymentDate: { type: "string", format: "date" },
+      customFees: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "amount", "type"],
+          properties: {
+            name: { type: "string", minLength: 1 },
+            amount: { type: "number", minimum: 0 },
+            type: { type: "string", enum: ["flat", "percentage"] },
+          },
+        },
       },
     },
   } as const;

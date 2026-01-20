@@ -4,6 +4,7 @@ import { db } from "../../db";
 import {
   businessProfiles,
   loanApplications,
+  loanApplicationVersions,
   loanDocuments,
   loanProducts,
   organizations,
@@ -430,7 +431,7 @@ export abstract class LoanApplicationsService {
       }
 
       // Fetch related data in parallel for efficiency
-      const [business, entrepreneur, loanProduct, creator, lastUpdatedByUser] = await Promise.all([
+      const [business, entrepreneur, loanProduct, creator, lastUpdatedByUser, activeVersion] = await Promise.all([
         // Business
         db.query.businessProfiles.findFirst({
           where: and(
@@ -496,6 +497,12 @@ export abstract class LoanApplicationsService {
               },
             })
           : Promise.resolve(null),
+        // Active Version (if exists)
+        application.activeVersionId
+          ? db.query.loanApplicationVersions.findFirst({
+              where: eq(loanApplicationVersions.id, application.activeVersionId),
+            })
+          : Promise.resolve(null),
       ]);
 
       // Validate required related data exists
@@ -541,6 +548,7 @@ export abstract class LoanApplicationsService {
         creator,
         lastUpdatedByUser: lastUpdatedByUser || null,
         organizationName: organizationData?.name || "Unknown Organization",
+        activeVersion: activeVersion || null,
       });
     } catch (error: any) {
       logger.error("Error getting loan application by ID:", error);
@@ -1251,6 +1259,82 @@ export abstract class LoanApplicationsService {
       logger.error("Error getting loan documents:", error);
       if (error?.status) throw error;
       throw httpError(500, "[GET_LOAN_DOCUMENTS_ERROR] Failed to fetch loan documents");
+    }
+  }
+
+  static async createCounterOffer(
+    clerkId: string,
+    applicationId: string,
+    body: LoanApplicationsModel.CreateCounterOfferBody
+  ): Promise<LoanApplicationsModel.LoanApplicationDetail> {
+    try {
+      return await db.transaction(async (tx) => {
+        const application = await tx.query.loanApplications.findFirst({
+          where: and(eq(loanApplications.id, applicationId), isNull(loanApplications.deletedAt)),
+        });
+
+        if (!application) {
+          throw httpError(404, "[LOAN_APPLICATION_NOT_FOUND] Loan application not found");
+        }
+
+        const user = await tx.query.users.findFirst({
+          where: eq(users.clerkId, clerkId),
+          columns: { id: true },
+        });
+
+        if (!user) {
+          throw httpError(401, "[UNAUTHORIZED] User not found");
+        }
+
+        const [newVersion] = await tx
+          .insert(loanApplicationVersions)
+          .values({
+            loanApplicationId: applicationId,
+            status: "counter_offer",
+            fundingAmount: body.fundingAmount.toString(),
+            repaymentPeriod: body.repaymentPeriod,
+            returnType: body.returnType,
+            interestRate: body.interestRate.toString(),
+            repaymentStructure: body.repaymentStructure,
+            repaymentCycle: body.repaymentCycle,
+            gracePeriod: body.gracePeriod,
+            firstPaymentDate: body.firstPaymentDate ? new Date(body.firstPaymentDate) : undefined,
+            customFees: body.customFees || [],
+            createdBy: user.id,
+          })
+          .returning();
+
+        // Only transition to document_generation if not already there
+        const newStatus = application.status === "document_generation" ? application.status : "document_generation";
+        const shouldUpdateStatus = application.status !== "document_generation";
+
+        await tx
+          .update(loanApplications)
+          .set({
+            activeVersionId: newVersion.id,
+            ...(shouldUpdateStatus && { status: newStatus }),
+            lastUpdatedBy: user.id,
+            lastUpdatedAt: new Date(),
+          })
+          .where(eq(loanApplications.id, applicationId));
+
+        await LoanApplicationAuditService.logEvent({
+          loanApplicationId: applicationId,
+          clerkId,
+          eventType: "counter_offer_proposed",
+          title: "Counter-offer Proposed",
+          description: "A counter-offer with revised terms has been proposed.",
+          status: newStatus,
+          ...(shouldUpdateStatus && { newStatus, previousStatus: application.status }),
+          details: { newVersionId: newVersion.id, terms: body },
+        });
+
+        return await LoanApplicationsService.getById(applicationId);
+      });
+    } catch (error: any) {
+      logger.error("Error creating counter-offer:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[CREATE_COUNTER_OFFER_ERROR] Failed to create counter-offer");
     }
   }
 }

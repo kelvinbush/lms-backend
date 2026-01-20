@@ -159,6 +159,7 @@ export function mapLoanApplicationDetail(
       email: string;
     } | null;
     organizationName: string;
+    activeVersion?: any | null;
   }
 ): LoanApplicationsModel.LoanApplicationDetail {
   // Build applicant name
@@ -171,20 +172,24 @@ export function mapLoanApplicationDetail(
   const creatorName = related.creator
     ? [related.creator.firstName, related.creator.lastName].filter(Boolean).join(" ") || "N/A"
     : "N/A";
+
+  // Use active version data if available, otherwise use base application data
+  const version = related.activeVersion;
+
   return {
     id: row.id,
     loanId: row.loanId,
     businessId: row.businessId,
     entrepreneurId: row.entrepreneurId,
     loanProductId: row.loanProductId,
-    fundingAmount: toNumber(row.fundingAmount) ?? 0,
+    fundingAmount: version ? (toNumber(version.fundingAmount) ?? 0) : (toNumber(row.fundingAmount) ?? 0),
     fundingCurrency: row.fundingCurrency,
     convertedAmount: row.convertedAmount ? (toNumber(row.convertedAmount) ?? undefined) : undefined,
     convertedCurrency: row.convertedCurrency ?? undefined,
     exchangeRate: row.exchangeRate ? (toNumber(row.exchangeRate) ?? undefined) : undefined,
-    repaymentPeriod: row.repaymentPeriod,
+    repaymentPeriod: version ? version.repaymentPeriod : row.repaymentPeriod,
     intendedUseOfFunds: row.intendedUseOfFunds,
-    interestRate: toNumber(row.interestRate) ?? 0,
+    interestRate: version ? (toNumber(version.interestRate) ?? 0) : (toNumber(row.interestRate) ?? 0),
     loanSource: row.loanSource || "Unknown",
     status: row.status,
     submittedAt: row.submittedAt?.toISOString(),
@@ -240,6 +245,21 @@ export function mapLoanApplicationDetail(
           firstName: related.lastUpdatedByUser.firstName ?? undefined,
           lastName: related.lastUpdatedByUser.lastName ?? undefined,
           email: related.lastUpdatedByUser.email,
+        }
+      : undefined,
+    activeVersion: version
+      ? {
+          id: version.id,
+          status: version.status,
+          fundingAmount: toNumber(version.fundingAmount) ?? 0,
+          repaymentPeriod: version.repaymentPeriod,
+          returnType: version.returnType,
+          interestRate: toNumber(version.interestRate) ?? 0,
+          repaymentStructure: version.repaymentStructure,
+          repaymentCycle: version.repaymentCycle,
+          gracePeriod: version.gracePeriod ?? undefined,
+          firstPaymentDate: version.firstPaymentDate?.toISOString(),
+          customFees: version.customFees,
         }
       : undefined,
   };

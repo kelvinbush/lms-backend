@@ -83,6 +83,9 @@ export const loanApplications = pgTable(
     // Metadata
     loanSource: varchar("loan_source", { length: 100 }), // Source of application (e.g., "Admin Platform", "SME Platform")
 
+    // Active version reference (for counter-offers)
+    activeVersionId: varchar("active_version_id", { length: 24 }),
+
     // Application status and workflow
     status: loanApplicationStatusEnum("status").default("kyc_kyb_verification").notNull(),
 

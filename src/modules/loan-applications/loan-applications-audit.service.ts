@@ -157,6 +157,7 @@ export abstract class LoanApplicationAuditService {
       credit_assessment_completed: "Credit assessment completed",
       head_of_credit_review_completed: "Head of credit review completed",
       internal_approval_ceo_completed: "Internal approval CEO completed",
+      counter_offer_proposed: "Counter-offer proposed",
     };
 
     return titles[eventType];

@@ -23,3 +23,4 @@ export * from "./schema/loanProductsUserGroups";
 export * from "./schema/loanApplicationAuditTrail";
 export * from "./schema/loanApplicationDocumentVerifications";
 export * from "./schema/loanDocuments";
+export * from "./schema/loanApplicationVersions";

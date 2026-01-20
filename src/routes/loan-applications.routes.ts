@@ -631,6 +631,58 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // PATCH create counter-offer for loan application
+  // Accessible to: admins/members only
+  fastify.patch(
+    "/:id/counter-offer",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: LoanApplicationsModel.CreateCounterOfferBodySchema,
+        response: {
+          200: LoanApplicationsModel.LoanApplicationDetailSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as LoanApplicationsModel.CreateCounterOfferBody;
+
+        const result = await LoanApplicationsService.createCounterOffer(userId, id, body);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error creating counter-offer:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to create counter-offer",
+          code: "CREATE_COUNTER_OFFER_FAILED",
+        });
+      }
+    }
+  );
+
   // GET loan applications list for external users (entrepreneurs)
   // Accessible to: entrepreneurs (can only see their own applications)
   fastify.get(
