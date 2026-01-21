@@ -343,6 +343,86 @@ export class InternalUsersService {
     return { success: true };
   }
 
+  /**
+   * Update a pending internal invitation's email/role and resend it.
+   * - Updates local invitation record and recreates the Clerk invitation.
+   */
+  static async updateInvitationAndResend(params: {
+    localInvitationId: string;
+    body: InternalUsersModel.UpdateInvitationBody;
+  }): Promise<InternalUsersModel.BasicSuccessResponse> {
+    const { localInvitationId, body } = params;
+
+    let inv = await db.query.internalInvitations.findFirst({
+      where: eq(internalInvitations.id, localInvitationId),
+    });
+    if (!inv) {
+      inv = await db.query.internalInvitations.findFirst({
+        where: eq(internalInvitations.clerkInvitationId, localInvitationId),
+      });
+    }
+    if (!inv) {
+      const err: any = new Error("Invitation not found");
+      err.status = 404;
+      throw err;
+    }
+
+    const nextEmail = body.email ?? inv.email;
+    const nextRole = body.role ?? inv.role;
+
+    // Revoke existing Clerk invitation if present
+    if (inv.clerkInvitationId) {
+      try {
+        await clerkClient.invitations.revokeInvitation(inv.clerkInvitationId as any);
+      } catch (_e: any) {
+        // Ignore errors from already-revoked/expired invitations
+      }
+    }
+
+    const appUrl = process.env.ADMIN_URL?.replace(/\/$/, "");
+    const redirectUrl = `${appUrl || ""}/accept-invite`;
+
+    let newInvite: any;
+    try {
+      newInvite = await clerkClient.invitations.createInvitation({
+        emailAddress: nextEmail,
+        publicMetadata: { role: nextRole, internal: true },
+        redirectUrl,
+      } as any);
+    } catch (e: any) {
+      const err: any = new Error(
+        e?.errors?.[0]?.message || e?.message || "Failed to create invitation"
+      );
+      err.status = e?.status || 400;
+      logger.error("[INVITE] Update & resend failed", {
+        email: nextEmail,
+        error: err.message,
+      });
+      throw err;
+    }
+
+    const now = new Date();
+    await db
+      .update(internalInvitations)
+      .set({
+        email: nextEmail,
+        role: nextRole,
+        clerkInvitationId: (newInvite as any)?.id,
+        lastSentAt: now,
+        updatedAt: now,
+      })
+      .where(eq(internalInvitations.id, inv.id));
+
+    logger.info("[INVITE] Updated and resent invitation", {
+      previousEmail: inv.email,
+      newEmail: nextEmail,
+      previousRole: inv.role,
+      newRole: nextRole,
+    });
+
+    return { success: true };
+  }
+
   static async revokeInvitation(params: {
     localInvitationId: string;
   }): Promise<InternalUsersModel.BasicSuccessResponse> {
@@ -460,6 +540,58 @@ export class InternalUsersService {
       .catch((error) => {
         logger.error("Failed to fetch user for reactivation email:", error);
       });
+
+    return { success: true };
+  }
+
+  /**
+   * Update an internal user's role in both the local DB and Clerk public metadata.
+   */
+  static async updateUserRole(params: {
+    clerkUserId: string;
+    role: InternalUsersModel.Role;
+  }): Promise<InternalUsersModel.BasicSuccessResponse> {
+    const { clerkUserId, role } = params;
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.clerkId, clerkUserId),
+    });
+    if (!user) {
+      const err: any = new Error("User not found");
+      err.status = 404;
+      throw err;
+    }
+
+    await db
+      .update(users)
+      .set({
+        role,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+
+    // Mirror role in Clerk public metadata (best-effort)
+    try {
+      const clerkUser = await clerkClient.users.getUser(clerkUserId);
+      const currentPublicMetadata = ((clerkUser as any).publicMetadata || {}) as Record<
+        string,
+        unknown
+      >;
+
+      await clerkClient.users.updateUser(clerkUserId as any, {
+        publicMetadata: {
+          ...currentPublicMetadata,
+          role,
+          internal: true,
+        },
+      } as any);
+    } catch (e: any) {
+      logger.error("[InternalUsers] Failed to update Clerk user role", {
+        clerkUserId,
+        role,
+        error: e?.message,
+      });
+    }
 
     return { success: true };
   }

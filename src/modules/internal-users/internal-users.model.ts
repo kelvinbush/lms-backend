@@ -6,6 +6,11 @@ export namespace InternalUsersModel {
     role: Role;
   }
 
+  export interface UpdateInvitationBody {
+    email?: string;
+    role?: Role;
+  }
+
   export interface CreateInvitationResponse {
     success: boolean;
     invitationId: string;
@@ -18,6 +23,15 @@ export namespace InternalUsersModel {
       role: { type: "string", enum: ["super-admin", "admin", "member"] },
     },
     required: ["email", "role"],
+    additionalProperties: false,
+  } as const;
+
+  export const UpdateInvitationBodySchema = {
+    type: "object",
+    properties: {
+      email: { type: "string", format: "email" },
+      role: { type: "string", enum: ["super-admin", "admin", "member"] },
+    },
     additionalProperties: false,
   } as const;
 
@@ -99,6 +113,19 @@ export namespace InternalUsersModel {
     type: "object",
     properties: { clerkUserId: { type: "string" } },
     required: ["clerkUserId"],
+    additionalProperties: false,
+  } as const;
+
+  export interface UpdateUserRoleBody {
+    role: Role;
+  }
+
+  export const UpdateUserRoleBodySchema = {
+    type: "object",
+    properties: {
+      role: { type: "string", enum: ["super-admin", "admin", "member"] },
+    },
+    required: ["role"],
     additionalProperties: false,
   } as const;
 }

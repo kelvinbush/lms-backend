@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { InternalUsersModel } from "../modules/internal-users/internal-users.model";
 import { InternalUsersService } from "../modules/internal-users/internal-users.service";
-import { requireSuperAdmin } from "../utils/authz";
+import { requireRole, requireSuperAdmin } from "../utils/authz";
 
 export async function adminInternalUsersRoutes(fastify: FastifyInstance) {
   fastify.post(
@@ -52,7 +52,8 @@ export async function adminInternalUsersRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        await requireSuperAdmin(request);
+        // Allow any internal role (member, admin, super-admin) to list internal users
+        await requireRole(request, "member");
         const result = await InternalUsersService.listInternalUsers();
         return reply.send(result);
       } catch (error: any) {
@@ -85,6 +86,44 @@ export async function adminInternalUsersRoutes(fastify: FastifyInstance) {
         await requireSuperAdmin(request);
         const result = await InternalUsersService.resendInvitation({
           localInvitationId: request.params.id,
+        });
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        return reply.code(status).send({ error: error?.message || "Internal error" });
+      }
+    }
+  );
+
+  // Update a pending invitation (email and/or role) and resend it
+  fastify.patch(
+    "/admin/internal-users/invitations/:id",
+    {
+      schema: {
+        params: InternalUsersModel.InvitationIdParamsSchema,
+        body: InternalUsersModel.UpdateInvitationBodySchema,
+        response: {
+          200: InternalUsersModel.BasicSuccessResponseSchema,
+          401: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+          403: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+          404: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+          500: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+        },
+        tags: ["admin-internal-users"],
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: InternalUsersModel.InvitationIdParams;
+        Body: InternalUsersModel.UpdateInvitationBody;
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        await requireSuperAdmin(request);
+        const result = await InternalUsersService.updateInvitationAndResend({
+          localInvitationId: request.params.id,
+          body: request.body,
         });
         return reply.send(result);
       } catch (error: any) {
@@ -210,6 +249,44 @@ export async function adminInternalUsersRoutes(fastify: FastifyInstance) {
         await requireSuperAdmin(request);
         const result = await InternalUsersService.activateUser({
           clerkUserId: request.params.clerkUserId,
+        });
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        return reply.code(status).send({ error: error?.message || "Internal error" });
+      }
+    }
+  );
+
+  // Update an internal user's role (DB + Clerk metadata)
+  fastify.patch(
+    "/admin/internal-users/:clerkUserId/role",
+    {
+      schema: {
+        params: InternalUsersModel.ClerkUserIdParamsSchema,
+        body: InternalUsersModel.UpdateUserRoleBodySchema,
+        response: {
+          200: InternalUsersModel.BasicSuccessResponseSchema,
+          401: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+          403: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+          404: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+          500: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+        },
+        tags: ["admin-internal-users"],
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: InternalUsersModel.ClerkUserIdParams;
+        Body: InternalUsersModel.UpdateUserRoleBody;
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        await requireSuperAdmin(request);
+        const result = await InternalUsersService.updateUserRole({
+          clerkUserId: request.params.clerkUserId,
+          role: request.body.role,
         });
         return reply.send(result);
       } catch (error: any) {
