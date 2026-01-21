@@ -268,6 +268,11 @@ export abstract class SignRequestWebhookService {
       return;
     }
 
+    // If the contract is already fully signed, ignore further signer_viewed events
+    if (loan.contractStatus === "contract_fully_signed" as any) {
+      return;
+    }
+
     await LoanApplicationAuditService.logEvent({
       loanApplicationId: loan.id,
       eventType: "contract_signer_opened",
