@@ -217,12 +217,18 @@ export namespace LoanApplicationsModel {
     interestRate: number;
     loanSource: string;
     status: LoanApplicationStatus;
+    contractStatus?: ContractStatus | null;
     submittedAt?: string; // ISO 8601 timestamp
     approvedAt?: string; // ISO 8601 timestamp
     rejectedAt?: string; // ISO 8601 timestamp
     disbursedAt?: string; // ISO 8601 timestamp
     cancelledAt?: string; // ISO 8601 timestamp
     rejectionReason?: string;
+    // Stage comments
+    eligibilityAssessmentComment?: string | null;
+    creditAssessmentComment?: string | null;
+    headOfCreditReviewComment?: string | null;
+    internalApprovalCeoComment?: string | null;
     createdAt: string; // ISO 8601 timestamp
     updatedAt: string; // ISO 8601 timestamp
     lastUpdatedAt?: string; // ISO 8601 timestamp
@@ -378,12 +384,17 @@ export namespace LoanApplicationsModel {
       interestRate: { type: "number" },
       loanSource: { type: "string" },
       status: { type: "string", enum: LoanApplicationStatusEnum },
+      contractStatus: { type: "string", enum: ContractStatusEnum, nullable: true },
       submittedAt: { type: "string" },
       approvedAt: { type: "string" },
       rejectedAt: { type: "string" },
       disbursedAt: { type: "string" },
       cancelledAt: { type: "string" },
       rejectionReason: { type: "string" },
+      eligibilityAssessmentComment: { type: "string" },
+      creditAssessmentComment: { type: "string" },
+      headOfCreditReviewComment: { type: "string" },
+      internalApprovalCeoComment: { type: "string" },
       createdAt: { type: "string" },
       updatedAt: { type: "string" },
       lastUpdatedAt: { type: "string" },

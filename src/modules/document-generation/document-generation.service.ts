@@ -369,13 +369,15 @@ export abstract class DocumentGenerationService {
           const documentUrl = signrequest?.document as string | undefined;
           const documentUuid =
             (documentUrl && documentUrl.split("/").filter(Boolean).pop()) || undefined;
+          const signrequestUuid = (signrequest?.uuid as string | undefined) ?? undefined;
 
           if (documentUuid) {
-            // Persist the external document UUID on the loan application
+            // Persist the external document UUID and signrequest UUID on the loan application
             await db
               .update(loanApplications)
               .set({
                 signrequestDocumentUuid: documentUuid,
+                signrequestSignrequestUuid: signrequestUuid ?? null,
                 lastUpdatedAt: new Date(),
               })
               .where(eq(loanApplications.id, loanApplicationId));

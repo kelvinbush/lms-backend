@@ -134,6 +134,40 @@ export class SignRequestService {
       return undefined;
     }
   }
+
+  /**
+   * Resend SignRequest emails to all pending signers for a given signrequest UUID.
+   *
+   * Uses POST /signrequests/{uuid}/resend_signrequest_email/
+   */
+  async resendSignRequestEmail(signrequestUuid: string): Promise<void> {
+    const apiToken = this.getApiToken();
+    const url = `${SIGNREQUEST_API_BASE_URL}/signrequests/${signrequestUuid}/resend_signrequest_email/`;
+
+    logger.info("[SignRequest] Resending signrequest emails", {
+      url,
+      signrequestUuid,
+    });
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${apiToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      logger.error("[SignRequest] Failed to resend signrequest emails", {
+        status: response.status,
+        statusText: response.statusText,
+        body: text,
+      });
+      throw new Error(
+        `[SIGNREQUEST_RESEND_EMAIL_FAILED] ${response.status} ${response.statusText}`
+      );
+    }
+  }
 }
 
 export const signRequestService = new SignRequestService();

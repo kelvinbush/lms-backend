@@ -21,6 +21,7 @@ import { CommitteeDecisionModel } from "../modules/committee-decision/committee-
 import { CommitteeDecisionService } from "../modules/committee-decision/committee-decision.service";
 import { DocumentGenerationModel } from "../modules/document-generation/document-generation.model";
 import { DocumentGenerationService } from "../modules/document-generation/document-generation.service";
+import { signRequestService } from "../services/signrequest.service";
 import { UserModel } from "../modules/user/user.model";
 import { isAdminOrMember, isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
 import { logger } from "../utils/logger";
@@ -2169,6 +2170,85 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to set contract signatories",
           code: "SET_CONTRACT_SIGNATORIES_FAILED",
+        });
+      }
+    }
+  );
+
+  // POST /loan-applications/:id/contract/remind-signers
+  // Resend SignRequest emails to all pending signers
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/contract/remind-signers",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          204: {
+            type: "null",
+          },
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "document-generation"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require admin/member role
+        await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+
+        // Fetch the loan application to get stored SignRequest UUID
+        const application = await db.query.loanApplications.findFirst({
+          where: and(eq(loanApplications.id, id), isNull(loanApplications.deletedAt)),
+          columns: {
+            id: true,
+            signrequestSignrequestUuid: true,
+          },
+        });
+
+        if (!application) {
+          return reply.code(404).send({
+            error: "Loan application not found",
+            code: "LOAN_APPLICATION_NOT_FOUND",
+          });
+        }
+
+        if (!application.signrequestSignrequestUuid) {
+          return reply.code(400).send({
+            error: "SignRequest UUID not available for this loan application",
+            code: "SIGNREQUEST_UUID_NOT_FOUND",
+          });
+        }
+
+        await signRequestService.resendSignRequestEmail(application.signrequestSignrequestUuid);
+
+        return reply.code(204).send();
+      } catch (error: any) {
+        logger.error("Error resending contract signing emails:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to resend contract signing emails",
+          code: "RESEND_CONTRACT_SIGNING_EMAILS_FAILED",
         });
       }
     }
