@@ -9,7 +9,7 @@ import {
 import { logger } from "../../utils/logger";
 import { LoanApplicationAuditService } from "../loan-applications/loan-applications-audit.service";
 import type { DocumentGenerationModel } from "./document-generation.model";
-import { firmaService, type FirmaSignerInput } from "../../services/firma.service";
+import { signRequestService, type SignRequestSignerInput } from "../../services/signrequest.service";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -337,13 +337,14 @@ export abstract class DocumentGenerationService {
         },
       });
 
-      // Call Firma.dev to create a signing request using the per-loan contract.
+      // Call SignRequest to create a signrequest using the per-loan contract.
       // We treat this as a best-effort side effect: failures are logged but do not
       // prevent the API from returning successfully, since contractStatus has
       // already been updated in our own database.
+      // Note: SignRequest automatically sends emails when creating the signrequest.
       (async () => {
         try {
-          const signers: FirmaSignerInput[] = [
+          const signers: SignRequestSignerInput[] = [
             // Client signatories (we already default their signingOrder to 1..N)
             ...result.insertedClient.map((s) => ({
               name: s.fullName,
@@ -358,53 +359,39 @@ export abstract class DocumentGenerationService {
             })),
           ];
 
-          const signingRequest = await firmaService.createDocumentSigningRequest({
+          const signrequest = await signRequestService.createQuickSignRequest({
             name: `Loan contract ${loanApplicationId}`,
             documentUrl: contractDocument.docUrl,
+            fromEmail: adminUser.email,
             recipients: signers,
           });
 
-          const signingRequestId =
-            (signingRequest && (signingRequest as any).id) || undefined;
+          const documentUrl = signrequest?.document as string | undefined;
+          const documentUuid =
+            (documentUrl && documentUrl.split("/").filter(Boolean).pop()) || undefined;
 
-          if (signingRequestId) {
-            // Persist the external signing request ID on the loan application
+          if (documentUuid) {
+            // Persist the external document UUID on the loan application
             await db
               .update(loanApplications)
               .set({
-                firmaSigningRequestId: signingRequestId,
+                signrequestDocumentUuid: documentUuid,
                 lastUpdatedAt: new Date(),
               })
               .where(eq(loanApplications.id, loanApplicationId));
 
-            logger.info("[Firma] Signing request created for loan application", {
+            logger.info("[SignRequest] SignRequest created and emails sent for loan application", {
               loanApplicationId,
-              signingRequestId,
+              documentUuid,
             });
-
-            // Immediately send email invites to all recipients via Firma.dev
-            try {
-              await firmaService.sendSigningRequest({
-                signingRequestId,
-                customMessage:
-                  "You have a new loan contract ready for review and signing from Melanin Kapital.",
-              });
-            } catch (sendError: any) {
-              // Log but do not fail the main flow if sending emails fails
-              logger.error("[Firma] Failed to send signing request emails", {
-                loanApplicationId,
-                signingRequestId,
-                errorMessage: sendError?.message || String(sendError),
-              });
-            }
           } else {
             logger.warn(
-              "[Firma] Signing request created but no ID returned; emails not sent automatically",
+              "[SignRequest] Quick signrequest created but no document URL/UUID returned",
               { loanApplicationId }
             );
           }
         } catch (error: any) {
-          logger.error("[Firma] Failed to create signing request for loan application", {
+          logger.error("[SignRequest] Failed to create signrequest for loan application", {
             loanApplicationId,
             errorMessage: error?.message || String(error),
           });

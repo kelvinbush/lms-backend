@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ClerkWebhookService } from "../services/clerk-webhook.service";
 import { type DocuSignWebhookEvent, docuSignService } from "../services/docusign.service";
-import { FirmaWebhookService } from "../services/firma-webhook.service";
+import { SignRequestWebhookService } from "../services/signrequest-webhook.service";
 import { logger } from "../utils/logger";
 import { verifyClerkWebhook } from "../utils/webhook.utils";
 import crypto from "crypto";
@@ -112,9 +112,9 @@ export async function webhookRoutes(fastify: FastifyInstance) {
     }
   );
 
- // Firma.dev webhook endpoint
+  // SignRequest webhook endpoint (Events callback)
   fastify.post(
-    "/firma",
+    "/signrequest",
     { config: { rawBody: true } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
@@ -124,111 +124,80 @@ export async function webhookRoutes(fastify: FastifyInstance) {
             ? rawBody
             : JSON.stringify(rawBody ?? {});
 
-        const signature = request.headers["x-firma-signature"] as string | undefined;
-        const signatureOld = request.headers["x-firma-signature-old"] as string | undefined;
-        const signingSecret = process.env.FIRMA_WEBHOOK_SECRET;
-
-        // VERY VERBOSE DEBUG LOGGING – safe to remove once things are stable
         const payloadString =
           typeof payload === "string" ? payload : payload.toString("utf8");
-        logger.info("[FirmaWebhook] Full incoming request debug", {
-          method: request.method,
-          url: request.url,
-          headers: request.headers,
-          rawBodyType: typeof rawBody,
-          rawBodyIsBuffer: Buffer.isBuffer(rawBody),
-          rawBodyLength: Buffer.isBuffer(rawBody) ? rawBody.length : payloadString.length,
-          rawBodyString: payloadString,
-          signature,
-          signatureOld,
-          signingSecretLength: signingSecret?.length ?? null,
-        });
 
-        if (!signingSecret) {
-          logger.error("FIRMA_WEBHOOK_SECRET is not configured");
-          return reply.code(500).send({
-            error: "Webhook secret not configured",
-            code: "FIRMA_WEBHOOK_SECRET_MISSING",
+        let event: any;
+        try {
+          event = JSON.parse(payloadString);
+        } catch {
+          return reply.code(400).send({
+            error: "Invalid JSON body",
+            code: "INVALID_JSON",
           });
         }
 
-        // Firma signature verification
-        // Header format: "t=<timestamp>,v1=<hex_signature>"
-        // Firma signs: HMAC-SHA256(secret, timestamp + "." + payload)
-        const parseSignatureHeader = (
-          raw?: string
-        ): { timestamp?: string; signature?: string } => {
-          if (!raw) return {};
-          const result: { timestamp?: string; signature?: string } = {};
-          for (const part of raw.split(",")) {
-            const trimmed = part.trim();
-            if (trimmed.startsWith("t=")) {
-              result.timestamp = trimmed.slice(2);
-            } else if (trimmed.startsWith("v1=")) {
-              result.signature = trimmed.slice(3);
-            }
-          }
-          return result;
-        };
-
-        const verifySignature = (rawSig?: string): boolean => {
-          const { timestamp, signature: sig } = parseSignatureHeader(rawSig);
-          if (!sig) return false;
-
-          // Firma signs: timestamp + "." + payload (Stripe-style)
-          const signedPayload = timestamp ? `${timestamp}.${payloadString}` : payloadString;
-
-          const expectedSignature = crypto
-            .createHmac("sha256", signingSecret)
-            .update(signedPayload)
-            .digest("hex");
-
-          logger.info("[FirmaWebhook] Verifying signature", {
-            timestamp: timestamp || "none",
-            providedLength: sig.length,
-            expectedLength: expectedSignature.length,
-            providedPrefix: sig.slice(0, 8),
-            expectedPrefix: expectedSignature.slice(0, 8),
-            signedPayloadLength: signedPayload.length,
-            signedPayloadPrefix: signedPayload.slice(0, 50),
+        // Verify event_hash using API token as per SignRequest docs:
+        // event_hash = HMAC_SHA256(key=API_TOKEN, data=event_time + event_type)
+        const apiToken = process.env.SIGNREQUEST_API_TOKEN;
+        if (!apiToken) {
+          logger.error("SIGNREQUEST_API_TOKEN is not configured");
+          return reply.code(500).send({
+            error: "Webhook secret not configured",
+            code: "SIGNREQUEST_API_TOKEN_MISSING",
           });
+        }
 
-          try {
-            return crypto.timingSafeEqual(
-              Buffer.from(sig),
-              Buffer.from(expectedSignature)
-            );
-          } catch {
-            return false;
-          }
-        };
+        const eventTime = event.event_time as string | undefined;
+        const eventType = event.event_type as string | undefined;
+        const eventHash = event.event_hash as string | undefined;
 
-        // Check current signature first, then old signature during rotation
-        if (!verifySignature(signature) && !verifySignature(signatureOld)) {
-          logger.error("Invalid Firma webhook signature", {
-            hasSignature: !!signature,
-            hasOldSignature: !!signatureOld,
+        if (!eventTime || !eventType || !eventHash) {
+          logger.error("[SignRequestWebhook] Missing event_time, event_type, or event_hash");
+          return reply.code(400).send({
+            error: "Missing event_time, event_type, or event_hash",
+            code: "INVALID_EVENT",
           });
+        }
+
+        const dataToSign = `${eventTime}${eventType}`;
+        const expectedHash = crypto
+          .createHmac("sha256", apiToken)
+          .update(dataToSign)
+          .digest("hex");
+
+        let isValid = false;
+        try {
+          isValid = crypto.timingSafeEqual(
+            Buffer.from(eventHash),
+            Buffer.from(expectedHash)
+          );
+        } catch {
+          isValid = false;
+        }
+
+        if (!isValid) {
+          logger.error("Invalid SignRequest event_hash");
           return reply.code(401).send({
             error: "Invalid signature",
             code: "INVALID_SIGNATURE",
           });
         }
 
-        const event =
-          typeof payload === "string"
-            ? JSON.parse(payload)
-            : JSON.parse(payload.toString("utf8"));
+        logger.info("[SignRequestWebhook] Received webhook event", {
+          eventType,
+          documentUuid: event.document?.uuid,
+        });
 
         // Process asynchronously, but after acknowledging receipt
-        void FirmaWebhookService.processWebhookEvent(event);
+        void SignRequestWebhookService.processWebhookEvent(event);
 
         return reply.code(200).send({ received: true });
       } catch (error: any) {
-        logger.error("Error processing Firma webhook:", error);
+        logger.error("Error processing SignRequest webhook:", error);
         return reply.code(500).send({
-          error: "Failed to process Firma webhook",
-          code: "FIRMA_WEBHOOK_ERROR",
+          error: "Failed to process SignRequest webhook",
+          code: "SIGNREQUEST_WEBHOOK_ERROR",
         });
       }
     }

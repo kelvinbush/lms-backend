@@ -99,8 +99,8 @@ export const loanApplications = pgTable(
 
     // Application status and workflow
     status: loanApplicationStatusEnum("status").default("kyc_kyb_verification").notNull(),
-    // External signing integration (Firma.dev) - signing request linkage
-    firmaSigningRequestId: varchar("firma_signing_request_id", { length: 255 }),
+    // External signing integration (SignRequest) - document UUID linkage
+    signrequestDocumentUuid: varchar("signrequest_document_uuid", { length: 255 }),
     contractStatus: contractStatusEnum("contract_status"),
 
     // Timeline tracking
