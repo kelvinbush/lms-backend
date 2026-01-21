@@ -177,6 +177,7 @@ export abstract class SignRequestWebhookService {
       await db
         .update(loanApplications)
         .set({
+          status: "awaiting_disbursement",
           contractStatus: "contract_fully_signed",
           lastUpdatedAt: new Date(),
         })
@@ -237,6 +238,7 @@ export abstract class SignRequestWebhookService {
     await db
       .update(loanApplications)
       .set({
+        status: "awaiting_disbursement",
         contractStatus: "contract_fully_signed",
         lastUpdatedAt: now,
       })
