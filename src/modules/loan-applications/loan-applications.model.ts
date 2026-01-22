@@ -721,6 +721,7 @@ export namespace LoanApplicationsModel {
     termUnit: string; // Unit from loan product (days, weeks, months, etc.)
     intendedUseOfFunds: string;
     interestRate: number;
+    termSheetUrl?: string | null; // URL to the term sheet document
     submittedAt?: string;
     approvedAt?: string;
     rejectedAt?: string;

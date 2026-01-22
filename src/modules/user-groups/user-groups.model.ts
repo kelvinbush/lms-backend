@@ -4,6 +4,7 @@ export namespace UserGroupsModel {
     slug?: string; // optional, auto-generated if missing
     description?: string;
     userIds?: string[]; // optional list of existing users to add as members
+    businessIds?: string[]; // optional list of SME/business IDs to assign to this group
   }
 
   export interface EditGroupBody {
@@ -11,6 +12,7 @@ export namespace UserGroupsModel {
     slug?: string;
     description?: string;
     userIds?: string[]; // replace membership set when provided
+    businessIds?: string[]; // replace SME/business set when provided
     addUserIds?: string[]; // optionally add specific users
     removeUserIds?: string[]; // optionally remove specific users
   }
@@ -50,6 +52,7 @@ export namespace UserGroupsModel {
       slug: { type: "string", minLength: 1, maxLength: 150 },
       description: { type: "string" },
       userIds: { type: "array", items: { type: "string", minLength: 1 }, uniqueItems: true },
+      businessIds: { type: "array", items: { type: "string", minLength: 1 }, uniqueItems: true },
     },
     required: ["name"],
   } as const;
@@ -63,6 +66,7 @@ export namespace UserGroupsModel {
       slug: { type: "string", minLength: 1, maxLength: 150 },
       description: { type: "string" },
       userIds: { type: "array", items: { type: "string", minLength: 1 }, uniqueItems: true },
+      businessIds: { type: "array", items: { type: "string", minLength: 1 }, uniqueItems: true },
       addUserIds: { type: "array", items: { type: "string", minLength: 1 }, uniqueItems: true },
       removeUserIds: { type: "array", items: { type: "string", minLength: 1 }, uniqueItems: true },
     },

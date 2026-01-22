@@ -2,26 +2,19 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import { loanApplicationAuditTrail, loanApplications, users } from "../../db/schema";
 import { logger } from "../../utils/logger";
-
-function httpError(status: number, message: string) {
-  const err: any = new Error(message);
-  err.status = status;
-  return err;
-}
+import {
+  mapEventTypeForEntrepreneur,
+  mapEventTitleForEntrepreneur,
+  type PublicTimelineEventType,
+} from "./loan-applications-timeline-mapper";
 
 /**
  * Timeline Event for Loan Application
+ * Uses PublicTimelineEventType which masks internal workflow events for entrepreneurs
  */
 export interface TimelineEvent {
   id: string;
-  type:
-    | "submitted"
-    | "cancelled"
-    | "review_in_progress"
-    | "rejected"
-    | "approved"
-    | "awaiting_disbursement"
-    | "disbursed";
+  type: PublicTimelineEventType;
   title: string;
   description?: string;
   date: string; // ISO date string or formatted date (e.g., "2025-01-25" or "Jan 25, 2025")
@@ -31,6 +24,12 @@ export interface TimelineEvent {
   performedBy?: string; // Optional: Name of person who performed the action (e.g., "Shalyne Waweru")
   performedById?: string; // Optional: ID of the user who performed the action
   lineColor?: "green" | "orange" | "grey"; // Optional: Visual indicator color
+}
+
+function httpError(status: number, message: string) {
+  const err: any = new Error(message);
+  err.status = status;
+  return err;
 }
 
 /**
@@ -65,7 +64,8 @@ export abstract class LoanApplicationTimelineService {
         throw httpError(404, "[LOAN_APPLICATION_NOT_FOUND] Loan application not found");
       }
 
-      // Check authorization if clerkId is provided
+      // Check authorization if clerkId is provided and determine if user is entrepreneur
+      let isEntrepreneur = false;
       if (clerkId) {
         const requestingUser = await db.query.users.findFirst({
           where: eq(users.clerkId, clerkId),
@@ -81,7 +81,7 @@ export abstract class LoanApplicationTimelineService {
           requestingUser.role === "admin" ||
           requestingUser.role === "super-admin" ||
           requestingUser.role === "member";
-        const isEntrepreneur = requestingUser.id === application.entrepreneurId;
+        isEntrepreneur = requestingUser.id === application.entrepreneurId;
 
         if (!isAdminOrMember && !isEntrepreneur) {
           throw httpError(
@@ -141,7 +141,8 @@ export abstract class LoanApplicationTimelineService {
       for (const entry of auditEntries) {
         const event = LoanApplicationTimelineService.mapAuditEntryToTimelineEvent(
           entry.audit,
-          entry.user
+          entry.user,
+          isEntrepreneur
         );
         if (event) {
           events.push(event);
@@ -155,6 +156,25 @@ export abstract class LoanApplicationTimelineService {
         return dateA - dateB;
       });
 
+      // For entrepreneurs, apply deduplication to clean up the timeline
+      if (isEntrepreneur) {
+        // Deduplicate consecutive events of the same type
+        // Keep only the first occurrence of consecutive duplicate events
+        const deduplicatedEvents: TimelineEvent[] = [];
+        let lastEventType: PublicTimelineEventType | null = null;
+        
+        for (const event of events) {
+          // If this is a different event type, or it's the first event, include it
+          if (event.type !== lastEventType) {
+            deduplicatedEvents.push(event);
+            lastEventType = event.type;
+          }
+          // Skip consecutive duplicates of the same type (e.g., multiple "review_in_progress" in a row)
+        }
+
+        return { data: deduplicatedEvents };
+      }
+
       return { data: events };
     } catch (error: any) {
       logger.error("Error getting loan application timeline:", error);
@@ -165,20 +185,52 @@ export abstract class LoanApplicationTimelineService {
 
   /**
    * Map audit trail entry to timeline event
+   * For entrepreneurs, masks internal workflow events and maps them to generic public events
    */
   private static mapAuditEntryToTimelineEvent(
     audit: typeof loanApplicationAuditTrail.$inferSelect,
-    user?: { id: string; firstName: string | null; lastName: string | null } | null
+    user?: { id: string; firstName: string | null; lastName: string | null } | null,
+    isEntrepreneur = false
   ): TimelineEvent | null {
-    const eventType = audit.eventType as TimelineEvent["type"];
+    // For entrepreneurs, map internal event types to public event types
+    let publicEventType: PublicTimelineEventType | null;
+    let eventTitle: string;
+
+    if (isEntrepreneur) {
+      // Map internal event type to public event type (may return null to hide event)
+      publicEventType = mapEventTypeForEntrepreneur(audit.eventType);
+      if (!publicEventType) {
+        // Event should be hidden from entrepreneurs
+        return null;
+      }
+      // Map title to generic title for entrepreneurs
+      eventTitle = mapEventTitleForEntrepreneur(publicEventType, audit.title);
+    } else {
+      // For admins/members, show all events that map to public types
+      // Map internal events to public types but keep original titles
+      publicEventType = mapEventTypeForEntrepreneur(audit.eventType);
+      if (!publicEventType) {
+        // Hide events that don't map to any public type (e.g., document_verified_approved)
+        return null;
+      }
+      // Keep original title for admins (they can see internal details)
+      eventTitle = audit.title;
+    }
 
     // Determine line color based on event type
     let lineColor: "green" | "orange" | "grey" = "grey";
-    if (eventType === "submitted" || eventType === "approved" || eventType === "disbursed") {
+    if (
+      publicEventType === "submitted" ||
+      publicEventType === "approved" ||
+      publicEventType === "disbursed"
+    ) {
       lineColor = "green";
-    } else if (eventType === "rejected" || eventType === "cancelled") {
+    } else if (publicEventType === "rejected" || publicEventType === "cancelled") {
       lineColor = "orange";
-    } else if (eventType === "review_in_progress" || eventType === "awaiting_disbursement") {
+    } else if (
+      publicEventType === "review_in_progress" ||
+      publicEventType === "awaiting_disbursement"
+    ) {
       lineColor = "orange";
     }
 
@@ -189,13 +241,13 @@ export abstract class LoanApplicationTimelineService {
 
     return {
       id: audit.id,
-      type: eventType,
-      title: audit.title,
-      description: audit.description || undefined,
+      type: publicEventType,
+      title: eventTitle,
+      description: isEntrepreneur ? undefined : audit.description || undefined, // Hide detailed descriptions for entrepreneurs
       date: LoanApplicationTimelineService.formatDate(audit.createdAt),
       time: LoanApplicationTimelineService.formatTime(audit.createdAt),
-      performedBy,
-      performedById: audit.performedById || undefined,
+      performedBy: isEntrepreneur ? undefined : performedBy, // Hide performer names for entrepreneurs
+      performedById: isEntrepreneur ? undefined : audit.performedById || undefined,
       lineColor,
     };
   }

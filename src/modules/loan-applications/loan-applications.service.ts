@@ -26,6 +26,7 @@ import { validateLoanApplicationCreation } from "./loan-applications.validators"
 import { LoanApplicationAuditService } from "./loan-applications-audit.service";
 import { KycKybVerificationService } from "../kyc-kyb-verification/kyc-kyb-verification.service";
 import { emailService } from "../../services/email.service";
+import { mapStatusForEntrepreneur, mapPublicStatusToInternalStatuses } from "./loan-applications-status-mapper";
 
 function httpError(status: number, message: string) {
   const err: any = new Error(message);
@@ -790,27 +791,10 @@ export abstract class LoanApplicationsService {
 
       // Status filter - map frontend status values to backend statuses
       if (query.status && query.status !== "all") {
-        const statusMap: Record<string, string[]> = {
-          pending: [
-            "kyc_kyb_verification",
-            "eligibility_check",
-            "credit_analysis",
-            "head_of_credit_review",
-            "internal_approval_ceo",
-            "committee_decision",
-            "sme_offer_approval",
-            "document_generation",
-            "signing_execution",
-            "awaiting_disbursement",
-          ],
-          approved: ["approved"],
-          rejected: ["rejected"],
-          disbursed: ["disbursed"],
-          cancelled: ["cancelled"],
-        };
-
-        const backendStatuses = statusMap[query.status];
-        if (backendStatuses) {
+        const backendStatuses = mapPublicStatusToInternalStatuses(
+          query.status as "pending" | "approved" | "rejected" | "disbursed" | "cancelled"
+        );
+        if (backendStatuses.length > 0) {
           whereConditions.push(
             or(...backendStatuses.map((s) => eq(loanApplications.status, s as any)))!
           );
@@ -866,30 +850,6 @@ export abstract class LoanApplicationsService {
         .limit(limit)
         .offset(offset);
 
-      // Map backend status to frontend status
-      const mapStatusToFrontend = (
-        backendStatus: string
-      ): "pending" | "approved" | "rejected" | "disbursed" | "cancelled" => {
-        const pendingStatuses = [
-          "kyc_kyb_verification",
-          "eligibility_check",
-          "credit_analysis",
-          "head_of_credit_review",
-          "internal_approval_ceo",
-          "committee_decision",
-          "sme_offer_approval",
-          "document_generation",
-          "signing_execution",
-          "awaiting_disbursement",
-        ];
-        if (pendingStatuses.includes(backendStatus)) return "pending";
-        if (backendStatus === "approved") return "approved";
-        if (backendStatus === "rejected") return "rejected";
-        if (backendStatus === "disbursed") return "disbursed";
-        if (backendStatus === "cancelled") return "cancelled";
-        return "pending"; // Default fallback
-      };
-
       // Format applications for external users
       const applications: LoanApplicationsModel.ExternalLoanApplicationListItem[] =
         applicationRows.map((row) => {
@@ -911,7 +871,7 @@ export abstract class LoanApplicationsService {
             requestedAmount: formattedAmount,
             currency: app.fundingCurrency,
             tenure,
-            status: mapStatusToFrontend(app.status),
+            status: mapStatusForEntrepreneur(app.status),
             appliedOn: app.submittedAt?.toISOString() || app.createdAt.toISOString(),
           };
         });
@@ -1008,30 +968,6 @@ export abstract class LoanApplicationsService {
         minimumFractionDigits: 0,
       });
 
-      // Map backend status to frontend status
-      const mapStatusToFrontend = (
-        backendStatus: string
-      ): "pending" | "approved" | "rejected" | "disbursed" | "cancelled" => {
-        const pendingStatuses = [
-          "kyc_kyb_verification",
-          "eligibility_check",
-          "credit_analysis",
-          "head_of_credit_review",
-          "internal_approval_ceo",
-          "committee_decision",
-          "sme_offer_approval",
-          "document_generation",
-          "signing_execution",
-          "awaiting_disbursement",
-        ];
-        if (pendingStatuses.includes(backendStatus)) return "pending";
-        if (backendStatus === "approved") return "approved";
-        if (backendStatus === "rejected") return "rejected";
-        if (backendStatus === "disbursed") return "disbursed";
-        if (backendStatus === "cancelled") return "cancelled";
-        return "pending"; // Default fallback
-      };
-
       return {
         success: true,
         message: "Loan application retrieved successfully",
@@ -1042,7 +978,7 @@ export abstract class LoanApplicationsService {
           requestedAmount: formattedAmount,
           currency: application.fundingCurrency,
           tenure,
-          status: mapStatusToFrontend(application.status),
+          status: mapStatusForEntrepreneur(application.status),
           appliedOn: application.submittedAt?.toISOString() || application.createdAt.toISOString(),
           // Additional detail fields
           fundingAmount: amount,
@@ -1050,6 +986,7 @@ export abstract class LoanApplicationsService {
           termUnit,
           intendedUseOfFunds: application.intendedUseOfFunds,
           interestRate: toNumber(application.interestRate) ?? 0,
+          termSheetUrl: application.termSheetUrl ?? null,
           submittedAt: application.submittedAt?.toISOString(),
           approvedAt: application.approvedAt?.toISOString(),
           rejectedAt: application.rejectedAt?.toISOString(),

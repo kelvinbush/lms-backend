@@ -96,8 +96,19 @@ export abstract class UserGroupsService {
         }
       }
 
-      // New groups have 0 businesses
-      return mapRow(group, 0);
+      // Optional: assign SMEs / businesses to this group at creation time
+      if (body.businessIds && body.businessIds.length > 0) {
+        // Reuse existing assignment logic (validates businesses, skips duplicates, etc.)
+        await UserGroupsService.assignBusinessesToGroup(group.id, body.businessIds);
+      }
+
+      // New groups start with 0 or more businesses depending on initial assignment
+      const [{ businessCount }] = await db
+        .select({ businessCount: count(businessUserGroups.id) })
+        .from(businessUserGroups)
+        .where(eq(businessUserGroups.groupId, group.id));
+
+      return mapRow(group, Number(businessCount));
     } catch (error: any) {
       logger.error("Error creating user group:", error);
       if (error?.status) throw error;
@@ -206,13 +217,7 @@ export abstract class UserGroupsService {
 
       if (!updated) throw httpError(404, "[USER_GROUP_NOT_FOUND] Group not found");
 
-      // Get business count for the updated group
-      const [{ businessCount }] = await db
-        .select({ businessCount: count(businessUserGroups.id) })
-        .from(businessUserGroups)
-        .where(eq(businessUserGroups.groupId, id));
-
-      // Membership operations
+      // Membership operations (users)
       if (body.userIds && body.userIds.length >= 0) {
         // Replace full membership set
         await db.delete(userGroupMembers).where(eq(userGroupMembers.groupId, id));
@@ -255,6 +260,23 @@ export abstract class UserGroupsService {
         // Invalidate members cache for this group
         await ResponseCachingService.invalidateByPattern(`GET:/user-groups/${id}/members*`);
       }
+
+      // Business assignments (SMEs)
+      if (body.businessIds && body.businessIds.length >= 0) {
+        // Replace full business set for this group:
+        // 1) delete all existing assignments
+        await db.delete(businessUserGroups).where(eq(businessUserGroups.groupId, id));
+        // 2) reassign based on provided IDs (reusing existing validation logic)
+        if (body.businessIds.length > 0) {
+          await UserGroupsService.assignBusinessesToGroup(id, body.businessIds);
+        }
+      }
+
+      // Recompute business count after potential changes
+      const [{ businessCount }] = await db
+        .select({ businessCount: count(businessUserGroups.id) })
+        .from(businessUserGroups)
+        .where(eq(businessUserGroups.groupId, id));
 
       return mapRow(updated, Number(businessCount));
     } catch (error: any) {

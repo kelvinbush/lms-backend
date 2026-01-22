@@ -2,7 +2,7 @@ import { getAuth } from "@clerk/fastify";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db } from "../db";
-import { loanApplications } from "../db/schema";
+import { loanApplications, users } from "../db/schema";
 import { LoanApplicationsModel } from "../modules/loan-applications/loan-applications.model";
 import { LoanApplicationsService } from "../modules/loan-applications/loan-applications.service";
 import { LoanApplicationTimelineService } from "../modules/loan-applications/loan-applications-timeline.service";
@@ -21,6 +21,8 @@ import { CommitteeDecisionModel } from "../modules/committee-decision/committee-
 import { CommitteeDecisionService } from "../modules/committee-decision/committee-decision.service";
 import { DocumentGenerationModel } from "../modules/document-generation/document-generation.model";
 import { DocumentGenerationService } from "../modules/document-generation/document-generation.service";
+import { RepaymentScheduleModel } from "../modules/repayment-schedule/repayment-schedule.model";
+import { RepaymentScheduleService } from "../modules/repayment-schedule/repayment-schedule.service";
 import { signRequestService } from "../services/signrequest.service";
 import { UserModel } from "../modules/user/user.model";
 import { isAdminOrMember, isEntrepreneur, requireAuth, requireRole } from "../utils/authz";
@@ -347,7 +349,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         }
 
         const { id } = (request.params as any) || {};
-
+        
         // Get the application first to check authorization
         const [application] = await db
           .select()
@@ -691,6 +693,94 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // GET my loan application documents (for entrepreneurs)
+  // Accessible to: entrepreneurs (can only see documents for their own applications)
+  fastify.get(
+    "/my-applications/:id/documents",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: LoanApplicationsModel.GetLoanDocumentsResponseSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Require authentication
+        const user = await requireAuth(request);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        // Verify user is an entrepreneur (not admin)
+        if (isAdminOrMember(user)) {
+          return reply.code(403).send({
+            error: "This endpoint is for entrepreneurs only. Admins should use /:id/documents",
+            code: "FORBIDDEN",
+          });
+        }
+
+        const { id } = (request.params as any) || {};
+
+        // Verify the application belongs to this entrepreneur
+        const application = await db.query.loanApplications.findFirst({
+          where: and(eq(loanApplications.id, id), isNull(loanApplications.deletedAt)),
+          columns: {
+            entrepreneurId: true,
+          },
+        });
+
+        if (!application) {
+          return reply.code(404).send({
+            error: "Loan application not found",
+            code: "LOAN_APPLICATION_NOT_FOUND",
+          });
+        }
+
+        // Get the user's ID from the database
+        const dbUser = await db.query.users.findFirst({
+          where: eq(users.clerkId, userId),
+          columns: { id: true },
+        });
+
+        if (!dbUser || application.entrepreneurId !== dbUser.id) {
+          return reply.code(403).send({
+            error: "You do not have permission to view these documents",
+            code: "FORBIDDEN",
+          });
+        }
+
+        const result = await LoanApplicationsService.getLoanDocuments(id);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting my loan application documents:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get loan application documents",
+          code: "GET_LOAN_APPLICATION_DOCUMENTS_FAILED",
+        });
+      }
+    }
+  );
+
   // PUT update loan application status
   fastify.put(
     "/:id/status",
@@ -948,6 +1038,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
                   termUnit: { type: "string" },
                   intendedUseOfFunds: { type: "string" },
                   interestRate: { type: "number" },
+                  termSheetUrl: { type: "string", nullable: true },
                   submittedAt: { type: "string" },
                   approvedAt: { type: "string" },
                   rejectedAt: { type: "string" },
@@ -2249,6 +2340,93 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
         return reply.code(500).send({
           error: "Failed to resend contract signing emails",
           code: "RESEND_CONTRACT_SIGNING_EMAILS_FAILED",
+        });
+      }
+    }
+  );
+
+  // GET /loan-applications/:id/repayment-schedule
+  // Get repayment schedule for a loan application
+  // Accessible to: admins/members and entrepreneurs (for their own applications)
+  fastify.get(
+    "/:id/repayment-schedule",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        response: {
+          200: RepaymentScheduleModel.RepaymentScheduleResponseSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications", "repayment-schedule"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await requireAuth(request);
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+
+        // Check if user is admin/member or entrepreneur
+        const user = await db.query.users.findFirst({
+          where: eq(users.clerkId, userId),
+          columns: { id: true, role: true },
+        });
+
+        if (!user) {
+          return reply.code(401).send({ error: "User not found", code: "UNAUTHORIZED" });
+        }
+
+        const isAdminOrMemberUser =
+          user.role === "admin" || user.role === "super-admin" || user.role === "member";
+
+        // If entrepreneur, verify they own the application
+        if (!isAdminOrMemberUser) {
+          const application = await db.query.loanApplications.findFirst({
+            where: and(eq(loanApplications.id, id), isNull(loanApplications.deletedAt)),
+            columns: { entrepreneurId: true },
+          });
+
+          if (!application) {
+            return reply.code(404).send({
+              error: "Loan application not found",
+              code: "LOAN_APPLICATION_NOT_FOUND",
+            });
+          }
+
+          if (application.entrepreneurId !== user.id) {
+            return reply.code(403).send({
+              error: "You do not have permission to view this repayment schedule",
+              code: "FORBIDDEN",
+            });
+          }
+        }
+
+        const result = await RepaymentScheduleService.getRepaymentSchedule(id);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error getting repayment schedule:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to get repayment schedule",
+          code: "GET_REPAYMENT_SCHEDULE_FAILED",
         });
       }
     }
