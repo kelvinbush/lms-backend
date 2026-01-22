@@ -91,6 +91,14 @@ export interface TermSheetApprovalNotificationEmailData {
   supportPhone?: string;
 }
 
+export interface LoanDisbursementEmailData {
+  to: string;
+  firstName?: string;
+  loginUrl?: string;
+  supportEmail?: string;
+  supportPhone?: string;
+}
+
 export class EmailService {
   private resend: Resend;
 
@@ -294,7 +302,7 @@ export class EmailService {
       const html = await render(
         AccountReactivationTemplate({
           firstName: params.firstName || "",
-          loginUrl: params.loginUrl || `${process.env.APP_URL?.replace(/\/$/, "") || ""}/login`,
+          loginUrl: params.loginUrl || `${process.env.APP_URL?.replace(/\/$/, "") || ""}/`,
         })
       );
 
@@ -538,7 +546,7 @@ export class EmailService {
     try {
       const html = await render(
         LoanDisbursementEmail({
-          firstName: params.firstName,
+          firstName: params.firstName || "Valued Customer",
           loginUrl: params.loginUrl || process.env.APP_URL || "#",
           supportEmail: params.supportEmail || "credit@melaninkapital.com",
           supportPhone: params.supportPhone || "+254 703 680 991",
