@@ -104,6 +104,7 @@ export namespace LoanApplicationsModel {
     interestRate: number;
     loanSource: string;
     status: LoanApplicationStatus; // Initial status (typically "kyc_kyb_verification")
+    contractStatus?: ContractStatus | null;
     createdAt: string; // ISO 8601 timestamp
     createdBy: string; // User ID of the creator
     updatedAt: string; // ISO 8601 timestamp
@@ -153,6 +154,7 @@ export namespace LoanApplicationsModel {
     loanCurrency: string; // Currency of loanRequested
     loanTenure: number; // Repayment period in months
     status: LoanApplicationStatus;
+    contractStatus?: ContractStatus | null;
     createdAt: string; // ISO 8601 timestamp
     createdBy: string; // Creator name or ID
     lastUpdated: string; // ISO 8601 timestamp
@@ -343,6 +345,7 @@ export namespace LoanApplicationsModel {
       interestRate: { type: "number" },
       loanSource: { type: "string" },
       status: { type: "string", enum: LoanApplicationStatusEnum },
+      contractStatus: { type: "string", enum: ContractStatusEnum, nullable: true },
       createdAt: { type: "string" },
       createdBy: { type: "string" },
       updatedAt: { type: "string" },

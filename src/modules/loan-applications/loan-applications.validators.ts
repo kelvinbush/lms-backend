@@ -64,7 +64,11 @@ export async function validateBusiness(businessId: string) {
     throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found");
   }
 
-  return business;
+  if (!business.userId) {
+    throw httpError(400, "[INVALID_BUSINESS] Business profile is missing user ID");
+  }
+
+  return business as typeof business & { userId: string };
 }
 
 /**
@@ -141,14 +145,40 @@ export function validateCurrency(
 
 /**
  * Validate all loan application creation data
+ * 
+ * Note: This function is called AFTER the service has:
+ * - Auto-set businessId and entrepreneurId for entrepreneurs
+ * - Validated that businessId and entrepreneurId are provided for admins
+ * So these fields are guaranteed to be set at this point, but we check defensively.
  */
 export async function validateLoanApplicationCreation(
   clerkId: string,
   body: LoanApplicationsModel.CreateLoanApplicationBody
 ) {
   const user = await validateUser(clerkId);
+  
+  // Defensive check: businessId should already be set by the service (auto-set for entrepreneurs, validated for admins)
+  if (!body.businessId) {
+    throw httpError(400, "[MISSING_BUSINESS_ID] Business ID is required");
+  }
+  
   const loanProduct = await validateLoanProduct(body.loanProductId);
   const business = await validateBusiness(body.businessId);
+  
+  if (!business.userId) {
+    throw httpError(400, "[INVALID_BUSINESS] Business profile is missing user ID");
+  }
+  
+  // Defensive check: entrepreneurId should already be set by the service (auto-set for entrepreneurs, validated for admins)
+  if (!body.entrepreneurId) {
+    throw httpError(400, "[MISSING_ENTREPRENEUR_ID] Entrepreneur ID is required");
+  }
+  
+  // fundingCurrency is required in the interface, but check defensively
+  if (!body.fundingCurrency) {
+    throw httpError(400, "[MISSING_FUNDING_CURRENCY] Funding currency is required");
+  }
+  
   await validateEntrepreneur(body.entrepreneurId, business.userId);
   validateFundingAmount(body.fundingAmount, loanProduct);
   validateRepaymentPeriod(body.repaymentPeriod, loanProduct);

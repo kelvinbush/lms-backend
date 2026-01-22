@@ -116,7 +116,7 @@ export abstract class LoanApplicationsService {
       };
 
       // Validate all input data (this will validate business, entrepreneur, loan product, etc.)
-      const { loanProduct } = await validateLoanApplicationCreation(clerkId, validatedBody);
+     await validateLoanApplicationCreation(clerkId, validatedBody);
 
       // Generate unique loan ID
       let loanId = generateLoanId();
