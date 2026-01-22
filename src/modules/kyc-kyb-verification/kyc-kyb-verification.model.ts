@@ -62,7 +62,7 @@ export namespace KycKybVerificationModel {
     verifiedAt: string;
     rejectionReason?: string;
     notes?: string;
-    lockedAt: string;
+    lockedAt?: string; // Optional - documents are no longer locked globally, verification is per-loan-application
   }
 
   // Bulk verify documents request body

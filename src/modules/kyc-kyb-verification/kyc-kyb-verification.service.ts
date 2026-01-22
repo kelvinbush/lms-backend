@@ -260,7 +260,9 @@ export abstract class KycKybVerificationService {
   /**
    * Verify a single document (approve or reject)
    *
-   * @description Verifies a document for a loan application. Locks the document to prevent updates.
+   * @description Verifies a document for a specific loan application. Each loan application maintains
+   * its own independent verification record, allowing the same document to be verified differently
+   * for different loan applications. Verification status is tracked in loan_application_document_verifications.
    *
    * @param loanApplicationId - The loan application ID
    * @param documentId - The document ID
@@ -320,13 +322,9 @@ export abstract class KycKybVerificationService {
           );
         }
 
-        // Check if document is already verified for another loan application
-        if (doc.isVerified && doc.verifiedForLoanApplicationId !== loanApplicationId) {
-          throw httpError(
-            400,
-            "[DOCUMENT_ALREADY_VERIFIED] This document has already been verified for another loan application"
-          );
-        }
+        // Note: Documents can be verified for multiple loan applications independently.
+        // Each loan application maintains its own verification record in loan_application_document_verifications.
+        // We no longer block documents from being verified for multiple loan applications.
       } else {
         const doc = await db.query.businessDocuments.findFirst({
           where: and(
@@ -343,13 +341,9 @@ export abstract class KycKybVerificationService {
           );
         }
 
-        // Check if document is already verified for another loan application
-        if (doc.isVerified && doc.verifiedForLoanApplicationId !== loanApplicationId) {
-          throw httpError(
-            400,
-            "[DOCUMENT_ALREADY_VERIFIED] This document has already been verified for another loan application"
-          );
-        }
+        // Note: Documents can be verified for multiple loan applications independently.
+        // Each loan application maintains its own verification record in loan_application_document_verifications.
+        // We no longer block documents from being verified for multiple loan applications.
       }
 
       // Get admin user
@@ -430,28 +424,10 @@ export abstract class KycKybVerificationService {
           verification = created;
         }
 
-        // Lock the document
-        if (documentType === "personal") {
-          await tx
-            .update(personalDocuments)
-            .set({
-              isVerified: true,
-              verifiedForLoanApplicationId: loanApplicationId,
-              lockedAt: now,
-              updatedAt: now,
-            })
-            .where(eq(personalDocuments.id, documentId));
-        } else {
-          await tx
-            .update(businessDocuments)
-            .set({
-              isVerified: true,
-              verifiedForLoanApplicationId: loanApplicationId,
-              lockedAt: now,
-              updatedAt: now,
-            })
-            .where(eq(businessDocuments.id, documentId));
-        }
+        // Note: We no longer lock documents globally or set isVerified/verifiedForLoanApplicationId
+        // on the document tables. Verification status is tracked per-loan-application in
+        // loan_application_document_verifications table. This allows the same document to be
+        // verified independently for different loan applications.
 
         return verification;
       });
@@ -487,10 +463,10 @@ export abstract class KycKybVerificationService {
           lastName: adminUser.lastName,
           email: adminUser.email,
         },
-        verifiedAt: result.verifiedAt?.toISOString(),
+        verifiedAt: result.verifiedAt?.toISOString() || now.toISOString(),
         rejectionReason: result.rejectionReason || undefined,
         notes: result.notes || undefined,
-        lockedAt: now.toISOString(),
+        lockedAt: undefined, // Documents are no longer locked globally - verification is per-loan-application
       };
     } catch (error: any) {
       logger.error("Error verifying document:", error);
