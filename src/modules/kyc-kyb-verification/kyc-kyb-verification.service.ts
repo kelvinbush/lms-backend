@@ -466,7 +466,7 @@ export abstract class KycKybVerificationService {
         verifiedAt: result.verifiedAt?.toISOString() || now.toISOString(),
         rejectionReason: result.rejectionReason || undefined,
         notes: result.notes || undefined,
-        lockedAt: undefined, // Documents are no longer locked globally - verification is per-loan-application
+        lockedAt: null as string | null | undefined, // Documents are no longer locked globally - verification is per-loan-application
       };
     } catch (error: any) {
       logger.error("Error verifying document:", error);

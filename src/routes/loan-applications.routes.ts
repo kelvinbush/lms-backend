@@ -1455,7 +1455,7 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
               verifiedAt: { type: "string" },
               rejectionReason: { type: "string" },
               notes: { type: "string" },
-              lockedAt: { type: "string" },
+              lockedAt: { type: "string", nullable: true },
             },
             required: [
               "documentId",
@@ -1463,7 +1463,6 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
               "verificationStatus",
               "verifiedBy",
               "verifiedAt",
-              "lockedAt",
             ],
           },
           400: UserModel.ErrorResponseSchema,
