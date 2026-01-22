@@ -113,6 +113,13 @@ export const loanApplications = pgTable(
     disbursedAt: timestamp("disbursed_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
 
+    // Disbursement details
+    amountDisbursed: numeric("amount_disbursed", { precision: 15, scale: 2 }),
+    disbursementReceiptUrl: text("disbursement_receipt_url"),
+    disbursedBy: varchar("disbursed_by", { length: 24 }).references(() => users.id, {
+      onDelete: "set null",
+    }),
+
     // Rejection reason (if applicable)
     rejectionReason: text("rejection_reason"),
 

@@ -12,6 +12,7 @@ import LoanStageReviewNotificationEmail from "../templates/email/loan-stage-revi
 import LoanRejectionEmail from "../templates/email/loan-rejection";
 import DocumentGenerationNotificationEmail from "../templates/email/document-generation-notification";
 import TermSheetApprovalNotificationEmail from "../templates/email/term-sheet-approval-notification";
+import { LoanDisbursementEmail } from "../templates/email/loan-disbursement";
 import { logger } from "../utils/logger";
 
 config({
@@ -523,6 +524,45 @@ export class EmailService {
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       logger.error("Error sending term sheet approval notification email:", error);
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
+  async sendLoanDisbursementEmail(
+    params: LoanDisbursementEmailData
+  ): Promise<{
+    success: boolean;
+    messageId?: string;
+    error?: string;
+  }> {
+    try {
+      const html = await render(
+        LoanDisbursementEmail({
+          firstName: params.firstName,
+          loginUrl: params.loginUrl || process.env.APP_URL || "#",
+          supportEmail: params.supportEmail || "credit@melaninkapital.com",
+          supportPhone: params.supportPhone || "+254 703 680 991",
+        })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || "Melanin Kapital <nore@melaninkapital.com>",
+        to: [params.to],
+        subject: "Loan Disbursement Confirmation",
+        html,
+      });
+
+      if (result.error) {
+        logger.error("Failed to send loan disbursement email:", result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`Loan disbursement email sent to ${params.to}`, {
+        messageId: result.data?.id,
+      });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error("Error sending loan disbursement email:", error);
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }

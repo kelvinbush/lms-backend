@@ -226,6 +226,10 @@ export namespace LoanApplicationsModel {
     disbursedAt?: string; // ISO 8601 timestamp
     cancelledAt?: string; // ISO 8601 timestamp
     rejectionReason?: string;
+    // Disbursement details
+    amountDisbursed?: number | null;
+    disbursementReceiptUrl?: string | null;
+    disbursedBy?: string | null; // User ID who performed disbursement
     // Stage comments
     eligibilityAssessmentComment?: string | null;
     creditAssessmentComment?: string | null;
@@ -394,6 +398,9 @@ export namespace LoanApplicationsModel {
       disbursedAt: { type: "string" },
       cancelledAt: { type: "string" },
       rejectionReason: { type: "string" },
+      amountDisbursed: { type: "number", nullable: true },
+      disbursementReceiptUrl: { type: "string", nullable: true },
+      disbursedBy: { type: "string" },
       eligibilityAssessmentComment: { type: "string" },
       creditAssessmentComment: { type: "string" },
       headOfCreditReviewComment: { type: "string" },
@@ -657,6 +664,24 @@ export namespace LoanApplicationsModel {
     additionalProperties: false,
     properties: {
       reason: { type: "string", maxLength: 500 },
+    },
+  } as const;
+
+  // Disburse loan application request body
+  export interface DisburseLoanApplicationBody {
+    amountDisbursed: number; // Amount actually disbursed
+    disbursementReceiptUrl: string; // URL to the disbursement receipt document
+    currency?: string; // Currency of disbursement (defaults to loan's fundingCurrency)
+  }
+
+  export const DisburseLoanApplicationBodySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["amountDisbursed", "disbursementReceiptUrl"],
+    properties: {
+      amountDisbursed: { type: "number", minimum: 0 },
+      disbursementReceiptUrl: { type: "string", format: "uri", minLength: 1 },
+      currency: { type: "string", minLength: 3, maxLength: 10 },
     },
   } as const;
 

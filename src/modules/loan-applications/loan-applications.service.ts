@@ -750,6 +750,136 @@ export abstract class LoanApplicationsService {
   }
 
   /**
+   * Disburse a loan application
+   * Moves loan from "awaiting_disbursement" to "disbursed" status
+   * Saves disbursement receipt and amount, sends email to applicant
+   *
+   * @description Disburses a loan application that is in "awaiting_disbursement" status.
+   * Requires disbursement receipt URL and amount disbursed.
+   * Sends confirmation email to the applicant.
+   *
+   * @param clerkId - The Clerk ID of the authenticated user performing disbursement
+   * @param applicationId - The loan application ID to disburse
+   * @param body - Disbursement details (amountDisbursed, disbursementReceiptUrl, currency)
+   * @returns Updated loan application detail
+   *
+   * @throws {400} If application is not in "awaiting_disbursement" status
+   * @throws {404} If loan application is not found
+   * @throws {500} If disbursement fails
+   */
+  static async disburse(
+    clerkId: string,
+    applicationId: string,
+    body: LoanApplicationsModel.DisburseLoanApplicationBody
+  ): Promise<LoanApplicationsModel.LoanApplicationDetail> {
+    try {
+      if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
+
+      // Get current application
+      const [current] = await db
+        .select()
+        .from(loanApplications)
+        .where(and(eq(loanApplications.id, applicationId), isNull(loanApplications.deletedAt)))
+        .limit(1);
+
+      if (!current) {
+        throw httpError(404, "[LOAN_APPLICATION_NOT_FOUND] Loan application not found");
+      }
+
+      // Validate status - must be in "awaiting_disbursement"
+      if (current.status !== "awaiting_disbursement") {
+        throw httpError(
+          400,
+          `[INVALID_STATUS] Loan application must be in "awaiting_disbursement" status. Current status: ${current.status}`
+        );
+      }
+
+      // Get user who is performing disbursement
+      const user = await db.query.users.findFirst({
+        where: eq(users.clerkId, clerkId),
+        columns: { id: true },
+      });
+
+      if (!user) {
+        throw httpError(401, "[UNAUTHORIZED] User not found");
+      }
+
+      // Prepare update data
+      const now = new Date();
+      const updateData: any = {
+        status: "disbursed" as any,
+        disbursedAt: now,
+        amountDisbursed: body.amountDisbursed.toString(),
+        disbursementReceiptUrl: body.disbursementReceiptUrl,
+        disbursedBy: user.id,
+        lastUpdatedBy: user.id,
+        lastUpdatedAt: now,
+        updatedAt: now,
+      };
+
+      // Update the application
+      await db
+        .update(loanApplications)
+        .set(updateData)
+        .where(eq(loanApplications.id, applicationId));
+
+      // Log audit event
+      const eventTitle = LoanApplicationAuditService.getEventTitle("disbursed");
+      const eventDescription = `Loan disbursed. Amount: ${body.amountDisbursed} ${body.currency || current.fundingCurrency}`;
+
+      await LoanApplicationAuditService.logEvent({
+        loanApplicationId: applicationId,
+        clerkId,
+        eventType: "disbursed",
+        title: eventTitle,
+        description: eventDescription,
+        status: "disbursed",
+        previousStatus: current.status,
+        newStatus: "disbursed",
+        details: {
+          amountDisbursed: body.amountDisbursed,
+          currency: body.currency || current.fundingCurrency,
+          disbursementReceiptUrl: body.disbursementReceiptUrl,
+        },
+      });
+
+      // Send disbursement email to applicant (non-blocking)
+      (async () => {
+        try {
+          const entrepreneur = await db.query.users.findFirst({
+            where: and(eq(users.id, current.entrepreneurId), isNull(users.deletedAt)),
+            columns: {
+              email: true,
+              firstName: true,
+            },
+          });
+
+          if (entrepreneur?.email) {
+            const appUrl = process.env.APP_URL || "#";
+            await emailService.sendLoanDisbursementEmail({
+              to: entrepreneur.email,
+              firstName: entrepreneur.firstName || "Valued Customer",
+              loginUrl: `${appUrl}/login`,
+            });
+          }
+        } catch (error) {
+          logger.error(
+            `Failed to send disbursement email for loan application ${applicationId}:`,
+            error
+          );
+        }
+      })();
+
+      // Return updated application detail
+      return await LoanApplicationsService.getById(applicationId);
+    } catch (error: any) {
+      logger.error("Error disbursing loan application:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[DISBURSE_LOAN_APPLICATION_ERROR] Failed to disburse loan application");
+    }
+  }
+
+  /**
    * List loan applications for external users (entrepreneurs)
    * Returns only applications where the authenticated user is the entrepreneur
    *

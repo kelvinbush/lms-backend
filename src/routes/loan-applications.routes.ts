@@ -840,6 +840,59 @@ export async function loanApplicationsRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // POST disburse loan application
+  // Accessible to: admins/members only
+  fastify.post(
+    "/:id/disburse",
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: { id: { type: "string", minLength: 1 } },
+          required: ["id"],
+          additionalProperties: false,
+        },
+        body: LoanApplicationsModel.DisburseLoanApplicationBodySchema,
+        response: {
+          200: LoanApplicationsModel.LoanApplicationDetailSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          403: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["loan-applications"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const user = await requireRole(request, "member");
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id } = (request.params as any) || {};
+        const body = request.body as LoanApplicationsModel.DisburseLoanApplicationBody;
+
+        const result = await LoanApplicationsService.disburse(userId, id, body);
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error disbursing loan application:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to disburse loan application",
+          code: "DISBURSE_LOAN_APPLICATION_FAILED",
+        });
+      }
+    }
+  );
+
   // PATCH create counter-offer for loan application
   // Accessible to: admins/members only
   fastify.patch(
