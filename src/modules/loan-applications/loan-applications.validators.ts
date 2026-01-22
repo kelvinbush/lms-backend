@@ -40,7 +40,6 @@ export async function validateLoanProduct(loanProductId: string) {
       and(
         eq(loanProducts.id, loanProductId),
         isNull(loanProducts.deletedAt),
-        eq(loanProducts.isActive, true),
         eq(loanProducts.status, "active")
       )
     )

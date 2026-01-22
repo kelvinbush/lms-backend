@@ -72,7 +72,7 @@ export namespace LoanProductsModel {
     interestRecognitionCriteria: InterestRecognitionCriteria;
     fees?: LoanFeeConfiguration[]; // Optional array of loan fees
     status?: ProductStatus; // default: draft
-    isActive?: boolean;
+    // isActive is deprecated - use status field instead
   }
 
   // Edit product input (partial)
@@ -102,7 +102,7 @@ export namespace LoanProductsModel {
     fees?: LoanFeeConfiguration[]; // Array of loan fees
     status?: ProductStatus;
     changeReason?: string;
-    isActive?: boolean;
+    // isActive is deprecated - use status field instead
   }
 
   // Params with :id
@@ -125,7 +125,7 @@ export namespace LoanProductsModel {
     ratePeriod?: InterestRatePeriod;
     amortizationMethod?: AmortizationMethod;
     repaymentFrequency?: RepaymentFrequency;
-    isActive?: string;
+    isActive?: string; // Deprecated - use status filter instead. Maps to status === "active" for backward compatibility
     search?: string; // Search in name, description
     sortBy?: "name" | "createdAt" | "updatedAt" | "interestRate" | "minAmount" | "maxAmount";
     sortOrder?: "asc" | "desc";
@@ -181,7 +181,7 @@ export namespace LoanProductsModel {
         },
       },
       status: { type: "string", enum: ProductStatusEnum },
-      isActive: { type: "boolean" },
+      // isActive is deprecated - use status field instead
     },
     required: [
       "name",

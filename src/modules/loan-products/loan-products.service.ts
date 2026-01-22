@@ -67,7 +67,7 @@ function mapRow(
     changeReason: r.changeReason ?? null,
     approvedBy: r.approvedBy ?? null,
     approvedAt: r.approvedAt?.toISOString() ?? null,
-    isActive: r.isActive,
+    isActive: r.status === "active", // Computed from status for backward compatibility
     createdAt: r.createdAt?.toISOString() ?? null,
     updatedAt: r.updatedAt?.toISOString() ?? null,
     loansCount: loansCount ?? 0,
@@ -228,7 +228,6 @@ export abstract class LoanProductsService {
           maxGraceUnit: (body.maxGraceUnit as any) ?? null,
           version: 1,
           status: (body.status ?? "draft") as any,
-          isActive: body.isActive ?? true,
         };
 
         const [row] = await tx.insert(loanProducts).values(values).returning();
@@ -347,11 +346,13 @@ export abstract class LoanProductsService {
 
       // Status filtering
       if (query.status) {
+        // If status is explicitly provided, use that filter
         whereConditions.push(eq(loanProducts.status, query.status));
-      } else if (query.includeArchived !== "true") {
-        // By default, exclude archived products unless explicitly requested
+      } else if (query.includeArchived === "false") {
+        // Only exclude archived if explicitly requested to exclude them
         whereConditions.push(ne(loanProducts.status, "archived"));
       }
+      // If no status filter and includeArchived is not "false", show all products (including archived)
 
       // Currency filtering
       if (query.currency) {
@@ -394,10 +395,15 @@ export abstract class LoanProductsService {
         whereConditions.push(eq(loanProducts.repaymentFrequency, query.repaymentFrequency));
       }
 
-      // Active status filtering
+      // isActive filter is deprecated - use status filter instead
+      // If isActive is provided, map it to status filter for backward compatibility
       if (query.isActive !== undefined) {
         const isActive = query.isActive === "true";
-        whereConditions.push(eq(loanProducts.isActive, isActive));
+        if (isActive) {
+          whereConditions.push(eq(loanProducts.status, "active"));
+        } else {
+          whereConditions.push(ne(loanProducts.status, "active"));
+        }
       }
 
       // Search functionality
@@ -479,7 +485,6 @@ export abstract class LoanProductsService {
           changeReason: loanProducts.changeReason,
           approvedBy: loanProducts.approvedBy,
           approvedAt: loanProducts.approvedAt,
-          isActive: loanProducts.isActive,
           createdAt: loanProducts.createdAt,
           updatedAt: loanProducts.updatedAt,
           deletedAt: loanProducts.deletedAt,
@@ -583,7 +588,6 @@ export abstract class LoanProductsService {
           changeReason: loanProducts.changeReason,
           approvedBy: loanProducts.approvedBy,
           approvedAt: loanProducts.approvedAt,
-          isActive: loanProducts.isActive,
           createdAt: loanProducts.createdAt,
           updatedAt: loanProducts.updatedAt,
           deletedAt: loanProducts.deletedAt,
@@ -782,7 +786,8 @@ export abstract class LoanProductsService {
         if (body.interestRecognitionCriteria !== undefined)
           updateData.interestRecognitionCriteria = body.interestRecognitionCriteria as any;
         if (shouldIncrementVersion) updateData.version = (currentProduct?.version ?? 1) + 1;
-        if (body.isActive !== undefined) updateData.isActive = body.isActive;
+        // isActive is deprecated - use status field instead
+        // If isActive is provided in body, ignore it (status should be used)
 
         const [row] = await tx
           .update(loanProducts)
@@ -937,7 +942,6 @@ export abstract class LoanProductsService {
         .update(loanProducts)
         .set({
           deletedAt: new Date(),
-          isActive: false,
           status: "archived" as any,
           updatedAt: new Date(),
         })
@@ -1160,7 +1164,6 @@ export abstract class LoanProductsService {
           changeReason: loanProducts.changeReason,
           approvedBy: loanProducts.approvedBy,
           approvedAt: loanProducts.approvedAt,
-          isActive: loanProducts.isActive,
           createdAt: loanProducts.createdAt,
           updatedAt: loanProducts.updatedAt,
           deletedAt: loanProducts.deletedAt,

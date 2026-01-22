@@ -1,6 +1,5 @@
 import { createId } from "@paralleldrive/cuid2";
 import {
-  boolean,
   index,
   integer,
   numeric,
@@ -128,7 +127,6 @@ export const loanProducts = pgTable(
     changeReason: text("change_reason"),
     approvedBy: varchar("approved_by"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
-    isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -145,7 +143,6 @@ export const loanProducts = pgTable(
       idxLoanProductsAmortization: index("idx_loan_products_amortization").on(
         table.amortizationMethod
       ),
-      idxLoanProductsActive: index("idx_loan_products_active").on(table.isActive),
       idxLoanProductsStatus: index("idx_loan_products_status").on(table.status),
       idxLoanProductsVersion: index("idx_loan_products_version").on(table.version),
       idxLoanProductsDeletedAt: index("idx_loan_products_deleted_at").on(table.deletedAt),

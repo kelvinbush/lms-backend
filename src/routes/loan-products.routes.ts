@@ -82,7 +82,7 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
             amortizationMethod: { type: "string", enum: LoanProductsModel.AmortizationMethodEnum },
             repaymentFrequency: { type: "string", enum: LoanProductsModel.RepaymentFrequencyEnum },
 
-            // Active status
+            // Active status (deprecated - use status filter instead, but kept for backward compatibility)
             isActive: { type: "string", enum: ["true", "false"] },
 
             // Search
@@ -157,7 +157,7 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
             // Pagination
             page: { type: "string", pattern: "^[0-9]+$" },
             limit: { type: "string", pattern: "^[0-9]+$" },
-            // Active status filter (defaults to true)
+            // Active status filter (deprecated - use status filter instead, but kept for backward compatibility)
             isActive: { type: "string", enum: ["true", "false"] },
           },
         },
@@ -196,7 +196,7 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
                     "minTerm",
                     "maxTerm",
                     "termUnit",
-                    "isActive",
+                    // isActive is deprecated - use status field instead
                   ],
                 },
               },
@@ -243,14 +243,15 @@ export async function loanProductsRoutes(fastify: FastifyInstance) {
           search?: string;
           page?: string;
           limit?: string;
-          isActive?: string;
+          isActive?: string; // Deprecated - kept for backward compatibility
         };
 
-        // Default to active products only and active status
+        // Default to active products only
         const searchQuery: LoanProductsModel.ListLoanProductsQuery = {
           page: queryParams.page || "1",
           limit: queryParams.limit || "20",
           search: queryParams.search,
+          // Map isActive to status for backward compatibility
           isActive: queryParams.isActive !== undefined ? queryParams.isActive : "true",
           status: "active", // Only show active status products
           sortBy: "name", // Sort by name alphabetically
