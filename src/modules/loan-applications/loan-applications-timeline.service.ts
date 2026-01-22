@@ -10,11 +10,12 @@ import {
 
 /**
  * Timeline Event for Loan Application
- * Uses PublicTimelineEventType which masks internal workflow events for entrepreneurs
+ * For entrepreneurs: Uses PublicTimelineEventType which masks internal workflow events
+ * For admins: Uses the original LoanApplicationAuditEventType to show all events
  */
 export interface TimelineEvent {
   id: string;
-  type: PublicTimelineEventType;
+  type: string; // PublicTimelineEventType for entrepreneurs, LoanApplicationAuditEventType for admins
   title: string;
   description?: string;
   date: string; // ISO date string or formatted date (e.g., "2025-01-25" or "Jan 25, 2025")
@@ -161,7 +162,7 @@ export abstract class LoanApplicationTimelineService {
         // Deduplicate consecutive events of the same type
         // Keep only the first occurrence of consecutive duplicate events
         const deduplicatedEvents: TimelineEvent[] = [];
-        let lastEventType: PublicTimelineEventType | null = null;
+        let lastEventType: string | null = null;
         
         for (const event of events) {
           // If this is a different event type, or it's the first event, include it
@@ -186,50 +187,55 @@ export abstract class LoanApplicationTimelineService {
   /**
    * Map audit trail entry to timeline event
    * For entrepreneurs, masks internal workflow events and maps them to generic public events
+   * For admins, shows all events with original event types and titles
    */
   private static mapAuditEntryToTimelineEvent(
     audit: typeof loanApplicationAuditTrail.$inferSelect,
     user?: { id: string; firstName: string | null; lastName: string | null } | null,
     isEntrepreneur = false
   ): TimelineEvent | null {
-    // For entrepreneurs, map internal event types to public event types
-    let publicEventType: PublicTimelineEventType | null;
+    let eventType: string;
     let eventTitle: string;
 
     if (isEntrepreneur) {
-      // Map internal event type to public event type (may return null to hide event)
-      publicEventType = mapEventTypeForEntrepreneur(audit.eventType);
+      // For entrepreneurs, map internal event types to public event types
+      const publicEventType = mapEventTypeForEntrepreneur(audit.eventType);
       if (!publicEventType) {
         // Event should be hidden from entrepreneurs
         return null;
       }
+      eventType = publicEventType;
       // Map title to generic title for entrepreneurs
       eventTitle = mapEventTitleForEntrepreneur(publicEventType, audit.title);
     } else {
-      // For admins/members, show all events that map to public types
-      // Map internal events to public types but keep original titles
-      publicEventType = mapEventTypeForEntrepreneur(audit.eventType);
-      if (!publicEventType) {
-        // Hide events that don't map to any public type (e.g., document_verified_approved)
-        return null;
-      }
-      // Keep original title for admins (they can see internal details)
+      // For admins/members, show ALL events with original event types and titles
+      eventType = audit.eventType;
       eventTitle = audit.title;
     }
 
     // Determine line color based on event type
     let lineColor: "green" | "orange" | "grey" = "grey";
     if (
-      publicEventType === "submitted" ||
-      publicEventType === "approved" ||
-      publicEventType === "disbursed"
+      eventType === "submitted" ||
+      eventType === "approved" ||
+      eventType === "disbursed" ||
+      eventType === "contract_fully_signed"
     ) {
       lineColor = "green";
-    } else if (publicEventType === "rejected" || publicEventType === "cancelled") {
+    } else if (eventType === "rejected" || eventType === "cancelled" || eventType === "contract_voided" || eventType === "contract_expired") {
       lineColor = "orange";
     } else if (
-      publicEventType === "review_in_progress" ||
-      publicEventType === "awaiting_disbursement"
+      eventType === "review_in_progress" ||
+      eventType === "awaiting_disbursement" ||
+      eventType === "kyc_kyb_completed" ||
+      eventType === "eligibility_assessment_completed" ||
+      eventType === "credit_assessment_completed" ||
+      eventType === "head_of_credit_review_completed" ||
+      eventType === "internal_approval_ceo_completed" ||
+      eventType === "contract_uploaded" ||
+      eventType === "contract_sent_for_signing" ||
+      eventType === "contract_signer_opened" ||
+      eventType === "contract_signed_by_signer"
     ) {
       lineColor = "orange";
     }
@@ -241,7 +247,7 @@ export abstract class LoanApplicationTimelineService {
 
     return {
       id: audit.id,
-      type: publicEventType,
+      type: eventType,
       title: eventTitle,
       description: isEntrepreneur ? undefined : audit.description || undefined, // Hide detailed descriptions for entrepreneurs
       date: LoanApplicationTimelineService.formatDate(audit.createdAt),
