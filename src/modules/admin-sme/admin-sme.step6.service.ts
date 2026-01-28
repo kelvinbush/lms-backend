@@ -36,6 +36,7 @@ export abstract class AdminSMEStep6Service {
         docPassword: d.isPasswordProtected ? (d.docPassword ?? null) : null,
         docYear: d.docYear ?? null,
         docBankName: d.docBankName ?? null,
+        docName: d.docName ?? null,
       }));
 
       // Validate document types and required fields
@@ -61,6 +62,13 @@ export abstract class AdminSMEStep6Service {
           throw httpError(
             400,
             `[INVALID_DOC_YEAR] Document ${i}: docYear is required for audited_financial_statements`
+          );
+        }
+        // Require docName when docType is 'other'
+        if (d.docType === "other" && (!d.docName || d.docName.length === 0)) {
+          throw httpError(
+            400,
+            `[INVALID_DOC_NAME] Document ${i}: docName is required when docType is 'other'`
           );
         }
       }
@@ -99,7 +107,7 @@ export abstract class AdminSMEStep6Service {
         }
 
         // Batch query: Get all existing documents for these types in one query
-        // Note: We match by docType only (as per original logic), uniqueness handled by DB constraint
+        // Note: We match by docType only for non-'other' docs; 'other' always creates new rows
         const existingDocs = await tx.query.businessDocuments.findMany({
           where: and(
             eq(businessDocuments.businessId, business.id),
@@ -124,6 +132,12 @@ export abstract class AdminSMEStep6Service {
         const toInsert: typeof normalized = [];
 
         for (const doc of normalized) {
+          // For 'other' type, always insert a new document (allow multiple 'other' docs)
+          if (doc.docType === "other") {
+            toInsert.push(doc);
+            continue;
+          }
+
           const existing = existingByType.get(doc.docType);
           if (existing) {
             toUpdate.push({ id: existing.id, doc });
@@ -146,6 +160,7 @@ export abstract class AdminSMEStep6Service {
                 docPassword: doc.docPassword,
                 docYear: doc.docYear,
                 docBankName: doc.docBankName,
+                docName: doc.docName,
                 updatedAt: new Date(),
               } as any)
               .where(eq(businessDocuments.id, id))
@@ -164,6 +179,7 @@ export abstract class AdminSMEStep6Service {
                 docPassword: doc.docPassword,
                 docYear: doc.docYear,
                 docBankName: doc.docBankName,
+                docName: doc.docName,
               })) as any
             )
           );

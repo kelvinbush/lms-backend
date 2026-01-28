@@ -49,6 +49,7 @@ export abstract class BusinessDocuments {
         docPassword: d.docPassword ?? null,
         docBankName: d.docBankName ?? null,
         docYear: typeof d.docYear === "number" ? d.docYear : null,
+        docName: d.docName ?? null,
       }));
 
       // Validate each item independently of route validation to avoid DB crashes
@@ -90,6 +91,12 @@ export abstract class BusinessDocuments {
           throw httpError(
             400,
             `[INVALID_BANK_STATEMENT] ${idxInfo}: docYear and docBankName are required for annual_bank_statement`
+          );
+        }
+        if (d.docType === "other" && (!d.docName || d.docName.length === 0)) {
+          throw httpError(
+            400,
+            `[INVALID_DOC_NAME] ${idxInfo}: docName is required when docType is 'other'`
           );
         }
       }
@@ -149,6 +156,7 @@ export abstract class BusinessDocuments {
                 docPassword: d.docPassword,
                 docBankName: d.docBankName,
                 docYear: d.docYear as any,
+                docName: d.docName,
                 updatedAt: new Date(),
               })
               .where(eq(businessDocuments.id, existing.id));
@@ -164,6 +172,7 @@ export abstract class BusinessDocuments {
               docPassword: d.docPassword,
               docBankName: d.docBankName,
               docYear: d.docYear as any,
+              docName: d.docName,
             });
           }
         }
@@ -202,12 +211,14 @@ export abstract class BusinessDocuments {
           isNull(businessDocuments.deletedAt)
         ),
         columns: {
+          id: true,
           docType: true,
           docUrl: true,
           isPasswordProtected: true,
           docPassword: true,
           docBankName: true,
           docYear: true,
+          docName: true,
         },
       });
 
@@ -220,6 +231,73 @@ export abstract class BusinessDocuments {
       logger.error("Error listing business documents:", error);
       if (error?.status) throw error;
       throw httpError(500, "[LIST_BUSINESS_DOCS_ERROR] Failed to list business documents");
+    }
+  }
+
+  /**
+   * Update the human-readable docName for a specific business document owned by the current user.
+   * Primarily intended for 'other' docType, but can be used for any document.
+   */
+  static async updateDocName(
+    clerkId: string,
+    businessId: string,
+    documentId: string,
+    docName: string
+  ): Promise<BusinessDocumentsModel.BasicSuccessResponse> {
+    try {
+      if (!clerkId) throw httpError(401, "[UNAUTHORIZED] Missing user context");
+
+      const user = await db.query.users.findFirst({ where: eq(users.clerkId, clerkId) });
+      if (!user) throw httpError(404, "[USER_NOT_FOUND] User not found");
+
+      const biz = await db.query.businessProfiles.findFirst({
+        where: and(eq(businessProfiles.id, businessId), eq(businessProfiles.userId, user.id)),
+        columns: { id: true },
+      });
+      if (!biz) throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found");
+
+      const doc = await db.query.businessDocuments.findFirst({
+        where: and(
+          eq(businessDocuments.id, documentId),
+          eq(businessDocuments.businessId, businessId),
+          isNull(businessDocuments.deletedAt)
+        ),
+        columns: {
+          id: true,
+          isVerified: true,
+          lockedAt: true,
+          docType: true,
+        },
+      });
+
+      if (!doc) {
+        throw httpError(404, "[DOCUMENT_NOT_FOUND] Business document not found");
+      }
+
+      // Reuse same locking rule: don't allow edits on verified+locked docs
+      if (doc.isVerified && doc.lockedAt) {
+        throw httpError(
+          400,
+          `[DOCUMENT_LOCKED] Document of type '${doc.docType}' is verified and locked. Cannot update name.`
+        );
+      }
+
+      await db
+        .update(businessDocuments)
+        .set({
+          docName,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(businessDocuments.id, documentId));
+
+      return {
+        success: true,
+        message: "Business document name updated successfully",
+      };
+    } catch (error: any) {
+      logger.error("Error updating business document name:", error);
+      if (error?.status) throw error;
+      throw httpError(500, "[UPDATE_BUSINESS_DOC_NAME_ERROR] Failed to update document name");
     }
   }
 }

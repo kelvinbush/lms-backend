@@ -128,4 +128,65 @@ export async function businessDocumentsRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  // PATCH /business/:id/documents/:documentId/name — update docName (e.g. for 'other' type)
+  fastify.patch(
+    "/:id/documents/:documentId/name",
+    {
+      schema: {
+        params: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            id: { type: "string", minLength: 1 },
+            documentId: { type: "string", minLength: 1 },
+          },
+          required: ["id", "documentId"],
+        },
+        body: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            docName: { type: "string", minLength: 1, maxLength: 200 },
+          },
+          required: ["docName"],
+        },
+        response: {
+          200: BusinessDocumentsModel.AddDocumentsResponseSchema,
+          400: UserModel.ErrorResponseSchema,
+          401: UserModel.ErrorResponseSchema,
+          404: UserModel.ErrorResponseSchema,
+          500: UserModel.ErrorResponseSchema,
+        },
+        tags: ["business-documents"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { userId } = getAuth(request);
+        if (!userId) {
+          return reply.code(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+        }
+
+        const { id, documentId } = (request.params as any) || {};
+        const { docName } = (request.body as any) || {};
+
+        const result = await BusinessDocuments.updateDocName(userId, id, documentId, docName);
+
+        return reply.send(result);
+      } catch (error: any) {
+        logger.error("Error updating business document name:", error);
+        if (error?.status) {
+          return reply.code(error.status).send({
+            error: error.message,
+            code: String(error.message).split("] ")[0].replace("[", ""),
+          });
+        }
+        return reply.code(500).send({
+          error: "Failed to update business document name",
+          code: "UPDATE_BUSINESS_DOCUMENT_NAME_FAILED",
+        });
+      }
+    }
+  );
 }

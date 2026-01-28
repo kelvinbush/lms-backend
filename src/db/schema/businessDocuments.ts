@@ -38,6 +38,9 @@ export const businessDocumentTypeEnum = pgEnum("business_document_type", [
   "audited_financial_statements",
   "income_statements",
   "personal_bank_statement",
+
+  // Generic fallback for any other document type (name comes from payload/UI)
+  "other",
 ]);
 
 // Type alias for use in application code
@@ -54,6 +57,8 @@ export const businessDocuments = pgTable(
       .references(() => businessProfiles.id, { onDelete: "cascade" }),
     // Use enum for doc type for better consistency
     docType: businessDocumentTypeEnum("doc_type").notNull(),
+    // Optional human-readable document name/label (required for 'other' type)
+    docName: varchar("doc_name", { length: 200 }),
     docUrl: text("doc_url"),
     // Optional: store a password if the document is password-protected
     isPasswordProtected: boolean("is_password_protected").default(false).notNull(),
@@ -78,12 +83,13 @@ export const businessDocuments = pgTable(
       idxBusinessDocsYear: index("idx_business_docs_year").on(table.docYear),
       idxBusinessDocsDeletedAt: index("idx_business_docs_deleted_at").on(table.deletedAt),
       idxBusinessDocsCreatedAt: index("idx_business_docs_created_at").on(table.createdAt),
-      // Prevent duplicates per business, doc type and year (and bank name when relevant)
+      // Prevent duplicates per business, doc type, year, bank name, and doc name
       uqBusinessDocsUniquePerYear: uniqueIndex("uq_business_docs_unique_per_year").on(
         table.businessId,
         table.docType,
         table.docYear,
-        table.docBankName
+        table.docBankName,
+        table.docName
       ),
       idxBusinessDocsBusinessDeleted: index("idx_business_docs_business_deleted").on(
         table.businessId,

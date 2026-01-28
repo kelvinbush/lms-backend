@@ -1076,6 +1076,66 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
     }
   );
 
+  // PATCH /admin/sme/users/:userId/documents/business/:documentId/name - Admin updates docName
+  fastify.patch(
+    "/admin/sme/users/:userId/documents/business/:documentId/name",
+    {
+      schema: {
+        params: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            userId: { type: "string", minLength: 1 },
+            documentId: { type: "string", minLength: 1 },
+          },
+          required: ["userId", "documentId"],
+        },
+        body: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            docName: { type: "string", minLength: 1, maxLength: 200 },
+          },
+          required: ["docName"],
+        },
+        response: {
+          200: AdminSMEModel.BasicSuccessResponseSchema,
+          400: AdminSMEModel.ErrorResponseSchema,
+          401: AdminSMEModel.ErrorResponseSchema,
+          403: AdminSMEModel.ErrorResponseSchema,
+          404: AdminSMEModel.ErrorResponseSchema,
+          500: AdminSMEModel.ErrorResponseSchema,
+        },
+        tags: ["admin-sme"],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        await requireRole(request, "member");
+
+        const { userId, documentId } = (request.params as any) || {};
+        const { docName } = (request.body as any) || {};
+
+        const result = await AdminSMEService.updateBusinessDocumentName(
+          userId,
+          documentId,
+          docName
+        );
+
+        return reply.send(result);
+      } catch (error: any) {
+        const status = error?.status || 500;
+        logger.error("[AdminSME Routes] Error updating business document name", {
+          error: error?.message,
+        });
+        return reply.code(status).send({
+          error: error?.message || "Internal error",
+          code: error?.code || "INTERNAL_ERROR",
+        });
+      }
+    }
+  );
+
   // GET /admin/sme/users/:userId/audit-trail - Get audit trail for SME user
   fastify.get(
     "/admin/sme/users/:userId/audit-trail",

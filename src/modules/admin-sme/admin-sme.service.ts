@@ -1032,6 +1032,7 @@ export abstract class AdminSMEService {
           docPassword: true,
           docBankName: true,
           docYear: true,
+          docName: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -1049,6 +1050,7 @@ export abstract class AdminSMEService {
           docPassword: doc.docPassword || null,
           docBankName: doc.docBankName || null,
           docYear: doc.docYear || null,
+          docName: doc.docName || null,
           createdAt: doc.createdAt?.toISOString() || "",
           updatedAt: doc.updatedAt?.toISOString() || "",
         })),
@@ -1060,6 +1062,80 @@ export abstract class AdminSMEService {
       });
       if (error?.status) throw error;
       throw httpError(500, "[GET_BUSINESS_DOCS_ERROR] Failed to get business documents");
+    }
+  }
+
+  /**
+   * Admin: update the human-readable docName for a specific business document of an SME user.
+   */
+  static async updateBusinessDocumentName(
+    smeUserId: string,
+    documentId: string,
+    docName: string
+  ): Promise<AdminSMEModel.BasicSuccessResponse> {
+    try {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, smeUserId),
+      });
+
+      if (!user) {
+        throw httpError(404, "[USER_NOT_FOUND] User not found");
+      }
+
+      const business = await db.query.businessProfiles.findFirst({
+        where: eq(businessProfiles.userId, smeUserId),
+        columns: { id: true },
+      });
+
+      if (!business) {
+        throw httpError(404, "[BUSINESS_NOT_FOUND] Business not found for SME user");
+      }
+
+      const doc = await db.query.businessDocuments.findFirst({
+        where: and(
+          eq(businessDocuments.id, documentId),
+          eq(businessDocuments.businessId, business.id),
+          isNull(businessDocuments.deletedAt)
+        ),
+        columns: {
+          id: true,
+          isVerified: true,
+          lockedAt: true,
+          docType: true,
+        },
+      });
+
+      if (!doc) {
+        throw httpError(404, "[DOCUMENT_NOT_FOUND] Business document not found");
+      }
+
+      if (doc.isVerified && doc.lockedAt) {
+        throw httpError(
+          400,
+          `[DOCUMENT_LOCKED] Document of type '${doc.docType}' is verified and locked. Cannot update name.`
+        );
+      }
+
+      await db
+        .update(businessDocuments)
+        .set({
+          docName,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(businessDocuments.id, documentId));
+
+      return {
+        success: true,
+        message: "Business document name updated successfully",
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error updating business document name", {
+        error: error?.message,
+        smeUserId,
+        documentId,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[UPDATE_BUSINESS_DOC_NAME_ERROR] Failed to update document name");
     }
   }
 

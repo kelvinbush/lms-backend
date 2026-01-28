@@ -210,6 +210,8 @@ export namespace AdminSMEModel {
       docBankName?: string;
       isPasswordProtected?: boolean;
       docPassword?: string;
+      // Optional human-readable name; required when docType is 'other'
+      docName?: string;
     }>;
   }
 
@@ -228,6 +230,7 @@ export namespace AdminSMEModel {
             docBankName: { type: "string", maxLength: 100 },
             isPasswordProtected: { type: "boolean" },
             docPassword: { type: "string" },
+            docName: { type: "string", maxLength: 200 },
           },
           required: ["docType", "docUrl"],
         },
@@ -616,6 +619,7 @@ export namespace AdminSMEModel {
     docPassword: string | null;
     docBankName: string | null;
     docYear: number | null;
+    docName: string | null;
     createdAt: string;
     updatedAt: string;
   }
@@ -1021,6 +1025,7 @@ export namespace AdminSMEModel {
       docPassword: { type: ["string", "null"] },
       docBankName: { type: ["string", "null"] },
       docYear: { type: ["integer", "null"] },
+      docName: { type: ["string", "null"] },
       createdAt: { type: "string" },
       updatedAt: { type: "string" },
     },

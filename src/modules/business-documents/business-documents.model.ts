@@ -1,31 +1,22 @@
+import { businessDocumentTypeEnum } from "../../db/schema";
 import type { BusinessDocumentType } from "../../db/schema";
 
 export namespace BusinessDocumentsModel {
   // Keep a local runtime enum list to power JSON Schema (must be string[])
   export const BusinessDocumentTypeEnum: BusinessDocumentType[] = [
-    "business_registration",
-    "articles_of_association",
-    "business_permit",
-    "tax_registration_certificate",
-    "certificate_of_incorporation",
-    "tax_clearance_certificate",
-    "partnership_deed",
-    "memorandum_of_association",
-    "business_plan",
-    "pitch_deck",
-    "annual_bank_statement",
-    "audited_financial_statements",
-    "income_statements",
-    "personal_bank_statement",
+    // Reuse enum values directly from the DB schema as the single source of truth
+    ...businessDocumentTypeEnum.enumValues,
   ];
 
   export interface BusinessDocumentItem {
+    id?: string;
     docType: BusinessDocumentType;
     docUrl: string;
     isPasswordProtected?: boolean;
     docPassword?: string;
     docBankName?: string;
     docYear?: number;
+    docName?: string | null;
   }
 
   // Body can be a single item or an array of items
@@ -47,12 +38,14 @@ export namespace BusinessDocumentsModel {
     type: "object",
     additionalProperties: false,
     properties: {
+      id: { type: "string" },
       docType: { type: "string", enum: BusinessDocumentTypeEnum },
       docUrl: { type: "string", minLength: 1, format: "uri" },
       isPasswordProtected: { type: "boolean" },
       docPassword: { type: "string", minLength: 1, maxLength: 200 },
       docBankName: { type: "string", minLength: 1, maxLength: 100 },
       docYear: { type: "integer", minimum: 1900, maximum: 2100 },
+      docName: { type: "string", minLength: 1, maxLength: 200 },
     },
     required: ["docType", "docUrl"],
     allOf: [
@@ -76,6 +69,11 @@ export namespace BusinessDocumentsModel {
       {
         if: { properties: { docType: { const: "annual_bank_statement" } }, required: ["docType"] },
         then: { required: ["docYear", "docBankName"] },
+      },
+      // If docType is 'other' -> require docName
+      {
+        if: { properties: { docType: { const: "other" } }, required: ["docType"] },
+        then: { required: ["docName"] },
       },
     ],
   } as const;
