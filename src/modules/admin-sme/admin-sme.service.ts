@@ -771,19 +771,20 @@ export abstract class AdminSMEService {
       });
 
       // If business exists, load related data needed for detailed response
-      let userGroupIds: string[] = [];
+      let userGroupNames: string[] = [];
       let countriesOfOperation: string[] = [];
       let videoLinks: { url: string; source: string | null }[] = [];
       let photos: string[] = [];
 
       if (business) {
         const [groupRows, countryRows, videoRows, photoRows] = await Promise.all([
-          db.query.businessUserGroups.findMany({
-            where: eq(businessUserGroups.businessId, business.id),
-            columns: {
-              groupId: true,
-            },
-          }),
+          db
+            .select({
+              name: userGroups.name,
+            })
+            .from(businessUserGroups)
+            .innerJoin(userGroups, eq(userGroups.id, businessUserGroups.groupId))
+            .where(eq(businessUserGroups.businessId, business.id)),
           db.query.businessCountries.findMany({
             where: eq(businessCountries.businessId, business.id),
             columns: {
@@ -815,7 +816,7 @@ export abstract class AdminSMEService {
           }),
         ]);
 
-        userGroupIds = groupRows.map((g) => g.groupId);
+        userGroupNames = groupRows.map((g) => g.name);
         countriesOfOperation = countryRows.map((c) => c.country);
         videoLinks = videoRows.map((v) => ({
           url: v.videoUrl,
@@ -858,7 +859,7 @@ export abstract class AdminSMEService {
               noOfEmployees: business.noOfEmployees ?? null,
               website: business.website ?? null,
               selectionCriteria: (business.selectionCriteria as string[]) ?? null,
-              userGroupIds,
+              userGroupNames,
               // Financial details
               averageMonthlyTurnover: business.avgMonthlyTurnover
                 ? Number(business.avgMonthlyTurnover)

@@ -375,7 +375,7 @@ export namespace AdminSMEModel {
       noOfEmployees: number | null;
       website: string | null;
       selectionCriteria: string[] | null;
-      userGroupIds: string[]; // A business can belong to multiple programs/user groups
+      userGroupNames: string[]; // A business can belong to multiple programs/user groups
       // Financial details (full)
       averageMonthlyTurnover: number | null;
       averageYearlyTurnover: number | null;
@@ -844,7 +844,7 @@ export namespace AdminSMEModel {
             type: ["array", "null"],
             items: { type: "string" },
           },
-          userGroupIds: {
+          userGroupNames: {
             type: "array",
             items: { type: "string" },
           },
