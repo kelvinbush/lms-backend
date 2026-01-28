@@ -299,11 +299,6 @@ export abstract class AdminSMEService {
       // Build where conditions (reuse logic from listSMEUsers)
       const conditions: any[] = [isNull(users.deletedAt)];
 
-      // Exclude internal/admin users (super-admin, admin, member)
-      conditions.push(
-        or(isNull(users.role), notInArray(users.role, ["super-admin", "admin", "member"]))
-      );
-
       if (query.onboardingStatus) {
         conditions.push(eq(users.onboardingStatus, query.onboardingStatus as any));
       }
@@ -386,7 +381,10 @@ export abstract class AdminSMEService {
 
       const TOTAL_STEPS = 7;
 
-      const items: AdminSMEModel.EntrepreneurListItem[] = userRows.map((user) => {
+      // Only include users that have at least one business profile
+      const usersWithBusiness = userRows.filter((user) => businessByUserId.has(user.id));
+
+      const items: AdminSMEModel.EntrepreneurListItem[] = usersWithBusiness.map((user) => {
         const progress = progressMap.get(user.id);
         const business = businessByUserId.get(user.id);
         const completedSteps = (progress?.completedSteps as number[]) ?? [];
@@ -639,7 +637,6 @@ export abstract class AdminSMEService {
 
       const isEntrepreneurCondition = and(
         isNull(users.deletedAt),
-        or(isNull(users.role), notInArray(users.role, ["super-admin", "admin", "member"]))
       );
 
       const buildWhereForPeriod = (start: Date, end: Date) =>
@@ -707,17 +704,19 @@ export abstract class AdminSMEService {
     smesWithLoans: number;
   }> {
     // Total, complete, pendingActivation in one aggregate query
+    // Only count users that have at least one associated business profile
     const [row] = await db
       .select({
-        total: sql<number>`count(*)`,
-        completeProfiles: sql<number>`count(*) filter (
+        total: sql<number>`count(distinct "users"."id")`,
+        completeProfiles: sql<number>`count(distinct "users"."id") filter (
           where jsonb_array_length("sme_onboarding_progress"."completed_steps") = 7
         )`,
-        pendingActivation: sql<number>`count(*) filter (
+        pendingActivation: sql<number>`count(distinct "users"."id") filter (
           where "users"."onboarding_status" = 'pending_invitation'
         )`,
       })
       .from(users)
+      .innerJoin(businessProfiles, eq(businessProfiles.userId, users.id))
       .leftJoin(smeOnboardingProgress, eq(smeOnboardingProgress.userId, users.id))
       .where(whereClause);
 
