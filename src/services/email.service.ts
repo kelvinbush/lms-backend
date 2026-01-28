@@ -13,6 +13,7 @@ import LoanRejectionEmail from "../templates/email/loan-rejection";
 import DocumentGenerationNotificationEmail from "../templates/email/document-generation-notification";
 import TermSheetApprovalNotificationEmail from "../templates/email/term-sheet-approval-notification";
 import { LoanDisbursementEmail } from "../templates/email/loan-disbursement";
+import AdminSMEGenericEmail from "../templates/email/admin-sme-generic-email";
 import { logger } from "../utils/logger";
 
 config({
@@ -97,6 +98,13 @@ export interface LoanDisbursementEmailData {
   loginUrl?: string;
   supportEmail?: string;
   supportPhone?: string;
+}
+
+export interface AdminSMEEmailData {
+  to: string;
+  firstName?: string | null;
+  subject: string;
+  bodyHtml: string;
 }
 
 export class EmailService {
@@ -571,6 +579,40 @@ export class EmailService {
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       logger.error("Error sending loan disbursement email:", error);
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
+  async sendAdminSMEEmail(
+    params: AdminSMEEmailData
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const html = await render(
+        AdminSMEGenericEmail({
+          subject: params.subject,
+          bodyHtml: params.bodyHtml,
+          firstName: params.firstName || undefined,
+        })
+      );
+
+      const result = await this.resend.emails.send({
+        from: process.env.FROM_EMAIL || "Melanin Kapital <nore@melaninkapital.com>",
+        to: [params.to],
+        subject: params.subject,
+        html,
+      });
+
+      if (result.error) {
+        logger.error("Failed to send Admin SME email:", result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      logger.info(`Admin SME email sent to ${params.to}`, {
+        messageId: result.data?.id,
+      });
+      return { success: true, messageId: result.data?.id };
+    } catch (error) {
+      logger.error("Error sending Admin SME email:", error);
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }

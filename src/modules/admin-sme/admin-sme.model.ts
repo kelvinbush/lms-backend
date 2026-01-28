@@ -402,6 +402,34 @@ export namespace AdminSMEModel {
   }
 
   // ============================================
+  // Admin → SME Direct Email
+  // ============================================
+  export interface SendSMEEmailBody {
+    subject: string;
+    /**
+     * HTML body produced by a WYSIWYG editor.
+     * This will be injected into the standard BaseTemplate layout.
+     */
+    bodyHtml: string;
+  }
+
+  export interface SendSMEEmailResponse {
+    success: boolean;
+    messageId?: string;
+    error?: string;
+  }
+
+  export const SendSMEEmailBodySchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      subject: { type: "string", minLength: 1, maxLength: 200 },
+      bodyHtml: { type: "string", minLength: 1 },
+    },
+    required: ["subject", "bodyHtml"],
+  } as const;
+
+  // ============================================
   // Financial Details Types
   // ============================================
   export interface SaveFinancialDetailsBody {

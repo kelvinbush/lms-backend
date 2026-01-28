@@ -13,6 +13,7 @@ import {
   userGroups,
   users,
 } from "../../db/schema";
+import { emailService } from "../../services/email.service";
 import { logger } from "../../utils/logger";
 import { AdminSMEInvitationService } from "./admin-sme.invitation.service";
 import type { AdminSMEModel } from "./admin-sme.model";
@@ -890,6 +891,56 @@ export abstract class AdminSMEService {
       });
       if (error?.status) throw error;
       throw httpError(500, "[GET_USER_DETAIL_ERROR] Failed to get SME user detail");
+    }
+  }
+
+  /**
+   * Send a direct email from an admin to an SME user using the standard email layout.
+   */
+  static async sendEmailToSMEUser(
+    userId: string,
+    body: AdminSMEModel.SendSMEEmailBody
+  ): Promise<AdminSMEModel.SendSMEEmailResponse> {
+    try {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      if (!user) {
+        throw httpError(404, "[USER_NOT_FOUND] User not found");
+      }
+
+      if (!user.email) {
+        throw httpError(400, "[USER_EMAIL_MISSING] SME user does not have an email address");
+      }
+
+      const { subject, bodyHtml } = body;
+
+      const result = await emailService.sendAdminSMEEmail({
+        to: user.email,
+        firstName: user.firstName,
+        subject,
+        bodyHtml,
+      });
+
+      if (!result.success) {
+        throw httpError(
+          500,
+          result.error || "[EMAIL_SEND_FAILED] Failed to send email to SME user"
+        );
+      }
+
+      return {
+        success: true,
+        messageId: result.messageId,
+      };
+    } catch (error: any) {
+      logger.error("[AdminSME] Error sending email to SME user", {
+        error: error?.message,
+        userId,
+      });
+      if (error?.status) throw error;
+      throw httpError(500, "[SEND_SME_EMAIL_ERROR] Failed to send email to SME user");
     }
   }
 

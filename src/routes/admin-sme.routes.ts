@@ -379,6 +379,70 @@ export async function adminSMERoutes(fastify: FastifyInstance) {
     }
   );
 
+  // POST /admin/sme/users/:userId/email - Send direct email to SME user
+  fastify.post(
+    "/admin/sme/users/:userId/email",
+    {
+      schema: {
+        params: AdminSMEModel.UserIdParamsSchema,
+        body: AdminSMEModel.SendSMEEmailBodySchema,
+        response: {
+          200: AdminSMEModel.BasicSuccessResponseSchema,
+          400: AdminSMEModel.ErrorResponseSchema,
+          401: AdminSMEModel.ErrorResponseSchema,
+          403: AdminSMEModel.ErrorResponseSchema,
+          404: AdminSMEModel.ErrorResponseSchema,
+          500: AdminSMEModel.ErrorResponseSchema,
+        },
+        tags: ["admin-sme"],
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { userId: string };
+        Body: AdminSMEModel.SendSMEEmailBody;
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        await requireRole(request, "member");
+
+        const result = await AdminSMEService.sendEmailToSMEUser(
+          request.params.userId,
+          request.body
+        );
+
+        // Log audit action (non-blocking)
+        const details = {
+          subject: request.body.subject,
+          hasBody: !!request.body.bodyHtml,
+        };
+
+        logAdminAction(
+          request,
+          request.params.userId,
+          "user_details_updated",
+          `Sent direct email to SME user (${request.body.subject})`,
+          details
+        ).catch((err) => logger.error("[AdminSME] Audit log error", { error: err }));
+
+        return reply.send({
+          success: result.success,
+          message: result.success ? "Email sent successfully" : result.error,
+        });
+      } catch (error: any) {
+        const status = error?.status || 500;
+        logger.error("[AdminSME Routes] Error sending email to SME user", {
+          error: error?.message,
+        });
+        return reply.code(status).send({
+          error: error?.message || "Internal error",
+          code: error?.code || "INTERNAL_ERROR",
+        });
+      }
+    }
+  );
+
   // POST /admin/sme/onboarding/start - Create user (Step 1)
   fastify.post(
     "/admin/sme/onboarding/start",
