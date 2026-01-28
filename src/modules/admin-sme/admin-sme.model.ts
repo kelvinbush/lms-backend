@@ -10,10 +10,10 @@ export namespace AdminSMEModel {
     email: string;
     firstName: string;
     lastName: string;
-    phone: string;
-    dob: string | Date;
+    phone?: string;
+    dob?: string | Date;
     gender: string;
-    position: string;
+    position?: string;
   }
 
   export const Step1UserInfoBodySchema = {
@@ -23,12 +23,20 @@ export namespace AdminSMEModel {
       email: { type: "string", format: "email" },
       firstName: { type: "string", minLength: 1, maxLength: 100 },
       lastName: { type: "string", minLength: 1, maxLength: 100 },
-      phone: { type: "string", minLength: 1, maxLength: 32 },
-      dob: { type: "string", format: "date" },
+      // Optional: allow empty or any non-empty string for phone
+      phone: { type: "string", maxLength: 32 },
+      // Optional: allow either a valid date string or an empty string
+      dob: {
+        anyOf: [
+          { type: "string", format: "date" },
+          { type: "string", maxLength: 0 },
+        ],
+      },
       gender: { type: "string", minLength: 1, maxLength: 20 },
-      position: { type: "string", minLength: 1, maxLength: 50 },
+      // Optional: allow empty or any non-empty string for position
+      position: { type: "string", maxLength: 50 },
     },
-    required: ["email", "firstName", "lastName", "phone", "dob", "gender", "position"],
+    required: ["email", "firstName", "lastName", "gender"],
   } as const;
 
   // ============================================

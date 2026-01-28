@@ -26,8 +26,13 @@ export abstract class AdminSMEStep1Service {
         throw httpError(400, "[EMAIL_EXISTS] User with this email already exists");
       }
 
-      // Ensure dob is a Date object
-      const dob = typeof payload.dob === "string" ? new Date(payload.dob) : payload.dob;
+      // Ensure dob is a Date object when provided and non-empty
+      const dob =
+        !payload.dob || (typeof payload.dob === "string" && payload.dob.trim() === "")
+          ? undefined
+          : typeof payload.dob === "string"
+            ? new Date(payload.dob)
+            : payload.dob;
 
       // Create user in a transaction with onboarding progress
       const { createdUser, createdProgress } = await db.transaction(async (tx) => {
@@ -130,8 +135,13 @@ export abstract class AdminSMEStep1Service {
         }
       }
 
-      // Ensure dob is a Date object
-      const dob = typeof payload.dob === "string" ? new Date(payload.dob) : payload.dob;
+      // Ensure dob is a Date object when provided and non-empty
+      const dob =
+        !payload.dob || (typeof payload.dob === "string" && payload.dob.trim() === "")
+          ? undefined
+          : typeof payload.dob === "string"
+            ? new Date(payload.dob)
+            : payload.dob;
 
       // Update user in transaction
       const { updatedUser, progress } = await db.transaction(async (tx) => {
